@@ -1,5 +1,9 @@
 name: Release
 
+# Tag push → verify → signed AAB to Play "internal" track + GitHub pre-release.
+# Promotion to closed/open testing and production is done by promote.yml.
+# Full flow: docs/RELEASING.md
+
 on:
   push:
     tags: ["v*.*.*"]
@@ -7,9 +11,13 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
-    name: Build & publish signed release
+    name: Build & publish to internal testing
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -17,12 +25,23 @@ jobs:
       TANDEMMOTO_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
       TANDEMMOTO_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
       TANDEMMOTO_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      PLAY_SERVICE_ACCOUNT_JSON_PATH: ${{ github.workspace }}/play-service-account.json
       VERSION_CODE: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history for release notes
 
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
+
+      - name: Require tag on main
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Tag $GITHUB_REF_NAME points to a commit that is not on main. Releases are cut from main only."
+            exit 1
+          fi
 
       - name: Derive version from tag
         run: echo "VERSION_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
@@ -32,10 +51,23 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error::KEYSTORE_BASE64 secret is not set. See CONTRIBUTING.md > Releasing."
+            echo "::error::KEYSTORE_BASE64 secret is not set. See docs/RELEASING.md."
             exit 1
           fi
           echo "$KEYSTORE_BASE64" | base64 --decode > "$TANDEMMOTO_KEYSTORE_PATH"
+
+      - name: Decode Play service account
+        id: play
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::warning::PLAY_SERVICE_ACCOUNT_JSON not set — skipping Google Play upload (GitHub release only)."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$PLAY_SERVICE_ACCOUNT_JSON" > "$PLAY_SERVICE_ACCOUNT_JSON_PATH"
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/setup-java@v4
         with:
@@ -49,22 +81,45 @@ jobs:
       - name: Verify
         run: ./gradlew ktlintCheck lintRelease testReleaseUnitTest
 
-      - name: Build signed APK
-        run: ./gradlew assembleRelease
+      - name: Write release notes
+        run: |
+          prev=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          range=${prev:+$prev..}$GITHUB_REF_NAME
+          notes_dir=app/src/main/play/release-notes/en-US
+          mkdir -p "$notes_dir"
+          # Play limits notes to 500 chars per language.
+          git log --no-merges --pretty='• %s' "$range" | head -c 450 > "$notes_dir/default.txt"
+          echo "Release notes:"; cat "$notes_dir/default.txt"
 
-      - name: Rename APK and checksum
+      - name: Build signed APK and AAB
+        run: ./gradlew assembleRelease bundleRelease
+
+      - name: Upload to Google Play (internal testing)
+        if: steps.play.outputs.enabled == 'true'
+        # Use repo variable PLAY_RELEASE_STATUS=draft until the app's first Play review is done.
+        run: >
+          ./gradlew publishReleaseBundle
+          --artifact-dir app/build/outputs/bundle/release
+          --track internal
+          --release-status ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
+          --release-name "$VERSION_NAME ($VERSION_CODE)"
+
+      - name: Collect release files
         run: |
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk "dist/TandemMoto-${VERSION_NAME}.apk"
-          cd dist && sha256sum *.apk > SHA256SUMS.txt
+          cd dist && sha256sum * > SHA256SUMS.txt
 
-      - name: Create GitHub release
+      # Every build starts as a pre-release; promote.yml marks it "latest" on 100% production rollout.
+      - name: Create GitHub pre-release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
           generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: true
+          body: |
+            **Version code:** ${{ env.VERSION_CODE }} · **Play track:** ${{ steps.play.outputs.enabled == 'true' && 'internal' || 'not uploaded' }}
 
-      - name: Remove keystore
+      - name: Remove credentials
         if: always()
-        run: rm -f "$TANDEMMOTO_KEYSTORE_PATH"
+        run: rm -f "$TANDEMMOTO_KEYSTORE_PATH" "$PLAY_SERVICE_ACCOUNT_JSON_PATH"

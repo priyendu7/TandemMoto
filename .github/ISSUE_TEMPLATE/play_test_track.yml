@@ -1,0 +1,47 @@
+name: Request a Play test track
+description: Ask for a closed testing track in the TandemMoto QA app for field testing with your own testers.
+title: "[Play track] tester-"
+labels: ["play-test-track"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Closed tracks let **your** group of testers get PR builds of TandemMoto QA through the Play Store.
+        They're granted at the maintainer's discretion, usually to contributors who've had a PR or two reviewed.
+        For one-off testing, just ask for an internal sharing link on your PR instead — see [docs/TESTING_ON_PLAY.md](../blob/main/docs/TESTING_ON_PLAY.md).
+  - type: input
+    id: github
+    attributes:
+      label: GitHub username
+      description: Your track will be named tester-<this username>.
+    validations:
+      required: true
+  - type: input
+    id: group
+    attributes:
+      label: Google Group email
+      description: Google Play grants closed-track access by Google Group. Create one at groups.google.com and add your testers.
+      placeholder: tandemmoto-testers-yourname@googlegroups.com
+    validations:
+      required: true
+  - type: dropdown
+    id: size
+    attributes:
+      label: Roughly how many testers?
+      options: ["1–5", "6–20", "21–100", "More than 100"]
+    validations:
+      required: true
+  - type: textarea
+    id: purpose
+    attributes:
+      label: What will you test?
+      description: e.g. Wi-Fi Direct reconnects on specific phones, HID remote models, intercom quality at highway speed.
+    validations:
+      required: true
+  - type: checkboxes
+    id: ack
+    attributes:
+      label: Acknowledgements
+      options:
+        - label: My testers understand these are pre-release builds and will report bugs with device model + Android version.
+          required: true

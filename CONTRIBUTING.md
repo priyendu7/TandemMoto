@@ -33,6 +33,7 @@ Phases 1–2 are prerequisites for almost everything else, so PRs against those 
 
 ## Branching & commits
 
+- `main` is **production-ready only** — there's no develop branch. Work happens on feature branches (or forks) and reaches `main` through reviewed PRs.
 - Branch from `main`: `phase-N/short-description` (e.g. `phase-1/wifi-direct-discovery`).
 - Keep commits scoped and use a short imperative subject line (`Add auto-reconnect backoff to ConnectionManager`), with body context for anything non-obvious.
 - Reference the issue number in the PR description (`Closes #12`).
@@ -55,25 +56,17 @@ Phases 1–2 are prerequisites for almost everything else, so PRs against those 
 - Describe what you tested and on what hardware.
 - Update `docs/` if your change affects architecture, scope, or the risk table.
 
+## Testing your PR on real phones via Google Play
+
+You don't need to wait for a merge to put your change in testers' hands. A maintainer can publish your PR to the separate **TandemMoto QA** app on Google Play — as an install link, or to your own closed testing track for field testing. See [`docs/TESTING_ON_PLAY.md`](docs/TESTING_ON_PLAY.md).
+
 ## Continuous integration
 
 Every PR and push to `main` runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml): Gradle wrapper validation, ktlint, Android lint, unit tests, and a debug build. The debug APK is attached to the run as an artifact for quick on-device testing.
 
 ## Releasing (maintainers)
 
-Releases are cut by pushing a semver tag; [`.github/workflows/release.yml`](.github/workflows/release.yml) verifies, builds a signed APK, and publishes a GitHub Release with auto-generated notes.
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-- `versionName` comes from the tag (`v0.1.0` → `0.1.0`); `versionCode` is the workflow run number.
-- Tags with a suffix (e.g. `v0.2.0-beta.1`) are published as pre-releases.
-- Required repository secrets (Settings → Secrets and variables → Actions):
-  - `KEYSTORE_BASE64` — `base64 -i release.jks | pbcopy` (macOS) / `base64 -w0 release.jks` (Linux)
-  - `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`
-- Never commit the keystore; `*.jks`/`*.keystore` are git-ignored. Back it up — losing it means users can't upgrade in place.
+Releases are cut by pushing a `vX.Y.Z` tag, which uploads a signed build to Google Play internal testing; the same build is then promoted through closed/open testing to a staged production rollout via the **Promote** workflow. See [`docs/RELEASING.md`](docs/RELEASING.md) for the full flow and one-time Play/GitHub setup.
 
 ## Reporting bugs / requesting features
 

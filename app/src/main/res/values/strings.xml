@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">TandemMoto</string>
+    <!-- app_name is defined per build type in app/build.gradle.kts (resValue). -->
 </resources>

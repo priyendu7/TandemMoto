@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jlleitschuh.gradle.ktlint")
+    id("com.github.triplet.play")
 }
 
 // Release signing is injected by CI (see .github/workflows/release.yml); local builds stay debug-only.
@@ -15,12 +16,15 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.tandemmoto"
+        // Overridable so contributors can publish a fork to their own Play account.
+        applicationId = providers.gradleProperty("tandemmoto.applicationId")
+            .getOrElse("com.tandemmoto")
         minSdk = 26
         targetSdk = 35
         // CI derives these from the git tag (vX.Y.Z) and run number on release.
         versionCode = System.getenv("VERSION_CODE")?.toInt() ?: 1
         versionName = System.getenv("VERSION_NAME") ?: "0.1.0-dev"
+        resValue("string", "app_name", "TandemMoto")
     }
 
     signingConfigs {
@@ -38,6 +42,15 @@ android {
         release {
             isMinifyEnabled = false
             signingConfig = signingConfigs.findByName("release")
+        }
+        // PR test builds for the separate "TandemMoto QA" Play app (docs/TESTING_ON_PLAY.md).
+        // Left unsigned: .github/workflows/play-test.yml signs it with the QA upload key.
+        create("qa") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".qa"
+            signingConfig = null
+            matchingFallbacks += "release"
+            resValue("string", "app_name", "TandemMoto QA")
         }
     }
 
@@ -58,6 +71,16 @@ android {
         warningsAsErrors = false
         abortOnError = true
     }
+}
+
+// Google Play publishing (Gradle Play Publisher). CI supplies the service-account key;
+// see docs/RELEASING.md (production app) and docs/TESTING_ON_PLAY.md (QA app).
+play {
+    serviceAccountCredentials.set(
+        file(System.getenv("PLAY_SERVICE_ACCOUNT_JSON_PATH") ?: "play-service-account.json")
+    )
+    defaultToAppBundles.set(true)
+    track.set("internal")
 }
 
 dependencies {
