@@ -13,14 +13,14 @@ android {
     namespace = "com.tandemmoto"
     // TODO(Phase 0): finalize compileSdk/minSdk against a modern Android baseline,
     // accounting for background execution / foreground service restrictions (PRD §4 Platform).
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         // Overridable so contributors can publish a fork to their own Play account.
         applicationId = providers.gradleProperty("tandemmoto.applicationId")
             .getOrElse("com.tandemmoto")
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         // CI derives these from the git tag (vX.Y.Z) and run number on release.
         versionCode = System.getenv("VERSION_CODE")?.toInt() ?: 1
         versionName = System.getenv("VERSION_NAME") ?: "0.1.0-dev"
