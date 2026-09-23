@@ -17,6 +17,14 @@ Closes #
 
 **Devices/peripherals used (if applicable):**
 
+## Play testing
+
+Want testers to try this PR from the Play Store before merge? See [`docs/TESTING_ON_PLAY.md`](https://github.com/priyendu7/TandemMoto/blob/main/docs/TESTING_ON_PLAY.md).
+
+- [ ] Not needed
+- [ ] Internal app sharing link
+- [ ] Upload to my closed track: `tester-<your-github-username>`
+
 ## Exit criteria
 
 If this closes out a development-plan phase or sub-task, note how it meets that phase's exit criteria (`docs/DEVELOPMENT_PLAN.md` §3).

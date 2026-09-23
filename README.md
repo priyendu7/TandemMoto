@@ -79,7 +79,7 @@ Run the same checks CI runs on every PR:
 ./gradlew ktlintCheck lintDebug testDebugUnitTest assembleDebug
 ```
 
-`./gradlew ktlintFormat` auto-fixes most style issues. Signed release APKs are published on the [Releases](https://github.com/priyendu7/TandemMoto/releases) page.
+`./gradlew ktlintFormat` auto-fixes most style issues. Builds are distributed through Google Play testing tracks (internal → closed → open → production); signed APKs are also attached to each [GitHub release](https://github.com/priyendu7/TandemMoto/releases). See [`docs/RELEASING.md`](docs/RELEASING.md). Pull requests can be tested from the Play Store before merge via the separate TandemMoto QA app — see [`docs/TESTING_ON_PLAY.md`](docs/TESTING_ON_PLAY.md).
 
 Requires two physical Android devices for any real link/voice testing — Wi-Fi Direct and BT HID/A2DP/HFP behavior can't be meaningfully validated on an emulator.
 

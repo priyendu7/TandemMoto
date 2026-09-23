@@ -1,0 +1,109 @@
+name: Promote
+
+# Manually promote the latest Play release between tracks, or adjust a staged
+# production rollout. Runs in the "play-production" environment so it needs
+# maintainer approval. Full flow: docs/RELEASING.md
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do
+        type: choice
+        required: true
+        options:
+          - internal → alpha (closed testing)
+          - alpha → beta (open testing)
+          - alpha → production (staged)
+          - beta → production (staged)
+          - update production rollout
+          - halt production rollout
+      user_fraction:
+        description: Production rollout fraction (0.01–1.0). 1.0 completes the rollout.
+        type: string
+        default: "0.1"
+      tag:
+        description: Git tag of this build (e.g. v0.2.0) — marked as the latest GitHub release when production reaches 100%
+        type: string
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: play-promote
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: ${{ inputs.action }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: play-production
+    env:
+      PLAY_SERVICE_ACCOUNT_JSON_PATH: ${{ github.workspace }}/play-service-account.json
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Decode Play service account
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::error::PLAY_SERVICE_ACCOUNT_JSON secret is not set. See docs/RELEASING.md."
+            exit 1
+          fi
+          echo "$PLAY_SERVICE_ACCOUNT_JSON" > "$PLAY_SERVICE_ACCOUNT_JSON_PATH"
+
+      - name: Resolve Play arguments
+        id: args
+        env:
+          ACTION: ${{ inputs.action }}
+          FRACTION: ${{ inputs.user_fraction }}
+        run: |
+          if ! awk -v f="$FRACTION" 'BEGIN { exit !(f > 0 && f <= 1) }'; then
+            echo "::error::user_fraction must be > 0 and <= 1 (got '$FRACTION')"
+            exit 1
+          fi
+          if awk -v f="$FRACTION" 'BEGIN { exit !(f == 1) }'; then
+            rollout="--release-status completed"
+            complete=true
+          else
+            rollout="--release-status inProgress --user-fraction $FRACTION"
+            complete=false
+          fi
+          case "$ACTION" in
+            "internal → alpha (closed testing)") a="--from-track internal --promote-track alpha --release-status completed"; complete=false ;;
+            "alpha → beta (open testing)")       a="--from-track alpha --promote-track beta --release-status completed"; complete=false ;;
+            "alpha → production (staged)")       a="--from-track alpha --promote-track production $rollout" ;;
+            "beta → production (staged)")        a="--from-track beta --promote-track production $rollout" ;;
+            "update production rollout")         a="--update production $rollout" ;;
+            "halt production rollout")           a="--update production --release-status halted"; complete=false ;;
+            *) echo "::error::Unknown action: $ACTION"; exit 1 ;;
+          esac
+          echo "gradle_args=$a" >> "$GITHUB_OUTPUT"
+          echo "complete=$complete" >> "$GITHUB_OUTPUT"
+          echo "Play arguments: $a"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+
+      - name: Promote on Google Play
+        run: ./gradlew promoteReleaseArtifact ${{ steps.args.outputs.gradle_args }}
+
+      - name: Mark GitHub release as latest
+        if: steps.args.outputs.complete == 'true' && inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: gh release edit "$TAG" --prerelease=false --latest
+
+      - name: Remove credentials
+        if: always()
+        run: rm -f "$PLAY_SERVICE_ACCOUNT_JSON_PATH"

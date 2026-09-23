@@ -1,0 +1,269 @@
+name: Play test
+
+# Maintainer-triggered Play Store test builds for pull requests, published to the
+# separate "TandemMoto QA" app (com.tandemmoto.qa) — never the production app.
+#
+#   /play-test <commit-sha>                 → Internal app sharing link
+#   /play-test <commit-sha> tester-<name>   → closed testing track in the QA app
+#
+# Security model (docs/TESTING_ON_PLAY.md):
+#   - issue_comment always runs this file from the default branch, so PRs can't change these steps.
+#   - gate:    only admin/maintain/write users; the SHA must belong to the PR.
+#   - build:   runs the PR's code with no secrets, read-only token, and no Gradle cache.
+#   - publish: never runs PR code; validates the AAB, signs it with the QA key, uploads it.
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+concurrency:
+  group: play-test-pr-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: Check command
+    if: github.event.issue.pull_request && startsWith(github.event.comment.body, '/play-test')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+      target: ${{ steps.parse.outputs.target }}
+      version_code: ${{ steps.version.outputs.code }}
+      version_name: ${{ steps.version.outputs.name }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.issue.number }}
+      ACTOR: ${{ github.event.comment.user.login }}
+      COMMENT_ID: ${{ github.event.comment.id }}
+      # Passed via env, never interpolated into scripts (prevents script injection).
+      COMMENT_BODY: ${{ github.event.comment.body }}
+      DOCS_URL: ${{ github.server_url }}/${{ github.repository }}/blob/main/docs/TESTING_ON_PLAY.md
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      - name: Check commenter permission
+        run: |
+          perm=$(gh api "repos/$REPO/collaborators/$ACTOR/permission" --jq .permission 2>/dev/null || echo none)
+          case "$perm" in
+            admin|maintain|write) echo "@$ACTOR has $perm permission" ;;
+            *) echo "Only maintainers can run /play-test (@$ACTOR has '$perm')." > "$RUNNER_TEMP/reason"; exit 1 ;;
+          esac
+
+      - name: Parse command
+        id: parse
+        run: |
+          if ! .github/scripts/parse-play-test-command.sh "$COMMENT_BODY" >> "$GITHUB_OUTPUT" 2> "$RUNNER_TEMP/reason"; then
+            exit 1
+          fi
+
+      - name: Resolve commit in this PR
+        id: resolve
+        env:
+          SHA_PREFIX: ${{ steps.parse.outputs.sha }}
+        run: |
+          state=$(gh api "repos/$REPO/pulls/$PR" --jq .state)
+          if [ "$state" != "open" ]; then
+            echo "PR #$PR is $state." > "$RUNNER_TEMP/reason"; exit 1
+          fi
+          matches=$(gh api --paginate "repos/$REPO/pulls/$PR/commits" --jq '.[].sha' | grep "^$SHA_PREFIX" || true)
+          count=$(printf '%s' "$matches" | grep -c . || true)
+          if [ "$count" -ne 1 ]; then
+            echo "Commit \`$SHA_PREFIX\` matches $count commits in this PR — use a longer SHA from this PR." > "$RUNNER_TEMP/reason"; exit 1
+          fi
+          echo "sha=$matches" >> "$GITHUB_OUTPUT"
+          head=$(gh api "repos/$REPO/pulls/$PR" --jq .head.sha)
+          if [ "$head" != "$matches" ]; then
+            echo "::warning::$matches is not the PR head ($head); building the requested commit."
+          fi
+
+      - name: Compute version
+        id: version
+        env:
+          SHA: ${{ steps.resolve.outputs.sha }}
+        run: |
+          # Seconds since 2026-01-01T00:00:00Z: unique per upload and always increasing.
+          echo "code=$(( $(date -u +%s) - 1767225600 ))" >> "$GITHUB_OUTPUT"
+          echo "name=pr${PR}-${SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Acknowledge
+        run: gh api "repos/$REPO/issues/comments/$COMMENT_ID/reactions" -f content=eyes --silent
+
+      - name: Report rejection
+        if: failure()
+        run: |
+          reason=$(cat "$RUNNER_TEMP/reason" 2>/dev/null || echo "Unexpected error.")
+          gh pr comment "$PR" --repo "$REPO" --body "❌ \`/play-test\` rejected: $reason
+
+          Usage: \`/play-test <commit-sha> [tester-<name>]\` — see [docs/TESTING_ON_PLAY.md]($DOCS_URL)."
+
+  build:
+    name: Build QA bundle (untrusted, no secrets)
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+          persist-credentials: false
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          # PR code must not read from or write to the cache used by main/release builds.
+          cache-disabled: true
+
+      - name: Build unsigned QA bundle
+        env:
+          VERSION_CODE: ${{ needs.gate.outputs.version_code }}
+          VERSION_NAME: ${{ needs.gate.outputs.version_name }}
+        run: ./gradlew bundleQa --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qa-bundle
+          path: app/build/outputs/bundle/qa/app-qa.aab
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Validate, sign & upload
+    needs: [gate, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: play-qa
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.issue.number }}
+      SHA: ${{ needs.gate.outputs.sha }}
+      TARGET: ${{ needs.gate.outputs.target }}
+      VERSION_CODE: ${{ needs.gate.outputs.version_code }}
+      VERSION_NAME: ${{ needs.gate.outputs.version_name }}
+      QA_KEYSTORE_PATH: ${{ github.workspace }}/qa.jks
+      PLAY_SERVICE_ACCOUNT_JSON_PATH: ${{ github.workspace }}/play-service-account.json
+      DOCS_URL: ${{ github.server_url }}/${{ github.repository }}/blob/main/docs/TESTING_ON_PLAY.md
+    steps:
+      # Default branch only — Gradle/GPP config here is trusted.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: qa-bundle
+          path: dist
+
+      - name: Validate bundle
+        run: |
+          export AAPT2="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/aapt2"
+          .github/scripts/validate-qa-bundle.sh dist/app-qa.aab "$VERSION_CODE"
+
+      - name: Decode credentials
+        env:
+          QA_KEYSTORE_BASE64: ${{ secrets.QA_KEYSTORE_BASE64 }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$QA_KEYSTORE_BASE64" ] || [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::error::QA_KEYSTORE_BASE64 / PLAY_SERVICE_ACCOUNT_JSON not configured. See docs/TESTING_ON_PLAY.md."
+            exit 1
+          fi
+          echo "$QA_KEYSTORE_BASE64" | base64 --decode > "$QA_KEYSTORE_PATH"
+          echo "$PLAY_SERVICE_ACCOUNT_JSON" > "$PLAY_SERVICE_ACCOUNT_JSON_PATH"
+
+      - name: Sign with QA upload key
+        env:
+          QA_KEYSTORE_PASSWORD: ${{ secrets.QA_KEYSTORE_PASSWORD }}
+          QA_KEY_ALIAS: ${{ secrets.QA_KEY_ALIAS }}
+          QA_KEY_PASSWORD: ${{ secrets.QA_KEY_PASSWORD }}
+        run: |
+          jarsigner -sigalg SHA256withRSA -digestalg SHA-256 \
+            -keystore "$QA_KEYSTORE_PATH" -storepass:env QA_KEYSTORE_PASSWORD -keypass:env QA_KEY_PASSWORD \
+            dist/app-qa.aab "$QA_KEY_ALIAS"
+          jarsigner -verify dist/app-qa.aab
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+
+      - name: Upload to Internal app sharing
+        if: needs.gate.outputs.target == 'internal-sharing'
+        id: sharing
+        run: |
+          ./gradlew uploadQaPrivateBundle --artifact-dir dist
+          json=$(find app/build/outputs/internal-sharing/bundle -name '*.json' -print0 | xargs -0 ls -t | head -1)
+          url=$(jq -r .downloadUrl "$json")
+          case "$url" in https://*) ;; *) echo "::error::No download URL in $json"; exit 1 ;; esac
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to closed track
+        if: needs.gate.outputs.target != 'internal-sharing'
+        run: |
+          notes=app/src/main/play/release-notes/en-US/default.txt
+          mkdir -p "$(dirname "$notes")"
+          echo "Test build of pull request #$PR at ${SHA:0:7}. Not a production release." > "$notes"
+          ./gradlew publishQaBundle --artifact-dir dist \
+            --track "$TARGET" --release-status completed --release-name "$VERSION_NAME ($VERSION_CODE)"
+
+      - name: Comment result
+        env:
+          URL: ${{ steps.sharing.outputs.url }}
+        run: |
+          if [ "$TARGET" = "internal-sharing" ]; then
+            where="**Install link (Internal app sharing):** $URL"
+          else
+            where="**Uploaded to closed track \`$TARGET\`** in TandemMoto QA. Testers in that track get it from the Play Store after Google's review (usually hours)."
+          fi
+          gh pr comment "$PR" --repo "$REPO" --body "✅ **TandemMoto QA** test build \`$VERSION_NAME\` (versionCode $VERSION_CODE) from commit $SHA
+
+          $where
+
+          Installs alongside the production app. Tester setup: [docs/TESTING_ON_PLAY.md]($DOCS_URL)."
+
+      - name: Remove credentials
+        if: always()
+        run: rm -f "$QA_KEYSTORE_PATH" "$PLAY_SERVICE_ACCOUNT_JSON_PATH"
+
+  report-failure:
+    name: Report failure
+    needs: [gate, build, publish]
+    if: always() && needs.gate.result == 'success' && (needs.build.result == 'failure' || needs.publish.result == 'failure')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - run: |
+          stage=$([ "${{ needs.build.result }}" = "failure" ] && echo "building the PR" || echo "validating/uploading to Play")
+          gh pr comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body "❌ \`/play-test\` failed while $stage. Logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
