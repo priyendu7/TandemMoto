@@ -67,6 +67,10 @@ android {
         jvmTarget = "17"
     }
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     lint {
         warningsAsErrors = false
         abortOnError = true
@@ -84,11 +88,17 @@ play {
 }
 
 dependencies {
-    // Minimal Compose shell so the app builds and launches.
-    implementation(platform("androidx.compose:compose-bom:2024.09.00"))
+    val composeBom = platform("androidx.compose:compose-bom:2024.09.00")
+    implementation(composeBom)
     implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.activity:activity-compose:1.9.2")
+    implementation("androidx.navigation:navigation-compose:2.8.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.5")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.5")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 
     // TODO(Phase 0-2): add and pin —
     //   androidx.media3 (exoplayer + session), androidx.room,
@@ -96,4 +106,8 @@ dependencies {
     //   Opus + WebRTC AudioProcessing via native/AAR deps (see docs/DEVELOPMENT_PLAN.md §2).
 
     testImplementation("junit:junit:4.13.2")
+    // Compose UI tests run on the JVM via Robolectric, so CI's testDebugUnitTest covers them.
+    testImplementation(composeBom)
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("org.robolectric:robolectric:4.14.1")
 }
