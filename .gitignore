@@ -1,0 +1,26 @@
+# Gradle
+.gradle/
+build/
+app/build/
+*.hprof
+
+# Local config
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Keystores (never commit signing keys)
+*.jks
+*.keystore
+
+# Logs
+*.log
+
+# Exported crash/debug logs (offline-friendly logging per NFR — keep local, not committed)
+/debug-logs/
