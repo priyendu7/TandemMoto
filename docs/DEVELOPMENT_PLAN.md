@@ -94,7 +94,7 @@
 - Mic permission missing/revoked → blocking, clear error, no silent failure
 - Phone-call interruption (call hold):
   - Call Interrupt Handler detects ringing / off-hook / idle for cellular and VoIP calls, and ignores the app's own voice channel
-  - On a call starting on either phone: pause playback and tear down the voice channel on both phones, release the mic and SCO/HFP so the call gets the headset, block play/resume, and show "Rider/Pillion is on a call" on the peer
+  - On a call starting on either phone: pause playback and tear down the voice channel on both phones, release the mic and SCO/HFP so the call gets the headset, block play/resume, and show "Your partner is on a call" on the peer
   - On call end (hung up, declined, missed): clear call hold on both phones → Paused + mic mode; no music auto-resume
   - Edge cases: both phones on calls at once (clear only when both have ended), link down during the call (local pause, re-sync call-hold state on reconnect), call starts during a file transfer (transfer continues), phone-state permission denied (fall back to audio-focus detection and warn in setup)
   - **Exit criteria:** an incoming call on either phone pauses music and the intercom on both within ~1s, the call is clearly audible on wired earphones and on BT earbuds, and after the call both phones land in Paused + mic mode with no stuck mic or audio route

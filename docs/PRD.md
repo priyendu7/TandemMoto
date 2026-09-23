@@ -45,7 +45,7 @@ TandemMoto solves this in software only, using two Android phones that talk to e
 - On-device wind/engine noise suppression + automatic gain control, active only during mic mode
 - Phone-call interruption ("call hold"): when either phone has an incoming call (from the moment it starts ringing) or an active outgoing call — cellular or VoIP — music playback and the phone-to-phone voice channel pause on **both** phones
   - While call hold is active, mic mode stays off on both phones (even though music is paused), and play/resume is blocked on both phones so music can't restart under the call
-  - The phone not on the call shows a clear status (e.g. "Rider is on a call")
+  - The phone not on the call shows a clear status (e.g. "Your partner is on a call")
   - When the call ends (answered and hung up, declined, or missed), call hold clears on both phones and they return to the normal paused state — i.e. mic mode turns on per the push-to-talk-via-pause rule. Music does not auto-resume; either rider resumes it as usual
   - If both phones are on calls at the same time, call hold clears only once both calls have ended
 - Auto-reconnect of the phone-to-phone link after a drop
