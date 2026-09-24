@@ -25,10 +25,9 @@
         android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
-    <!-- Foreground service to keep link/mic alive with screen off (PRD §4 Battery) -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <!-- Foreground service permissions (FOREGROUND_SERVICE, _MICROPHONE, _CONNECTED_DEVICE) are
+         added with the service itself (see service/README.md): Play requires a declaration and a
+         demo video for each foreground service type, so they ship only once the feature works. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
@@ -47,12 +46,5 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <!-- Phase 4/5: keeps link + mic-mode + playback alive in background -->
-        <service
-            android:name=".service.TandemMotoForegroundService"
-            android:foregroundServiceType="microphone|connectedDevice"
-            android:exported="false" />
-
     </application>
 </manifest>
