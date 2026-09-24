@@ -10,7 +10,8 @@ import androidx.compose.ui.platform.LocalContext
 
 /**
  * Material You dynamic colour on Android 12+, with a fixed fallback palette below that.
- * Follows the system light/dark setting.
+ * Follows the system light/dark setting, and uses the system font at Material's default sizes,
+ * so text follows the user's font and font-size settings.
  */
 @Composable
 fun TandemMotoTheme(
@@ -26,5 +27,5 @@ fun TandemMotoTheme(
         darkTheme -> FallbackDarkColors
         else -> FallbackLightColors
     }
-    MaterialTheme(colorScheme = colorScheme, typography = AppTypography, content = content)
+    MaterialTheme(colorScheme = colorScheme, content = content)
 }

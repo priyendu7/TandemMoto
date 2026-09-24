@@ -62,7 +62,7 @@ Pass thresholds come from the [PRD](PRD.md) §4 and the phase exit criteria in t
 
 | ID | Test | From phase | Steps | Pass |
 |---|---|---|---|---|
-| T0 | Permission onboarding | 0 | Fresh install → Get started → Allow; deny twice → Open settings; on Android ≤ 12 pick "Approximate" | Continue only after Nearby (or precise location) is granted; Open settings appears; Precise hint shows |
+| T0 | Launch + permission prompts | 0 | Fresh install → splash → Home; in the connection bar tap Allow; deny twice → Open settings; on Android ≤ 12 pick "Approximate" | Splash closes by itself and Home opens; the connection bar shows the prompt until Nearby (or precise location) is granted, then "Not paired · Tap to pair"; Open settings appears after two denials; Precise hint shows; the rest of Home works throughout |
 | T1 | Discovery | 1 | Both phones open Pair | Each phone sees the other within ~10 s |
 | T2 | Pair + remembered partner | 1 | Tap partner, accept on the other phone; restart both apps | Group forms with the initiator as group owner; after restart, reconnects to that partner only |
 | T3 | Airplane-mode drop | 1 | Airplane mode on one phone for 10 s, then off | Link restores with no taps on either phone (**Phase 1 exit criterion**) |
