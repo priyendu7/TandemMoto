@@ -32,7 +32,7 @@ Use IDs from docs/TEST_MATRIX.md where the device is listed (e.g. P1, R1, E1).
 - Wired earphones used (rider side)?
 
 **Logs / crash trace**
-Paste relevant logcat output or attach exported local logs.
+Attach the file from Settings → Export diagnostic logs (or paste relevant logcat output).
 
 **Additional context**
 Anything else — e.g. did this happen mid-ride, on first pairing, after a link drop, etc.

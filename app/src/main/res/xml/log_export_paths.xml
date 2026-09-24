@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only the export file built by LogExporter is shareable; raw logs in files/logs/ are not. -->
+<paths>
+    <cache-path name="exports" path="exports/" />
+</paths>

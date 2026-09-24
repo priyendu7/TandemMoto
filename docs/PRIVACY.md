@@ -1,6 +1,6 @@
 # Privacy Policy — TandemMoto
 
-_Last updated: September 23, 2026_
+_Last updated: September 24, 2026_
 
 TandemMoto is free, open-source software. It has no ads and is built to respect your privacy.
 
@@ -16,9 +16,16 @@ TandemMoto is free, open-source software. It has no ads and is built to respect 
 TandemMoto stores, in its private app storage on your phone:
 
 - songs you choose to share, cached so they play without interruption,
-- your shared playlist and basic settings.
+- your shared playlist and basic settings,
+- diagnostic logs (see below).
 
 Uninstalling the app deletes all of it.
+
+## Diagnostic logs
+
+To help fix problems, TandemMoto keeps a small technical log in its private storage: app events (for example "link connected" or "reconnecting"), errors, and crash details, together with the app version, Android version and phone model. It's capped at 2 MB, older entries are overwritten, and it never contains your music, song names, voice, contacts, phone numbers or location.
+
+The log **never leaves your phone on its own.** It's shared only if you choose **Settings → Export diagnostic logs** and pick where to send it, for example an email to the developer. Whoever you send it to can read it.
 
 ## Permissions
 
