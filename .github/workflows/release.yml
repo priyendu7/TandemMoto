@@ -81,7 +81,9 @@ jobs:
           cache-read-only: true
 
       - name: Verify
-        run: ./gradlew ktlintCheck lintRelease testReleaseUnitTest
+        # Unit tests run on the debug variant: Compose UI tests need ui-test-manifest,
+        # which is debug-only. The tests themselves are variant-independent.
+        run: ./gradlew ktlintCheck lintRelease testDebugUnitTest
 
       - name: Write release notes
         run: |
