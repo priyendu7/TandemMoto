@@ -47,7 +47,7 @@ jobs:
       COMMENT_BODY: ${{ github.event.comment.body }}
       DOCS_URL: ${{ github.server_url }}/${{ github.repository }}/blob/main/docs/TESTING_ON_PLAY.md
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: .github/scripts
           persist-credentials: false
@@ -115,7 +115,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.gate.outputs.sha }}
           persist-credentials: false
@@ -169,7 +169,7 @@ jobs:
       DOCS_URL: ${{ github.server_url }}/${{ github.repository }}/blob/main/docs/TESTING_ON_PLAY.md
     steps:
       # Default branch only — Gradle/GPP config here is trusted.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
