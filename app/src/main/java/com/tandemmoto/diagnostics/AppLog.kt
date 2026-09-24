@@ -68,9 +68,8 @@ object AppLog {
     private const val TAG = "AppLog"
 }
 
-internal class CrashLogger(
-    private val previous: Thread.UncaughtExceptionHandler?
-) : Thread.UncaughtExceptionHandler {
+internal class CrashLogger(private val previous: Thread.UncaughtExceptionHandler?) :
+    Thread.UncaughtExceptionHandler {
     override fun uncaughtException(thread: Thread, error: Throwable) {
         try {
             AppLog.e("Crash", "Uncaught exception on thread ${thread.name}", error)

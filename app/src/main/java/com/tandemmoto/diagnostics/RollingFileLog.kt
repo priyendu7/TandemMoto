@@ -58,12 +58,7 @@ class RollingFileLog(
          * `2026-09-24T19:42:10.123+05:30 I/Link: message`, with any further lines of the message
          * (e.g. a stack trace) indented under it.
          */
-        fun formatLine(
-            time: ZonedDateTime,
-            level: LogLevel,
-            tag: String,
-            message: String
-        ): String {
+        fun formatLine(time: ZonedDateTime, level: LogLevel, tag: String, message: String): String {
             val lines = message.trimEnd().lines()
             return buildString {
                 append(TIMESTAMP.format(time)).append(' ')
