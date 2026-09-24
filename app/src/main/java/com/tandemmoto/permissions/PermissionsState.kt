@@ -18,20 +18,11 @@ data class PermissionsState(
     val approximateLocationOnly: Boolean = false
 ) {
     fun isGranted(permission: AppPermission): Boolean =
-        statuses[permission]?.let { it == PermissionStatus.Granted } ?: true
+        status(permission) == PermissionStatus.Granted
 
-    /** Setup can move on to pairing once every required permission is granted. */
-    val canContinue: Boolean get() = statuses.all { (permission, status) ->
-        !permission.required || status == PermissionStatus.Granted
-    }
-
-    val missing: List<AppPermission> get() = statuses.filterValues {
-        it != PermissionStatus.Granted
-    }.keys.toList()
-
-    /** Android permissions the system dialog can still ask for (not permanently denied). */
-    val requestable: List<String> get() = statuses.filterValues { it == PermissionStatus.Denied }
-        .keys.flatMap { it.permissionsFor(sdk) }
+    /** Permissions that don't apply on [sdk] count as granted. */
+    fun status(permission: AppPermission): PermissionStatus =
+        statuses[permission] ?: PermissionStatus.Granted
 
     companion object {
         /**

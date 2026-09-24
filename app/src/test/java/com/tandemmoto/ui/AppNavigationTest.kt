@@ -13,7 +13,6 @@ import com.tandemmoto.ui.navigation.AppNavHost
 import com.tandemmoto.ui.navigation.Routes
 import com.tandemmoto.ui.theme.TandemMotoTheme
 import org.junit.Assert.assertEquals
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -32,67 +31,52 @@ class AppNavigationTest {
 
     private fun str(id: Int, vararg args: Any) = compose.activity.getString(id, *args)
 
-    @Before
-    fun setUp() {
-        shadowOf(RuntimeEnvironment.getApplication())
-            .grantPermissions(Manifest.permission.NEARBY_WIFI_DEVICES)
+    private fun start(grantNearby: Boolean = true) {
+        if (grantNearby) {
+            shadowOf(RuntimeEnvironment.getApplication())
+                .grantPermissions(Manifest.permission.NEARBY_WIFI_DEVICES)
+        }
         compose.setContent {
             navController = rememberNavController()
             TandemMotoTheme { AppNavHost(navController) }
         }
     }
 
-    private fun goToRide() {
-        compose.onNodeWithText(str(R.string.welcome_get_started)).performClick()
-        compose.onNodeWithText(str(R.string.permissions_continue)).performClick()
-        compose.onNodeWithText(str(R.string.pair_skip)).performClick()
-        compose.waitForIdle()
-    }
-
     @Test
-    fun startsOnWelcome() {
-        compose.onNodeWithText(str(R.string.welcome_title)).assertExists()
-    }
-
-    @Test
-    fun setupFlowReachesRide() {
-        goToRide()
+    fun opensStraightOnHome() {
+        start()
         compose.onNodeWithText(str(R.string.status_not_paired)).assertExists()
         assertEquals(Routes.RIDE, navController.currentDestination?.route)
     }
 
     @Test
-    fun getStartedOpensPermissions() {
-        compose.onNodeWithText(str(R.string.welcome_get_started)).performClick()
-        compose.onNodeWithText(str(R.string.permissions_intro)).assertExists()
-        assertEquals(Routes.PERMISSIONS, navController.currentDestination?.route)
-    }
-
-    @Test
-    fun permissionsBackReturnsToWelcome() {
-        compose.onNodeWithText(str(R.string.welcome_get_started)).performClick()
-        compose.onNodeWithContentDescription(str(R.string.action_back)).performClick()
-        compose.onNodeWithText(str(R.string.welcome_title)).assertExists()
-    }
-
-    @Test
-    fun pairBackReturnsToPermissions() {
-        compose.onNodeWithText(str(R.string.welcome_get_started)).performClick()
-        compose.onNodeWithText(str(R.string.permissions_continue)).performClick()
-        compose.onNodeWithContentDescription(str(R.string.action_back)).performClick()
-        assertEquals(Routes.PERMISSIONS, navController.currentDestination?.route)
-    }
-
-    @Test
-    fun setupScreensAreRemovedFromBackStack() {
-        goToRide()
-        // Only Ride should remain, so system Back from Ride exits instead of returning to setup.
+    fun homeIsTheRootSoBackExits() {
+        start()
         compose.runOnIdle { assertEquals(false, navController.popBackStack()) }
     }
 
     @Test
+    fun withoutNearbyHomeShowsThePromptInsteadOfPairing() {
+        start(grantNearby = false)
+        compose.onNodeWithText(str(R.string.permission_nearby_prompt)).assertExists()
+        compose.onNodeWithText(str(R.string.status_not_paired)).assertDoesNotExist()
+        assertEquals(Routes.RIDE, navController.currentDestination?.route)
+    }
+
+    @Test
+    fun notPairedOpensPairAndBackReturnsHome() {
+        start()
+        compose.onNodeWithText(str(R.string.status_not_paired)).performClick()
+        compose.onNodeWithText(str(R.string.pair_body)).assertExists()
+        assertEquals(Routes.PAIR, navController.currentDestination?.route)
+        compose.onNodeWithContentDescription(str(R.string.action_back)).performClick()
+        compose.waitForIdle()
+        assertEquals(Routes.RIDE, navController.currentDestination?.route)
+    }
+
+    @Test
     fun playlistOpensAndReturns() {
-        goToRide()
+        start()
         compose.onNodeWithContentDescription(str(R.string.ride_open_playlist)).performClick()
         compose.onNodeWithText(str(R.string.playlist_empty)).assertExists()
         compose.onNodeWithContentDescription(str(R.string.action_back)).performClick()
@@ -101,10 +85,11 @@ class AppNavigationTest {
 
     @Test
     fun settingsOpensAndReturns() {
-        goToRide()
+        start()
         compose.onNodeWithContentDescription(str(R.string.ride_open_settings)).performClick()
         compose.onNodeWithText(str(R.string.settings_privacy_policy)).assertExists()
         compose.onNodeWithContentDescription(str(R.string.action_back)).performClick()
+        compose.waitForIdle()
         assertEquals(Routes.RIDE, navController.currentDestination?.route)
     }
 }

@@ -2,4 +2,12 @@
 <resources>
     <!-- Platform base theme; Compose handles in-app styling (see ui/). -->
     <style name="Theme.TandemMoto" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Launch theme: the system splash (app icon), dismissed automatically once the first
+         frame is ready, then Theme.TandemMoto. -->
+    <style name="Theme.TandemMoto.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.TandemMoto</item>
+    </style>
 </resources>

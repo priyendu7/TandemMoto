@@ -30,20 +30,31 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tandemmoto.R
+import com.tandemmoto.permissions.AppPermission
+import com.tandemmoto.permissions.PermissionStatus
+import com.tandemmoto.permissions.PermissionsState
 import com.tandemmoto.ui.components.ConnectionStatus
 import com.tandemmoto.ui.components.ConnectionStatusBar
 import com.tandemmoto.ui.components.ControlButton
+import com.tandemmoto.ui.components.PermissionPrompt
+import com.tandemmoto.ui.components.rememberPermissionRequester
 import com.tandemmoto.ui.theme.TandemMotoTheme
 
+/** The Home screen: the app opens here, and every feature is reached from it. */
 @Composable
 fun RideRoute(
+    onOpenPair: () -> Unit,
     onOpenPlaylist: () -> Unit,
     onOpenSettings: () -> Unit,
     viewModel: RideViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val permissions = rememberPermissionRequester()
     RideScreen(
         state = state,
+        permissions = permissions.state,
+        onRequestPermission = permissions.request,
+        onOpenPair = onOpenPair,
         onPlayPause = viewModel::onPlayPause,
         onNext = viewModel::onNext,
         onPrevious = viewModel::onPrevious,
@@ -56,6 +67,9 @@ fun RideRoute(
 @Composable
 fun RideScreen(
     state: RideUiState,
+    permissions: PermissionsState,
+    onRequestPermission: (AppPermission) -> Unit,
+    onOpenPair: () -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
@@ -88,7 +102,7 @@ fun RideScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            ConnectionStatusBar(state.connection)
+            ConnectionSection(state.connection, permissions, onRequestPermission, onOpenPair)
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(24.dp),
@@ -102,6 +116,32 @@ fun RideScreen(
                 IntercomIndicator(state.intercomOn)
             }
         }
+    }
+}
+
+/**
+ * Each Home section asks for its own permission in place, so the rest of the app keeps working
+ * without it. Connection needs Nearby devices; music (Phase 2) and intercom (Phase 4) add theirs.
+ */
+@Composable
+private fun ConnectionSection(
+    connection: ConnectionStatus,
+    permissions: PermissionsState,
+    onRequestPermission: (AppPermission) -> Unit,
+    onOpenPair: () -> Unit
+) {
+    if (permissions.isGranted(AppPermission.NEARBY)) {
+        ConnectionStatusBar(
+            status = connection,
+            onClickLabel = stringResource(R.string.ride_pair_action),
+            onClick = if (connection == ConnectionStatus.NotPaired) onOpenPair else null
+        )
+    } else {
+        PermissionPrompt(
+            permission = AppPermission.NEARBY,
+            state = permissions,
+            onRequest = { onRequestPermission(AppPermission.NEARBY) }
+        )
     }
 }
 
@@ -192,11 +232,40 @@ private fun IntercomIndicator(intercomOn: Boolean) {
     }
 }
 
+private val nearbyGranted =
+    PermissionsState(34, mapOf(AppPermission.NEARBY to PermissionStatus.Granted))
+
+@Composable
+private fun RidePreview(state: RideUiState, permissions: PermissionsState = nearbyGranted) {
+    RideScreen(
+        state = state,
+        permissions = permissions,
+        onRequestPermission = {},
+        onOpenPair = {},
+        onPlayPause = {},
+        onNext = {},
+        onPrevious = {},
+        onOpenPlaylist = {},
+        onOpenSettings = {}
+    )
+}
+
+@Preview(name = "Nearby permission missing · light", showBackground = true)
+@Composable
+private fun RideNeedsNearbyPreview() {
+    TandemMotoTheme(darkTheme = false, dynamicColor = false) {
+        RidePreview(
+            RideUiState(),
+            PermissionsState(34, mapOf(AppPermission.NEARBY to PermissionStatus.Denied))
+        )
+    }
+}
+
 @Preview(name = "Not paired · light", showBackground = true)
 @Composable
 private fun RideNotPairedPreview() {
     TandemMotoTheme(darkTheme = false, dynamicColor = false) {
-        RideScreen(RideUiState(), {}, {}, {}, {}, {})
+        RidePreview(RideUiState())
     }
 }
 
@@ -204,13 +273,8 @@ private fun RideNotPairedPreview() {
 @Composable
 private fun RideConnectedPreview() {
     TandemMotoTheme(darkTheme = true, dynamicColor = false) {
-        RideScreen(
-            RideUiState(connection = ConnectionStatus.Connected, nowPlaying = "Highway Song"),
-            {},
-            {},
-            {},
-            {},
-            {}
+        RidePreview(
+            RideUiState(connection = ConnectionStatus.Connected, nowPlaying = "Highway Song")
         )
     }
 }

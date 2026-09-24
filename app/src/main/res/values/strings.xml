@@ -5,35 +5,21 @@
     <!-- Common -->
     <string name="action_back">Back</string>
 
-    <!-- Welcome -->
-    <string name="welcome_title">Ride together, hear each other</string>
-    <string name="welcome_body">Share one playlist with your partner and talk like an intercom whenever the music is paused. Two phones, no extra hardware, no internet.</string>
-    <string name="welcome_promise">Free · No ads · Nothing leaves your two phones</string>
-    <string name="welcome_get_started">Get started</string>
-
-    <!-- Permissions -->
-    <string name="permissions_title">Permissions</string>
-    <string name="permissions_intro">TandemMoto asks only for what it needs. Nothing leaves your two phones.</string>
-    <string name="permission_nearby_title">Nearby devices</string>
-    <string name="permission_nearby_reason">Find and connect directly to your partner\'s phone over Wi-Fi Direct.</string>
-    <string name="permission_location_title">Location</string>
-    <string name="permission_location_reason">Android needs it to find your partner\'s phone over Wi-Fi Direct. TandemMoto never reads or stores your location.</string>
-    <string name="permission_status_granted">Allowed</string>
-    <string name="permission_status_required">Required</string>
-    <string name="permission_status_optional">Optional</string>
+    <!-- Permission prompts (shown in place of the Home section that needs them) -->
+    <string name="permission_nearby_prompt">Allow nearby devices to pair</string>
+    <!-- Android 12 and older: Wi-Fi Direct discovery needs location; TandemMoto never reads it. -->
+    <string name="permission_location_prompt">Allow location to pair</string>
+    <string name="permission_precise_location_prompt">Choose precise location to pair</string>
+    <string name="permission_allow">Allow</string>
     <string name="permission_open_settings">Open settings</string>
-    <string name="permissions_allow">Allow</string>
-    <string name="permissions_continue">Continue</string>
-    <string name="permissions_required_missing">Allow %1$s to continue. TandemMoto can\'t find your partner\'s phone without it.</string>
-    <string name="permissions_precise_location_hint">Choose \"Precise\" location. Android needs it to find nearby phones.</string>
 
     <!-- Pair -->
     <string name="pair_title">Pair with your partner</string>
     <string name="pair_body">Both of you open TandemMoto on your phones and pair once before the ride. Pairing arrives in the next development phase.</string>
-    <string name="pair_skip">Skip for now</string>
 
     <!-- Ride -->
     <string name="ride_open_playlist">Playlist</string>
+    <string name="ride_pair_action">Pair with your partner</string>
     <string name="ride_open_settings">Settings</string>
     <string name="ride_now_playing">Now playing</string>
     <string name="ride_no_song">No song selected</string>
@@ -46,7 +32,7 @@
     <string name="ride_intercom_off">Intercom turns on when the music is paused</string>
 
     <!-- Connection status -->
-    <string name="status_not_paired">Not paired</string>
+    <string name="status_not_paired">Not paired · Tap to pair</string>
     <string name="status_searching">Looking for your partner…</string>
     <string name="status_connected">Connected to your partner</string>
     <string name="status_reconnecting">Reconnecting…</string>

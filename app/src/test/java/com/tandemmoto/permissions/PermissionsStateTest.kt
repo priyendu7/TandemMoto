@@ -40,10 +40,10 @@ class PermissionsStateTest {
     }
 
     @Test
-    fun nearbyIsRequiredToContinue() {
-        assertFalse(stateOn(34).canContinue)
+    fun grantedNearbyIsGranted() {
+        assertFalse(stateOn(34).isGranted(NEARBY))
         val nearbyOnly = setOf(Manifest.permission.NEARBY_WIFI_DEVICES)
-        assertTrue(stateOn(34, granted = nearbyOnly).canContinue)
+        assertTrue(stateOn(34, granted = nearbyOnly).isGranted(NEARBY))
     }
 
     @Test
@@ -51,10 +51,10 @@ class PermissionsStateTest {
         val state = stateOn(31, granted = setOf(Manifest.permission.ACCESS_COARSE_LOCATION))
         assertEquals(PermissionStatus.Denied, state.statuses[NEARBY])
         assertTrue(state.approximateLocationOnly)
-        assertFalse(state.canContinue)
+        assertFalse(state.isGranted(NEARBY))
 
         val precise = stateOn(31, granted = location.toSet())
-        assertTrue(precise.canContinue)
+        assertTrue(precise.isGranted(NEARBY))
         assertFalse(precise.approximateLocationOnly)
     }
 
@@ -76,12 +76,7 @@ class PermissionsStateTest {
     }
 
     @Test
-    fun requestableAsksForEveryAndroidPermissionBehindARow() {
-        assertEquals(location, stateOn(31).requestable)
-        assertEquals(emptyList<String>(), stateOn(34, askedBefore = setOf(NEARBY)).requestable)
-        assertEquals(
-            emptyList<String>(),
-            stateOn(34, granted = setOf(Manifest.permission.NEARBY_WIFI_DEVICES)).requestable
-        )
+    fun permissionsNotInTheStateCountAsGranted() {
+        assertEquals(PermissionStatus.Granted, PermissionsState(34, emptyMap()).status(NEARBY))
     }
 }

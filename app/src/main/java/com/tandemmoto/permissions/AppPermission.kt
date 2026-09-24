@@ -6,16 +6,18 @@ import androidx.annotation.StringRes
 import com.tandemmoto.R
 
 /**
- * A runtime permission as the user sees it: one row on the permissions screen, which may map to
- * several Android permissions depending on the API level.
+ * A runtime permission as the user sees it, which may map to several Android permissions
+ * depending on the API level. Each one gates a single Home screen section and is asked for there,
+ * so the rest of the app works without it.
  *
- * Permissions are added here in the PR that builds the feature using them: the microphone with
- * the intercom (Phase 4, optional: music sharing works without it), notifications with the
- * foreground service, phone state with call hold (Phase 5).
+ * Permissions are added here in the PR that builds the feature using them: audio files with the
+ * music library (Phase 2, if it scans the device instead of using the file picker), the
+ * microphone with the intercom (Phase 4), notifications with the foreground service, phone state
+ * with call hold (Phase 5).
  */
-enum class AppPermission(val required: Boolean) {
-    /** Wi-Fi Direct discovery (PRD §5.1): nearby Wi-Fi devices on 13+, location before that. */
-    NEARBY(required = true);
+enum class AppPermission {
+    /** Connection bar: Wi-Fi Direct discovery (PRD §5.1); nearby devices, location before 13. */
+    NEARBY;
 
     /**
      * Android permissions to request on [sdk], empty when none are needed there. The first entry
@@ -34,24 +36,17 @@ enum class AppPermission(val required: Boolean) {
             }
     }
 
+    /**
+     * One line shown in the section's prompt: what to allow and why. [approximateOnly] is the
+     * Android 12-and-older case where location was granted, but not precise location.
+     */
     @StringRes
-    fun title(sdk: Int): Int = when (this) {
-        NEARBY ->
-            if (sdk >= Build.VERSION_CODES.TIRAMISU) {
-                R.string.permission_nearby_title
-            } else {
-                R.string.permission_location_title
-            }
-    }
-
-    @StringRes
-    fun reason(sdk: Int): Int = when (this) {
-        NEARBY ->
-            if (sdk >= Build.VERSION_CODES.TIRAMISU) {
-                R.string.permission_nearby_reason
-            } else {
-                R.string.permission_location_reason
-            }
+    fun prompt(sdk: Int, approximateOnly: Boolean = false): Int = when (this) {
+        NEARBY -> when {
+            sdk >= Build.VERSION_CODES.TIRAMISU -> R.string.permission_nearby_prompt
+            approximateOnly -> R.string.permission_precise_location_prompt
+            else -> R.string.permission_location_prompt
+        }
     }
 
     companion object {
