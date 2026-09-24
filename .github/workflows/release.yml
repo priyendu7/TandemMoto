@@ -26,7 +26,6 @@ jobs:
       TANDEMMOTO_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
       TANDEMMOTO_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
       PLAY_SERVICE_ACCOUNT_JSON_PATH: ${{ github.workspace }}/play-service-account.json
-      VERSION_CODE: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,7 +43,10 @@ jobs:
           fi
 
       - name: Derive version from tag
-        run: echo "VERSION_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+        # Offset keeps codes above the manual bootstrap uploads (versionCode 1-2) on Play.
+        run: |
+          echo "VERSION_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$(( GITHUB_RUN_NUMBER + 100 ))" >> "$GITHUB_ENV"
 
       - name: Decode signing keystore
         env:
