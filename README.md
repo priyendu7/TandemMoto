@@ -28,6 +28,8 @@ Riders and pillions each run their own earphones off their own phone today — d
 10. Independent per-device volume (native OS)
 11. Setup/pairing flow + connection status UI
 12. Basic error/edge-case handling (disconnects, permission issues)
+13. Phone-call interruption ("call hold") on either phone pauses music and the intercom on both
+14. Self-mute: mute your own voice while still hearing your partner (manual only)
 
 Anything not on this list — multi-rider/mesh, voice-activated hands-free talk, live streaming, iOS, streaming-service integration, ride history/social — is explicitly **out of scope** until the PRD is updated. See `docs/PRD.md` §3 and §5.
 
