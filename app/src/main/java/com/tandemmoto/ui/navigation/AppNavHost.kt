@@ -9,10 +9,12 @@ import com.tandemmoto.ui.playlist.PlaylistScreen
 import com.tandemmoto.ui.ride.RideRoute
 import com.tandemmoto.ui.settings.SettingsScreen
 import com.tandemmoto.ui.setup.PairScreen
+import com.tandemmoto.ui.setup.PermissionsRoute
 import com.tandemmoto.ui.setup.WelcomeScreen
 
 object Routes {
     const val WELCOME = "welcome"
+    const val PERMISSIONS = "permissions"
     const val PAIR = "pair"
     const val RIDE = "ride"
     const val PLAYLIST = "playlist"
@@ -24,7 +26,13 @@ object Routes {
 fun AppNavHost(navController: NavHostController = rememberNavController()) {
     NavHost(navController = navController, startDestination = Routes.WELCOME) {
         composable(Routes.WELCOME) {
-            WelcomeScreen(onGetStarted = { navController.navigate(Routes.PAIR) })
+            WelcomeScreen(onGetStarted = { navController.navigate(Routes.PERMISSIONS) })
+        }
+        composable(Routes.PERMISSIONS) {
+            PermissionsRoute(
+                onContinue = { navController.navigate(Routes.PAIR) },
+                onBack = { navController.popBackStack() }
+            )
         }
         composable(Routes.PAIR) {
             PairScreen(

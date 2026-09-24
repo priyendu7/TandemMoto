@@ -29,9 +29,6 @@ The app only asks for permissions a feature needs, and only uses them for that f
 | Nearby Wi-Fi devices (Android 13+) | Find and connect directly to your partner's phone over Wi-Fi Direct | Only to your paired partner's phone |
 | Location (Android 12 and older only) | Android requires it for Wi-Fi Direct discovery on these versions. TandemMoto never reads or stores your location | No |
 | Wi-Fi and network state | Set up and monitor the direct phone-to-phone link | No |
-| Microphone | The intercom: your voice is sent to your partner's phone while the music is paused | Only to your paired partner's phone, live; never recorded or stored |
-| Bluetooth connect | Use your Bluetooth earbuds and handlebar remote | No |
-| Foreground service and notifications | Keep the link and intercom working with the screen off, and show a notification while it runs | No |
 
 ## Network use
 

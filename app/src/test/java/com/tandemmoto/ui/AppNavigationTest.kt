@@ -1,5 +1,6 @@
 package com.tandemmoto.ui
 
+import android.Manifest
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -17,6 +18,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -31,6 +34,8 @@ class AppNavigationTest {
 
     @Before
     fun setUp() {
+        shadowOf(RuntimeEnvironment.getApplication())
+            .grantPermissions(Manifest.permission.NEARBY_WIFI_DEVICES)
         compose.setContent {
             navController = rememberNavController()
             TandemMotoTheme { AppNavHost(navController) }
@@ -39,6 +44,7 @@ class AppNavigationTest {
 
     private fun goToRide() {
         compose.onNodeWithText(str(R.string.welcome_get_started)).performClick()
+        compose.onNodeWithText(str(R.string.permissions_continue)).performClick()
         compose.onNodeWithText(str(R.string.pair_skip)).performClick()
         compose.waitForIdle()
     }
@@ -56,10 +62,25 @@ class AppNavigationTest {
     }
 
     @Test
-    fun pairBackReturnsToWelcome() {
+    fun getStartedOpensPermissions() {
+        compose.onNodeWithText(str(R.string.welcome_get_started)).performClick()
+        compose.onNodeWithText(str(R.string.permissions_intro)).assertExists()
+        assertEquals(Routes.PERMISSIONS, navController.currentDestination?.route)
+    }
+
+    @Test
+    fun permissionsBackReturnsToWelcome() {
         compose.onNodeWithText(str(R.string.welcome_get_started)).performClick()
         compose.onNodeWithContentDescription(str(R.string.action_back)).performClick()
         compose.onNodeWithText(str(R.string.welcome_title)).assertExists()
+    }
+
+    @Test
+    fun pairBackReturnsToPermissions() {
+        compose.onNodeWithText(str(R.string.welcome_get_started)).performClick()
+        compose.onNodeWithText(str(R.string.permissions_continue)).performClick()
+        compose.onNodeWithContentDescription(str(R.string.action_back)).performClick()
+        assertEquals(Routes.PERMISSIONS, navController.currentDestination?.route)
     }
 
     @Test

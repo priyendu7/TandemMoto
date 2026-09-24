@@ -16,19 +16,13 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Voice channel mic capture (PRD §5.8-9) -->
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-
-    <!-- Bluetooth peripherals: rider HID remote, pillion earbuds (PRD §4 Platform) -->
-    <uses-permission
-        android:name="android.permission.BLUETOOTH"
-        android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-
-    <!-- Foreground service permissions (FOREGROUND_SERVICE, _MICROPHONE, _CONNECTED_DEVICE) are
-         added with the service itself (see service/README.md): Play requires a declaration and a
-         demo video for each foreground service type, so they ship only once the feature works. -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Permissions are added in the PR that builds the feature using them, never ahead of it:
+         RECORD_AUDIO with the intercom (Phase 4); POST_NOTIFICATIONS and the foreground service
+         ones (FOREGROUND_SERVICE, _MICROPHONE, _CONNECTED_DEVICE) with the service, which also
+         needs a Play declaration and demo video per type (see service/README.md);
+         READ_PHONE_STATE with call hold (Phase 5).
+         No Bluetooth permission: the handlebar remote arrives as media-button events via
+         MediaSession, and earbud audio/mic routing goes through AudioManager. -->
 
     <application
         android:name=".TandemMotoApp"
