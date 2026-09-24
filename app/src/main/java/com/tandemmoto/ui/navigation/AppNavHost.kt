@@ -1,10 +1,12 @@
 package com.tandemmoto.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.tandemmoto.diagnostics.LogExporter
 import com.tandemmoto.ui.playlist.PlaylistScreen
 import com.tandemmoto.ui.ride.RideRoute
 import com.tandemmoto.ui.settings.SettingsScreen
@@ -55,7 +57,11 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             PlaylistScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.SETTINGS) {
-            SettingsScreen(onBack = { navController.popBackStack() })
+            val context = LocalContext.current
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onExportLogs = { LogExporter.share(context) }
+            )
         }
     }
 }

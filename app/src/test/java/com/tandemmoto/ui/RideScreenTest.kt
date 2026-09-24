@@ -6,12 +6,14 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import com.tandemmoto.R
 import com.tandemmoto.ui.components.ConnectionStatus
 import com.tandemmoto.ui.ride.RideScreen
 import com.tandemmoto.ui.ride.RideUiState
 import com.tandemmoto.ui.settings.SettingsScreen
 import com.tandemmoto.ui.theme.TandemMotoTheme
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -61,6 +63,7 @@ class RideScreenTest {
             TandemMotoTheme {
                 SettingsScreen(
                     onBack = {},
+                    onExportLogs = {},
                     versionName = "9.9.9"
                 )
             }
@@ -69,5 +72,15 @@ class RideScreenTest {
             str(R.string.settings_version, "9.9.9"),
             substring = true
         ).assertExists()
+    }
+
+    @Test
+    fun settingsExportRowStartsTheExport() {
+        var exported = false
+        compose.setContent {
+            TandemMotoTheme { SettingsScreen(onBack = {}, onExportLogs = { exported = true }) }
+        }
+        compose.onNodeWithText(str(R.string.settings_export_logs)).performClick()
+        assertTrue(exported)
     }
 }

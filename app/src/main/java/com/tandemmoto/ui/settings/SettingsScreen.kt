@@ -23,7 +23,11 @@ private const val PRIVACY_URL = "$SOURCE_URL/blob/main/docs/PRIVACY.md"
 
 // Links open in the browser, so the app itself needs no INTERNET permission for them.
 @Composable
-fun SettingsScreen(onBack: () -> Unit, versionName: String = BuildConfig.VERSION_NAME) {
+fun SettingsScreen(
+    onBack: () -> Unit,
+    onExportLogs: () -> Unit,
+    versionName: String = BuildConfig.VERSION_NAME
+) {
     val uriHandler = LocalUriHandler.current
     Scaffold(topBar = { BackTopBar(stringResource(R.string.settings_title), onBack) }) { padding ->
         Column(
@@ -51,6 +55,14 @@ fun SettingsScreen(onBack: () -> Unit, versionName: String = BuildConfig.VERSION
                 supportingContent = { Text(stringResource(R.string.settings_source_summary)) },
                 modifier = Modifier.clickable { uriHandler.openUri(SOURCE_URL) }
             )
+            HorizontalDivider()
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_export_logs)) },
+                supportingContent = {
+                    Text(stringResource(R.string.settings_export_logs_summary))
+                },
+                modifier = Modifier.clickable(onClick = onExportLogs)
+            )
         }
     }
 }
@@ -58,5 +70,7 @@ fun SettingsScreen(onBack: () -> Unit, versionName: String = BuildConfig.VERSION
 @Preview(showBackground = true)
 @Composable
 private fun SettingsPreview() {
-    TandemMotoTheme(dynamicColor = false) { SettingsScreen(onBack = {}, versionName = "0.1.0") }
+    TandemMotoTheme(dynamicColor = false) {
+        SettingsScreen(onBack = {}, onExportLogs = {}, versionName = "0.1.0")
+    }
 }

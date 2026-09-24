@@ -67,4 +67,11 @@
     <string name="settings_privacy_summary">No ads, no accounts, no data collection</string>
     <string name="settings_source_code">Source code</string>
     <string name="settings_source_summary">github.com/priyendu7/TandemMoto</string>
+    <string name="settings_export_logs">Export diagnostic logs</string>
+    <string name="settings_export_logs_summary">Share a log file to help fix a problem. Nothing is sent automatically.</string>
+
+    <!-- Log export -->
+    <string name="export_logs_chooser">Share diagnostic logs</string>
+    <string name="export_logs_subject">TandemMoto diagnostic logs</string>
+    <string name="export_logs_failed">Couldn\'t export the logs</string>
 </resources>

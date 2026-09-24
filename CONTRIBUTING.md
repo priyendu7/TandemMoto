@@ -48,6 +48,7 @@ Phases 1–2 are prerequisites for almost everything else, so PRs against those 
 
 - Anything touching `link/`, `voice/`, or `micmode/` state transitions should include unit tests around the state machine, not just manual verification — see the "mic-mode race condition" risk in `docs/DEVELOPMENT_PLAN.md` §5.
 - Wi-Fi Direct and audio-hardware behavior genuinely needs two physical devices; note in your PR description what you tested on, since emulator testing doesn't cover this. Use the device IDs and tests from [`docs/TEST_MATRIX.md`](docs/TEST_MATRIX.md) (e.g. "T3 on P1 ↔ P2 ✅"), and add your results to its log. If you own a device that isn't listed, add it there.
+- Log with `AppLog` (see `app/src/main/java/com/tandemmoto/diagnostics/README.md`), never with personal data: no song titles or file names, phone numbers, or partner device names/addresses. Testers attach the export from Settings → Export diagnostic logs to bug reports.
 - Each phase's PRD "exit criteria" (development plan §3) is the bar for calling that phase's work done, not just "compiles."
 
 ## Pull requests
