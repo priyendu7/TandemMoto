@@ -121,14 +121,14 @@ jobs:
           persist-credentials: false
 
       - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v4
+        uses: gradle/actions/wrapper-validation@v6
 
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
           # PR code must not read from or write to the cache used by main/release builds.
           cache-disabled: true
@@ -211,7 +211,7 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: true
 
