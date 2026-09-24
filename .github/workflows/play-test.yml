@@ -139,7 +139,7 @@ jobs:
           VERSION_NAME: ${{ needs.gate.outputs.version_name }}
         run: ./gradlew bundleQa --no-daemon
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: qa-bundle
           path: app/build/outputs/bundle/qa/app-qa.aab
