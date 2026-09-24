@@ -11,6 +11,22 @@
     <string name="welcome_promise">Free · No ads · Nothing leaves your two phones</string>
     <string name="welcome_get_started">Get started</string>
 
+    <!-- Permissions -->
+    <string name="permissions_title">Permissions</string>
+    <string name="permissions_intro">TandemMoto asks only for what it needs. Nothing leaves your two phones.</string>
+    <string name="permission_nearby_title">Nearby devices</string>
+    <string name="permission_nearby_reason">Find and connect directly to your partner\'s phone over Wi-Fi Direct.</string>
+    <string name="permission_location_title">Location</string>
+    <string name="permission_location_reason">Android needs it to find your partner\'s phone over Wi-Fi Direct. TandemMoto never reads or stores your location.</string>
+    <string name="permission_status_granted">Allowed</string>
+    <string name="permission_status_required">Required</string>
+    <string name="permission_status_optional">Optional</string>
+    <string name="permission_open_settings">Open settings</string>
+    <string name="permissions_allow">Allow</string>
+    <string name="permissions_continue">Continue</string>
+    <string name="permissions_required_missing">Allow %1$s to continue. TandemMoto can\'t find your partner\'s phone without it.</string>
+    <string name="permissions_precise_location_hint">Choose \"Precise\" location. Android needs it to find nearby phones.</string>
+
     <!-- Pair -->
     <string name="pair_title">Pair with your partner</string>
     <string name="pair_body">Both of you open TandemMoto on your phones and pair once before the ride. Pairing arrives in the next development phase.</string>

@@ -9,8 +9,8 @@ indicator), playlist, settings, and the connection status bar with the PRD's err
 | Package | Contents |
 |---|---|
 | `theme/` | `TandemMotoTheme`: Material You dynamic colour on Android 12+, fallback palette below; larger type scale |
-| `navigation/` | `AppNavHost` and `Routes`: Welcome → Pair → Ride, with Playlist and Settings opened from Ride |
-| `setup/` | Welcome and Pair screens (Pair is a placeholder until Phase 1) |
+| `navigation/` | `AppNavHost` and `Routes`: Welcome → Permissions → Pair → Ride, with Playlist and Settings opened from Ride |
+| `setup/` | Welcome, Permissions (only Nearby devices is required; see `permissions/`) and Pair screens (Pair is a placeholder until Phase 1) |
 | `ride/` | `RideScreen`, `RideViewModel`, `RideUiState` |
 | `components/` | `ConnectionStatusBar` + `ConnectionStatus`, `ControlButton`, `BackTopBar` |
 | `playlist/`, `settings/` | Playlist (placeholder until Phase 2) and Settings (version, privacy policy, source) |
