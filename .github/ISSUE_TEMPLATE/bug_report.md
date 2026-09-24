@@ -24,6 +24,7 @@ A clear, short description of what's wrong.
 
 
 **Hardware/environment (important for this project — Wi-Fi Direct and BT behavior varies a lot by device)**
+Use IDs from docs/TEST_MATRIX.md where the device is listed (e.g. P1, R1, E1).
 - Rider phone model + Android version:
 - Pillion phone model + Android version:
 - Bike BT HID remote model (if relevant):

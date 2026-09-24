@@ -79,7 +79,7 @@ TandemMoto solves this in software only, using two Android phones that talk to e
 
 **Offline support**
 
-- Fully functional with no internet connection — music library, sync, and voice all run over the direct device-to-device Bluetooth link
+- Fully functional with no internet connection — music library, sync, and voice all run over the direct device-to-device Wi-Fi Direct link
 
 **Battery**
 
