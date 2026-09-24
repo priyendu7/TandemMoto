@@ -85,7 +85,13 @@
 - Design the state machine with a **call-hold** state from the start (Playing / Paused + mic mode / Call hold). Call hold overrides both other states, and clears into Paused + mic mode. The call-detection wiring is done in Phase 5
 - Opus encode/decode voice channel over a dedicated low-latency socket, separate from file transfer
 - Noise suppression + AGC applied only while mic mode is active
-- **Exit criteria:** pausing music on either phone opens a clear two-way voice channel on both within the ~300ms latency target (bench-tested with wired mic/earphone loopback before road testing)
+- **Self-mute** (PRD v1.2): a per-phone `muted` flag, separate from the shared mic-mode state. Mic mode decides whether the voice channel is open; `muted` only gates the local send path
+  - Muted: release `AudioRecord` (no capture, no NS/AGC, mic indicator off) but keep receiving and playing the partner's voice
+  - Publish `muted` over the command channel so the partner shows "Partner muted"; re-send it on reconnect
+  - Persist it locally (DataStore). Nothing but the user's toggle changes it: not pause/resume, call hold, link drops or restarts
+  - In-app toggle on the Ride screen, usable any time; the handlebar buttons stay play/pause/skip
+  - Pillion on BT earbuds: while muted, check whether the partner's voice can play over A2DP instead of holding the HFP/SCO route (better audio quality); decide during Phase 4 testing
+- **Exit criteria:** pausing music on either phone opens a clear two-way voice channel on both within the ~300ms latency target (bench-tested with wired mic/earphone loopback before road testing); muting one phone stops its voice and releases its mic within ~0.5s while it keeps hearing the partner, and the partner sees "Partner muted"
 
 ### Phase 5 — Robustness & edge cases
 

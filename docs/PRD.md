@@ -1,6 +1,6 @@
 # TandemMoto — Product Requirements Document
 
-**Status:** Draft v1.1 (adds phone-call interruption handling)\
+**Status:** Draft v1.2 (adds self-mute; v1.1 added phone-call interruption handling)\
 **Platform:** Android only (rider ↔ pillion, 1:1 pairing)
 
 ---
@@ -19,6 +19,7 @@ TandemMoto solves this in software only, using two Android phones that talk to e
 - **As the pillion**, I want to control music playback from my phone screen, so I can change songs even without a hardware remote.
 - **As either rider or pillion**, when I pause the music, I want both of us to automatically be able to talk to each other clearly — like flipping to an intercom — without pressing any extra button.
 - **As either rider or pillion**, when the music resumes, I want mic mode to switch off automatically so we're not left with open mics unintentionally.
+- **As either rider or pillion**, I want to mute my own voice during talk mode while still hearing my partner, and unmute whenever I choose, so I control when I'm heard. Nothing should mute or unmute me automatically.
 - **As the rider**, I want wind and engine noise filtered out of my voice, so the pillion can actually understand me at riding speed.
 - **As either rider or pillion**, I want to control my own earphone volume independently of the other person's.
 - **As either rider or pillion**, I want the song I select to already be available on the other phone before it plays, so playback isn't interrupted by a weak Bluetooth link mid-ride.
@@ -43,13 +44,20 @@ TandemMoto solves this in software only, using two Android phones that talk to e
 - Independent per-phone volume (native OS behavior, no custom logic needed)
 - Push-to-talk via pause: pausing music (either side) switches both phones into mic mode; resuming playback switches mic mode off
 - On-device wind/engine noise suppression + automatic gain control, active only during mic mode
+- Self-mute: each person can mute their own voice with an in-app toggle
+  - While muted, your voice isn't sent, but you still hear your partner in mic mode
+  - Mute is per-phone, not shared state: muting yourself doesn't mute your partner or change mic mode for either phone
+  - Manual only: only the user mutes or unmutes. Pausing/resuming music, call hold, link drops and reconnects, and app restarts never change it (it's remembered across restarts)
+  - The mic is fully released while muted: no capture, no noise suppression, and Android's mic-in-use indicator is off
+  - The partner's phone shows that you're muted (e.g. "Partner muted"), so silence isn't mistaken for a broken intercom
+  - The toggle works whether or not mic mode is active, so you can mute before pausing the music
 - Phone-call interruption ("call hold"): when either phone has an incoming call (from the moment it starts ringing) or an active outgoing call — cellular or VoIP — music playback and the phone-to-phone voice channel pause on **both** phones
   - While call hold is active, mic mode stays off on both phones (even though music is paused), and play/resume is blocked on both phones so music can't restart under the call
   - The phone not on the call shows a clear status (e.g. "Your partner is on a call")
   - When the call ends (answered and hung up, declined, or missed), call hold clears on both phones and they return to the normal paused state — i.e. mic mode turns on per the push-to-talk-via-pause rule. Music does not auto-resume; either rider resumes it as usual
   - If both phones are on calls at the same time, call hold clears only once both calls have ended
 - Auto-reconnect of the phone-to-phone link after a drop
-- Basic setup/pairing flow, connection status indicator, and clear error states (peer disconnected, headset disconnected, mic permission missing, peer on a call)
+- Basic setup/pairing flow, connection status indicator, and clear error states (peer disconnected, headset disconnected, mic permission missing, peer on a call, partner muted)
 
 ### Future scope (explicitly out of MVP)
 
@@ -113,5 +121,6 @@ TandemMoto solves this in software only, using two Android phones that talk to e
 11. Setup/pairing flow + connection status UI
 12. Basic error/edge-case handling (disconnects, permission issues)
 13. Phone-call interruption: an incoming/outgoing call on either phone pauses music and the voice channel on both phones (call hold), synced both ways
+14. Self-mute: per-phone manual mute of your own voice (you still hear your partner), shown on the partner's phone and remembered across restarts
 
 Anything not on this list is future scope and out of MVP by default — no scope additions without updating this document first.

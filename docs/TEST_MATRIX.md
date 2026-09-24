@@ -71,6 +71,7 @@ Pass thresholds come from the [PRD](PRD.md) §4 and the phase exit criteria in t
 | T6 | Playback mirror | 3 | Play / pause / skip / seek from each phone | Other phone follows within ~0.5 s |
 | T7 | Handlebar and inline controls | 3 | Press every R1 and W1 button during playback | Each button works on both phones; key codes recorded in the device table |
 | T8 | Mic mode + latency | 4 | Pause → talk both ways; measure the round trip (clap test) | Intercom opens on both phones; round trip under ~300 ms |
+| T8b | Self-mute | 4 | In mic mode, mute P1; talk from both sides; unmute. Then mute, pause/resume music, drop the link, make a call and restart the app | Muted phone's voice stops and its mic indicator turns off within ~0.5 s while it still hears the partner; partner shows "Partner muted"; stays muted through pause/resume, reconnect, call hold and restart until unmuted by hand |
 | T9 | Call hold | 5 | Incoming and outgoing call on each phone: cellular + one VoIP app (e.g. WhatsApp) | Both phones pause and the intercom closes within ~1 s; the call is audible on W1 and E1; both phones land in Paused + mic mode after; no stuck mic or audio route |
 | T10 | Screen-off ride | 5 | Screen off, music + intercom in use for 1 h | Link and service stay alive; record battery % used per phone |
 | T11 | Real ride | 6 | P1 + P2 on the X440 T at riding speed, R1 + W1 rider, E1 pillion | T3, T6, T8 and T9 behaviour holds; note wind/engine noise and intercom clarity |
