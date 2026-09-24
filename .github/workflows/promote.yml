@@ -43,7 +43,7 @@ jobs:
     env:
       PLAY_SERVICE_ACCOUNT_JSON_PATH: ${{ github.workspace }}/play-service-account.json
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Decode Play service account
         env:
