@@ -27,7 +27,7 @@ jobs:
       TANDEMMOTO_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
       PLAY_SERVICE_ACCOUNT_JSON_PATH: ${{ github.workspace }}/play-service-account.json
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # full history for release notes
 
