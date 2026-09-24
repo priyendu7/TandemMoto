@@ -1,14 +1,14 @@
 package com.tandemmoto.diagnostics
 
+import java.io.File
+import java.time.ZoneOffset
+import java.time.ZonedDateTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import java.io.File
-import java.time.ZoneOffset
-import java.time.ZonedDateTime
 
 class RollingFileLogTest {
     @get:Rule

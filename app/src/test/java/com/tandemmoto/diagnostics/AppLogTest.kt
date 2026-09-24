@@ -1,5 +1,6 @@
 package com.tandemmoto.diagnostics
 
+import java.io.File
 import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
@@ -11,7 +12,6 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
