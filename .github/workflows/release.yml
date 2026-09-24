@@ -116,7 +116,7 @@ jobs:
 
       # Every build starts as a pre-release; promote.yml marks it "latest" on 100% production rollout.
       - name: Create GitHub pre-release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/*
           generate_release_notes: true
