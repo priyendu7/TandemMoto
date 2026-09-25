@@ -86,6 +86,8 @@ Newest first. One row per test run. Link an issue for every ❌.
 
 | Date | App version | Test | Phones | Peripherals | Result | Notes / issue |
 |---|---|---|---|---|---|---|
+| 2026-09-25 | Wi‑Fi Direct lab v2 (`pr37-136f1d6`, #22) | Latency L1–L4 | P1 ↔ P4 | — | ✅ with steady traffic | 1 packet/s: p95 up to 1.4 s. 20 packets/s: median ≈ 10 ms, p95 ≈ 40–75 ms. A low-latency Wi‑Fi lock helps ~20–30% more |
+| 2026-09-25 | Wi‑Fi Direct lab v2 (`pr37-136f1d6`, #22) | Screen off with foreground service | P1 ↔ P4 | — | ✅ | P1 locked with the foreground service: no drop for ≈ 6 min. P4 still throttled by MIUI (3–4 s gaps) but connected |
 | 2026-09-25 | Wi‑Fi Direct lab (`pr37-78169fe`, #22) | T1 Discovery | P1 ↔ P4 | — | ⚠️ | Partner seen in 1.1–13.5 s (median ≈ 7 s); 4 of 14 runs over the ~10 s target. See [`spikes/wifi-direct.md`](spikes/wifi-direct.md) |
 | 2026-09-25 | Wi‑Fi Direct lab (`pr37-78169fe`, #22) | T2 Pair (group formation) | P1 ↔ P4 | — | ✅ | First pairing ≈ 15 s with one prompt on the partner; reconnections 1.4–7 s, no prompt. P1 was group owner every time (persistent group) |
 | 2026-09-25 | Wi‑Fi Direct lab (`pr37-78169fe`, #22) | T3 Airplane-mode drop (baseline) | P1 ↔ P4 | — | ❌ expected | Drop detected in < 1 s on both, but nothing reconnects automatically (no reconnect logic yet; #27). Manual recovery 5–20 s |
@@ -109,6 +111,7 @@ Record anything a tester had to change or work around, with the device ID.
   - On Android 9 and older, switch Location on too if discovery finds nothing.
 - **P4 has no USB data connection** to the dev laptop (micro‑USB), so no `adb`. Install through Play (`/play-test` or the QA track) or by sideloading the CI debug APK, and use the in-app log export.
 - **W1 is USB audio:** it shows up as a USB headset, not a wired analogue headset. Headset-disconnect detection (Phase 5) must handle `TYPE_USB_HEADSET`.
-- **P1 kills the app's socket when its screen turns off** (`Software caused connection abort`) unless the app is kept in the foreground; P4 (Android 9) keeps it, throttled. See [`spikes/wifi-direct.md`](spikes/wifi-direct.md).
+- **P1 kills the app's socket when its screen turns off** (`Software caused connection abort`) unless a foreground service is running (confirmed with lab v2); P4 (Android 9) keeps it, throttled, with or without one.
+- **P4's Wi‑Fi Direct can get stuck returning `BUSY`** to Discover/Stop; switching Wi‑Fi off and on clears it. See [`spikes/wifi-direct.md`](spikes/wifi-direct.md).
 - **Unrelated Wi‑Fi Direct devices nearby** (a TV, printer…) show up in discovery; always match the remembered partner.
 - **P1 discovery without Nearby devices permission** fails with a generic `ERROR` instead of a permission error.
