@@ -66,7 +66,7 @@ Pass thresholds come from the [PRD](PRD.md) §4 and the phase exit criteria in t
 |---|---|---|---|---|
 | T0 | Launch + permission prompts | 0 | Fresh install → splash → Home; in the connection bar tap Allow; deny twice → Open settings; on Android ≤ 12 pick "Approximate" | Splash closes by itself and Home opens; the connection bar shows the prompt until Nearby (or precise location) is granted, then "Not paired · Tap to pair"; Open settings appears after two denials; Precise hint shows; the rest of Home works throughout |
 | T1 | Discovery | 1 | Both phones open Pair | Each phone sees the other within ~10 s |
-| T2 | Pair + remembered partner | 1 | Tap partner, accept on the other phone; restart both apps | Group forms with the initiator as group owner; after restart, reconnects to that partner only |
+| T2 | Pair + remembered partner | 1 | Tap partner, accept on the other phone; restart both apps | Group forms (the partner accepts Android's prompt the first time only); after restart, reconnects to that partner only. Either phone may be group owner: the first pairing fixes the roles |
 | T3 | Airplane-mode drop | 1 | Airplane mode on one phone for 10 s, then off | Link restores with no taps on either phone (**Phase 1 exit criterion**) |
 | T4 | Range walk-out | 1 | Walk apart until the link drops, then walk back | Reconnects automatically; note the distance at drop |
 | T5 | Song transfer | 2 | Send a 25 MB song; repeat with a mid-transfer link drop | Completes; resumes after the drop; record the time taken |
@@ -86,6 +86,11 @@ Newest first. One row per test run. Link an issue for every ❌.
 
 | Date | App version | Test | Phones | Peripherals | Result | Notes / issue |
 |---|---|---|---|---|---|---|
+| 2026-09-25 | Wi‑Fi Direct lab (`pr37-78169fe`, #22) | T1 Discovery | P1 ↔ P4 | — | ⚠️ | Partner seen in 1.1–13.5 s (median ≈ 7 s); 4 of 14 runs over the ~10 s target. See [`spikes/wifi-direct.md`](spikes/wifi-direct.md) |
+| 2026-09-25 | Wi‑Fi Direct lab (`pr37-78169fe`, #22) | T2 Pair (group formation) | P1 ↔ P4 | — | ✅ | First pairing ≈ 15 s with one prompt on the partner; reconnections 1.4–7 s, no prompt. P1 was group owner every time (persistent group) |
+| 2026-09-25 | Wi‑Fi Direct lab (`pr37-78169fe`, #22) | T3 Airplane-mode drop (baseline) | P1 ↔ P4 | — | ❌ expected | Drop detected in < 1 s on both, but nothing reconnects automatically (no reconnect logic yet; #27). Manual recovery 5–20 s |
+| 2026-09-25 | Wi‑Fi Direct lab (`pr37-78169fe`, #22) | T4 Range walk-out | P1 ↔ P4 | — | ➖ inconclusive | ~12 m: survived an 11.7 s silence; final drop was most likely P1's screen turning off, not range |
+| 2026-09-25 | Wi‑Fi Direct lab (`pr37-78169fe`, #22) | Screen off (T10 precursor) | P1 ↔ P4 | — | ❌ | P4 screen off: stays connected (throttled, 3–4 s gaps). P1 screen off: socket killed within ~1 s. Needs a foreground service |
 | 2026-09-25 | — (Android's own Wi‑Fi Direct screen, not TandemMoto) | Baseline discovery | P1 ↔ P4 | — | ✅ | Each phone listed the other in 2–3 s. Confirms both phones' Wi‑Fi Direct works before the #22 spike |
 
 ---
@@ -104,4 +109,6 @@ Record anything a tester had to change or work around, with the device ID.
   - On Android 9 and older, switch Location on too if discovery finds nothing.
 - **P4 has no USB data connection** to the dev laptop (micro‑USB), so no `adb`. Install through Play (`/play-test` or the QA track) or by sideloading the CI debug APK, and use the in-app log export.
 - **W1 is USB audio:** it shows up as a USB headset, not a wired analogue headset. Headset-disconnect detection (Phase 5) must handle `TYPE_USB_HEADSET`.
-- Wi‑Fi Direct findings from the spike (#22) go here.
+- **P1 kills the app's socket when its screen turns off** (`Software caused connection abort`) unless the app is kept in the foreground; P4 (Android 9) keeps it, throttled. See [`spikes/wifi-direct.md`](spikes/wifi-direct.md).
+- **Unrelated Wi‑Fi Direct devices nearby** (a TV, printer…) show up in discovery; always match the remembered partner.
+- **P1 discovery without Nearby devices permission** fails with a generic `ERROR` instead of a permission error.
