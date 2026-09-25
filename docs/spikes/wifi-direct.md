@@ -1,8 +1,8 @@
 # Wi‑Fi Direct spike: findings (#22)
 
-**Date:** 2026-09-25 · **Phones:** P1 Samsung Galaxy S25 (Android 16, One UI) ↔ P4 Xiaomi Redmi Y2 (Android 9, MIUI), see [`TEST_MATRIX.md`](../TEST_MATRIX.md) · **Build:** the throwaway Wi‑Fi Direct lab on draft PR #37 (`pr37-78169fe`, QA build via `/play-test`) · **Setup:** phones side by side (~1 m) except S8 (~12 m); **neither phone connected to a Wi‑Fi network**, which is also the on-bike situation.
+**Date:** 2026-09-25 (round 1: lab v1; round 2: lab v2) · **Phones:** P1 Samsung Galaxy S25 (Android 16, One UI) ↔ P4 Xiaomi Redmi Y2 (Android 9, MIUI), see [`TEST_MATRIX.md`](../TEST_MATRIX.md) · **Build:** the throwaway Wi‑Fi Direct lab on draft PR #37, QA builds via `/play-test`: v1 `pr37-78169fe`, v2 `pr37-136f1d6` (adds a low-latency Wi‑Fi lock, a 1/s vs 20/s ping rate, a foreground-service switch and per-peer timings) · **Setup:** phones side by side (~1 m) except S8 (~12 m); **neither phone connected to a Wi‑Fi network**, which is also the on-bike situation.
 
-The lab logged every Wi‑Fi Direct event, timing and ping to the in-app diagnostic log; these findings come from the two log exports of three sessions (13:00–13:12, 13:23–13:28, 13:38–13:46).
+The lab logged every Wi‑Fi Direct event, timing and ping to the in-app diagnostic log; these findings come from the log exports of round 1 (13:00–13:46, v1) and round 2 (15:22–15:51, v1 then v2).
 
 ## Summary
 
@@ -17,8 +17,9 @@ The lab logged every Wi‑Fi Direct event, timing and ping to the in-app diagnos
 | Socket after group formed | First attempt always fails (`ENETUNREACH`); connected **0.55–1.1 s** after the group formed |
 | Detecting a drop (airplane mode, disconnect) | **< 1 s**, from Android's own events (`Wi-Fi Direct disabled`, group removed) |
 | Automatic reconnection by Android | ❌ **None.** The app must rediscover and reconnect |
-| Screen off | P4 (Android 9): **stays connected**, slowed down. P1 (Android 16): **socket killed within ~1 s** (`Software caused connection abort`) |
-| Latency (1 ping/s) | ⚠️ **Median ≈ 150–250 ms, p95 ≈ 0.5–2.4 s**, occasionally 5–15 ms. Too slow for Phase 3/4 targets as is. **Open** |
+| Screen off | P4 (Android 9): **stays connected**, slowed down. P1 (Android 16): **socket killed within ~1 s** (`Software caused connection abort`), **unless a foreground service is running**: then it stays connected (≈ 6 min tested) |
+| Range | ✅ Connected at ≈ 18 m (60 ft) with higher latency (p95 ≈ 0.35 s at 1 packet/s); not tested further |
+| Latency | With sparse traffic (1 packet/s): median ≈ 50–250 ms, **p95 up to 2.4 s** (Wi‑Fi power saving). With **steady traffic (20 packets/s): median ≈ 10 ms, p95 ≈ 40–75 ms** ✅. A low-latency Wi‑Fi lock helps a little more |
 
 ## Results by step
 
@@ -79,33 +80,72 @@ The first pings of each session were often 4–15 ms, and latency **dropped** (m
 ### Pitfall: both phones tapping Connect
 In every reconnection both phones tapped Connect. The second `connect()` hit an already forming or formed group and left the partner stuck as **invited**. While it was stuck: the first socket took **5.4 s**, latency rose to a median of **0.5–4.3 s** (p95 up to 9.5 s) with an **11.7 s** silence; it recovered once the invitation cleared (≈ 60 s later).
 
+## Round 2: lab v2 (15:41–15:51)
+
+P1 ↔ P4, ~1 m, both screens on unless noted. P4 wasn't connected to a Wi‑Fi network; **P1 was** (the new Step 0 line showed it). Connect was tapped on P4 only: group formed in 1.7 s, socket 0.6 s later. Each step: same settings on both phones, stats reset, ~40–60 s.
+
+### Latency (L1–L4)
+
+| Step | Rate | Wi‑Fi lock | P1 median / p95 | P4 median / p95 | Longest gap |
+|---|---|---|---|---|---|
+| L1 | 1/s | off | 49–88 ms / 1.1–1.4 s | 48–55 ms / 1.05–1.3 s | 2.2 s |
+| L2 | 1/s | on | 70–143 ms / 0.26–0.65 s | 40–45 ms / 0.14–0.52 s | 1.5 s |
+| L3 | 20/s | off | 13–15 ms / 62–75 ms | 10–12 ms / 51–67 ms | 0.18 s |
+| L4 | 20/s | on | 8–11 ms / 41–51 ms | 7–10 ms / 37–46 ms | 0.17 s |
+
+The lock is Android's low-latency mode on P1 and the older "high performance" mode on P4 (Android 9).
+
+- **Steady traffic is what fixes latency.** At 20 packets/s the radio stays awake: ~10 ms median, well inside Phase 4's 300 ms. With 1 packet/s it dozes between packets, which explains round 1's 150–250 ms.
+- **The Wi‑Fi lock alone doesn't fix sparse traffic** (p95 still up to 0.65 s); on top of steady traffic it lowers latency by another ~20–30%.
+- Latency was fine even with P1 connected to a Wi‑Fi network.
+
+### Foreground service (F1/F2)
+- Foreground service on both phones, 1/s, then P1 locked: **no drop for ≈ 6 minutes** (15:44:55–15:50:39); P1 kept pinging every second with median ≈ 35–60 ms. The session ended only when the lab was closed. **The foreground service fixes P1's screen-off socket kill.**
+- P4, left on the desk with its screen off and its foreground service on, was still **throttled by MIUI** (3–4 s gaps, 10 s log ticks stretched to 13–19 s), but stayed connected.
+
+### Range (end of round 2)
+- P1 was carried **≈ 18 m (60 ft)** away with its screen on; P4 stayed behind with its screen off (foreground service on both, 1 packet/s).
+- **Stayed connected, no drop.** At P1, latency rose from ≈ 35 ms to ≈ 60 ms median, with recent round trips at 110–160 ms and p95 ≈ 0.35 s; 1–2 pings missed.
+- Round 1's ~12 m walk (S8) wasn't a clean range test; this one is. Rider and pillion are ~1 m apart on the bike, so range has plenty of margin.
+- Not run: a 10–15 minute locked run with battery %. That belongs in T10 (Phase 5) with the real service.
+
+### More pitfalls seen in round 2
+- **Both phones tapping Connect at once deadlocks** (15:30–15:31 and 15:37–15:40): both sides stay *invited*, no group forms, and `cancelConnect` fails with `BUSY` until the group is removed. A per-phone guard can't prevent it; only a one-initiator rule can.
+- **A stuck invitation survives an app restart:** after reopening the lab, the partner still showed *invited* with no group.
+- **P4's Wi‑Fi Direct got stuck returning `BUSY`** to every Discover and Stop (13 times over ~1.5 min) until Wi‑Fi was switched off and on; then it worked immediately. The app can't reset Wi‑Fi itself.
+
 ## Recommendations
 
 **#21 Discovery**
 - Check the Nearby/location permission before `discoverPeers` (P1 reports only a generic `ERROR`). On Android ≤ 12, also check Location is switched on.
 - Keep discovering until the **remembered partner** appears, with a timeout of **≥ 30 s**, and restart discovery rather than relying on one call. Never auto-pick "the first peer".
+- If Discover keeps failing with `BUSY` (P4: 13 times in a row), ask the user to switch Wi‑Fi off and on; nothing else cleared it.
 
 **#24 Pairing**
 - Expect one Android invitation prompt on the partner phone the **first** time only; the UI should tell the partner to accept it.
 - **Exactly one phone initiates.** Decide by a fixed rule (e.g. the phone with the smaller stored partner ID initiates; the other only discovers and accepts). **Never call `connect()` while a group with the partner exists or is forming.**
 - Don't rely on `groupOwnerIntent`: the first pairing fixes the roles. Both phones must support both roles.
+- On startup, if the partner shows as *invited* but no group exists, `cancelConnect` first: a stuck invitation survives app restarts.
 
 **#25 Command channel**
 - Add `INTERNET` permanently, with a `docs/PRIVACY.md` note (used only for the direct phone-to-phone link; the Play listing will show "full network access").
 - Group owner listens; the client connects to `groupOwnerAddress`, retrying every **250–500 ms for up to ~10 s** (the first attempt fails with `ENETUNREACH`).
 - On startup, check for an existing group (`requestConnectionInfo`) and reuse it instead of forming a new one; judge the link only by the channel's own heartbeat, never by "group formed".
+- **The heartbeat doubles as a keep-awake.** Sparse traffic lets the radio doze (p95 up to 1.4 s at 1/s); steady traffic keeps latency at ~10 ms. Send small heartbeats at roughly **5–10 per second** while connected (20/s was measured; the lowest rate that keeps p95 under ~100 ms still has to be found), and hold a **low-latency Wi‑Fi lock** (`WIFI_MODE_FULL_LOW_LATENCY`, API 29+) while connected. Measure the battery cost in T10.
 
 **#26 Status bar / #27 Auto-reconnect**
 - Treat `Wi‑Fi Direct disabled`, group removed and socket errors as **immediate** loss (< 1 s).
 - Heartbeat: show **Reconnecting…** after ~**5 s** without traffic but keep the socket; give up on it after ~**20–30 s** (the link survived 11.7 s and 3–4 s throttling gaps).
 - Reconnect loop: rediscover the partner → the initiating phone connects → socket with retries. Budget ≈ **5–20 s** after Wi‑Fi returns. Android won't reconnect on its own.
 - On an explicit user disconnect, remove the group (`removeGroup`); otherwise leave the persistent group alone.
-- **Foreground service in Phase 1** (moved from Phase 5): without it, P1 kills the socket as soon as its screen turns off. Needs `FOREGROUND_SERVICE` + `_CONNECTED_DEVICE` (and `_MICROPHONE` from Phase 4), the Play declaration and demo video.
+- **Foreground service in Phase 1** (moved from Phase 5): without it, P1 kills the socket as soon as its screen turns off; with it (lab v2), P1 stayed connected while locked. Type `connectedDevice` (allowed by `CHANGE_WIFI_STATE`), plus `microphone` from Phase 4; needs `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_CONNECTED_DEVICE`, the Play declaration and demo video.
+- Aggressive skins (P4, MIUI) still throttle the app while locked even with the service: 3–4 s gaps. Keep the ~20–30 s give-up timeout.
 
 **Phase 3/4 (latency)**
-- As measured, command latency (median ≈ 200 ms, p95 up to 2.4 s) would miss Phase 3's ~0.5 s mirroring and Phase 4's 300 ms voice targets. Resolve before Phase 3; see open questions.
+- Voice (Phase 4) sends ~50 packets/s, which keeps the radio awake: expect ~10 ms network latency, leaving most of the 300 ms budget for codec and buffering.
+- Playback commands (Phase 3) meet the ~0.5 s mirroring target only if the #25 keep-awake heartbeat is running.
 
-## Open questions (lab v2 on draft PR #37)
-1. **Latency cause and fix:** repeat S5 with a **low-latency Wi‑Fi lock** on/off, and with a denser stream (≈ 20 packets/s, closer to voice traffic) vs 1/s.
-2. **Foreground service:** does it keep P1's socket alive with the screen off? (APK sideload: a Play upload with foreground-service permissions needs the Play declaration first.)
-3. **Range:** a clean S8 walk-out with both screens kept on (lower priority).
+## Carried forward (not blocking #22)
+1. **Heartbeat rate vs battery:** find the lowest rate that keeps p95 under ~100 ms (try 5/s and 10/s) and its battery cost. Belongs in #25 / T10.
+2. **Ride-length run:** 10–15+ minutes locked with the foreground service, with battery % (T10, Phase 5).
+3. **Range beyond ≈ 18 m:** where the link actually drops (low priority: rider and pillion are ~1 m apart).
