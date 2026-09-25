@@ -27,7 +27,7 @@ interface WifiP2pDriver {
     /** The phone declares Wi-Fi Direct and the system service exists. */
     val supported: Boolean
 
-    /** Wi-Fi Direct enabled (false when Wi-Fi is off); null until Android first reports it. */
+    /** Wi-Fi Direct enabled (false when Wi-Fi is off); null while unknown, which isn't "off". */
     val enabled: StateFlow<Boolean?>
 
     val peers: StateFlow<List<NearbyDevice>>
@@ -47,6 +47,9 @@ interface DiscoveryPreconditions {
     /** Nearby devices (Android 13+) or precise location (12 and older) is granted. */
     fun nearbyGranted(): Boolean
 
-    /** Android 12 and older only: Location is switched off, so discovery finds nothing. */
+    /**
+     * Android 12 and older only: Location is switched off. Not a blocker (the Redmi Y2 on Android 9
+     * discovers with Location off), only a hint when a search finds nothing.
+     */
     fun locationOff(): Boolean
 }

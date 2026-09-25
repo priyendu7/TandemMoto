@@ -114,19 +114,23 @@ fun PairScreen(
                         DeviceList(state.devices)
                     }
                     ActionButton(stringResource(R.string.pair_search_again), onSearchAgain)
+                    if (state.suggestLocation) {
+                        Message(stringResource(R.string.pair_location_hint))
+                        OutlinedButton(
+                            onClick = onOpenLocationSettings,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 56.dp)
+                        ) {
+                            Text(stringResource(R.string.pair_open_location_settings))
+                        }
+                    }
                 }
                 DiscoveryState.WifiOff -> {
                     Message(stringResource(R.string.pair_wifi_off))
                     ActionButton(
                         stringResource(R.string.pair_open_wifi_settings),
                         onOpenWifiSettings
-                    )
-                }
-                DiscoveryState.LocationOff -> {
-                    Message(stringResource(R.string.pair_location_off))
-                    ActionButton(
-                        stringResource(R.string.pair_open_location_settings),
-                        onOpenLocationSettings
                     )
                 }
                 DiscoveryState.Stuck -> {

@@ -86,10 +86,17 @@ class PairScreenTest {
     }
 
     @Test
-    fun locationOffOffersLocationSettings() {
-        show(DiscoveryState.LocationOff)
+    fun nothingFoundWithLocationOffSuggestsLocation() {
+        show(DiscoveryState.Finished(emptyList(), suggestLocation = true))
+        compose.onNodeWithText(str(R.string.pair_location_hint)).assertExists()
         compose.onNodeWithText(str(R.string.pair_open_location_settings)).performClick()
         assertEquals(listOf("location"), clicks)
+    }
+
+    @Test
+    fun nothingFoundWithoutTheHintDoesNotMentionLocation() {
+        show(DiscoveryState.Finished(emptyList()))
+        compose.onNodeWithText(str(R.string.pair_location_hint)).assertDoesNotExist()
     }
 
     @Test

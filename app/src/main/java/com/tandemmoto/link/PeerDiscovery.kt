@@ -21,8 +21,6 @@ sealed interface DiscoveryState {
 
     data object PermissionMissing : DiscoveryState
 
-    data object LocationOff : DiscoveryState
-
     data object WifiOff : DiscoveryState
 
     /** Android kept answering BUSY; only switching Wi-Fi off and on cleared it in the spike. */
@@ -30,8 +28,12 @@ sealed interface DiscoveryState {
 
     data class Scanning(val devices: List<NearbyDevice>) : DiscoveryState
 
-    /** The search window ended; [devices] are what was found. */
-    data class Finished(val devices: List<NearbyDevice>) : DiscoveryState
+    /**
+     * The search window ended; [devices] are what was found. [suggestLocation]: nothing was found
+     * and Location is off on Android 12 or older, which may be why.
+     */
+    data class Finished(val devices: List<NearbyDevice>, val suggestLocation: Boolean = false) :
+        DiscoveryState
 }
 
 /**
@@ -40,7 +42,8 @@ sealed interface DiscoveryState {
  * Shaped by the spike (docs/spikes/wifi-direct.md): permission is checked before asking Android
  * (Android 16 only answers a generic ERROR), discovery is restarted whenever Android stops it (the
  * partner is only visible while it discovers too), BUSY is retried before giving up, and Wi-Fi
- * coming back on resumes the search by itself.
+ * coming back on resumes the search by itself. Only an explicit "Wi-Fi Direct disabled" counts as
+ * Wi-Fi off: the Redmi Y2 never reported its initial state.
  */
 class PeerDiscovery(
     private val driver: WifiP2pDriver,
@@ -79,10 +82,9 @@ class PeerDiscovery(
             )
             !preconditions.nearbyGranted() ->
                 return finish(DiscoveryState.PermissionMissing, "Nearby permission missing")
-            preconditions.locationOff() -> return finish(DiscoveryState.LocationOff, "Location off")
         }
         while (true) {
-            if (driver.enabled.value != true) {
+            if (driver.enabled.value == false) {
                 _state.value = DiscoveryState.WifiOff
                 log("Wi-Fi Direct off, waiting for it to come back")
                 driver.enabled.first { it == true }
@@ -92,9 +94,11 @@ class PeerDiscovery(
                 Outcome.Finished -> {
                     val devices = sorted(driver.peers.value)
                     driver.stopPeerDiscovery()
+                    val suggestLocation = devices.isEmpty() && preconditions.locationOff()
                     return finish(
-                        DiscoveryState.Finished(devices),
-                        "Search finished: ${describe(devices)}"
+                        DiscoveryState.Finished(devices, suggestLocation),
+                        "Search finished: ${describe(devices)}" +
+                            if (suggestLocation) " (Location is off)" else ""
                     )
                 }
                 Outcome.Stuck -> {
@@ -184,8 +188,8 @@ class PeerDiscovery(
     private enum class Outcome { Finished, WifiLost, Stuck, PermissionLost, Unsupported }
 
     companion object {
-        /** One search window. Revisit after field testing. */
-        const val SCAN_DURATION_MS = 30_000L
+        /** One search window: 30 s felt too short in the first phone test. */
+        const val SCAN_DURATION_MS = 60_000L
 
         /** discoverPeers attempts before [DiscoveryState.Stuck]; retries wait 1 s, 2 s, 4 s. */
         const val MAX_ATTEMPTS = 4

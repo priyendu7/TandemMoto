@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.LocationManager
+import android.net.wifi.WifiManager
 import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pDeviceList
 import android.net.wifi.p2p.WifiP2pManager
@@ -35,7 +36,11 @@ class AndroidWifiP2pDriver(context: Context) : WifiP2pDriver {
             channel != null &&
             appContext.packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_DIRECT)
 
-    private val _enabled = MutableStateFlow<Boolean?>(null)
+    // Seeded from Wi-Fi's current state: Android is supposed to send the Wi-Fi Direct state as soon
+    // as the receiver registers, but the Redmi Y2 (MIUI, Android 9) never did.
+    private val _enabled = MutableStateFlow(
+        appContext.getSystemService(WifiManager::class.java)?.isWifiEnabled
+    )
     override val enabled: StateFlow<Boolean?> = _enabled.asStateFlow()
 
     private val _peers = MutableStateFlow<List<NearbyDevice>>(emptyList())

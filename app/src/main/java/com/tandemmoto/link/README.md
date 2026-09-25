@@ -7,10 +7,14 @@ persistent command/state socket, auto-reconnect, connection status.
 
 - `WifiP2pDriver`: the slice of WifiP2pManager discovery needs. `AndroidWifiP2pDriver` wraps the
   platform API; tests use a fake.
-- `PeerDiscovery`: searches for `SCAN_DURATION_MS` (30 s, to revisit after field testing), then
-  stops. Checks permission and (Android ≤ 12) Location before asking Android, restarts discovery
-  whenever Android stops it, retries `BUSY` (1 s, 2 s, 4 s) before reporting `Stuck`, and resumes
-  by itself when Wi-Fi comes back. Phones (device category 10) are listed before other devices.
+- `PeerDiscovery`: searches for `SCAN_DURATION_MS` (60 s; 30 s felt too short on real phones),
+  then stops. Checks the permission before asking Android, restarts discovery whenever Android
+  stops it, retries `BUSY` (1 s, 2 s, 4 s) before reporting `Stuck`, and resumes by itself when
+  Wi-Fi comes back. Phones (device category 10) are listed before other devices.
+- Location off doesn't block the search (the Redmi Y2 on Android 9 discovers without it); on
+  Android ≤ 12 a search that finds nothing with Location off suggests turning it on.
+- Wi-Fi is only "off" when Android says so: the driver seeds the state from `WifiManager`,
+  because the Redmi Y2 never sent its initial Wi-Fi Direct state.
 - Logs go to `AppLog` under the tag `Link`, with hashed peer IDs only.
 
 Design notes come from the spike: [`docs/spikes/wifi-direct.md`](../../../../../../../docs/spikes/wifi-direct.md).

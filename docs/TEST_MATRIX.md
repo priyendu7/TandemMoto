@@ -113,6 +113,7 @@ Record anything a tester had to change or work around, with the device ID.
 - **P4 has no USB data connection** to the dev laptop (micro‑USB), so no `adb`. Install through Play (`/play-test` or the QA track) or by sideloading the CI debug APK, and use the in-app log export.
 - **W1 is USB audio:** it shows up as a USB headset, not a wired analogue headset. Headset-disconnect detection (Phase 5) must handle `TYPE_USB_HEADSET`.
 - **P1 kills the app's socket when its screen turns off** (`Software caused connection abort`) unless a foreground service is running (confirmed with lab v2); P4 (Android 9) keeps it, throttled, with or without one.
-- **P4's Wi‑Fi Direct can get stuck returning `BUSY`** to Discover/Stop; switching Wi‑Fi off and on clears it. See [`spikes/wifi-direct.md`](spikes/wifi-direct.md).
+- **P4's Wi‑Fi Direct can get stuck returning `BUSY`** to Discover/Stop; switching Wi‑Fi off and on clears it.
+- **P4 never reports its initial Wi‑Fi Direct state** when an app starts listening (P1 does), and **discovers with Location switched off** (Android 9). See [`spikes/wifi-direct.md`](spikes/wifi-direct.md).
 - **Unrelated Wi‑Fi Direct devices nearby** (a TV, printer…) show up in discovery; always match the remembered partner.
 - **P1 discovery without Nearby devices permission** fails with a generic `ERROR` instead of a permission error.

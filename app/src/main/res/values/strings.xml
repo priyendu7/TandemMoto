@@ -28,7 +28,7 @@
     <string name="pair_search_again">Search again</string>
     <string name="pair_wifi_off">Wi-Fi is off. TandemMoto uses Wi-Fi to connect directly to your partner\'s phone; you don\'t need to join a network.</string>
     <string name="pair_open_wifi_settings">Turn on Wi-Fi</string>
-    <string name="pair_location_off">Location is off. On this version of Android, finding nearby phones needs Location switched on. TandemMoto never reads your location.</string>
+    <string name="pair_location_hint">Location is off. On some phones, finding nearby phones only works with Location switched on. TandemMoto never reads your location.</string>
     <string name="pair_open_location_settings">Open location settings</string>
     <string name="pair_stuck">Wi-Fi Direct isn\'t responding. Turn Wi-Fi off and on again, then search again.</string>
     <string name="pair_unsupported">This phone doesn\'t support Wi-Fi Direct, so it can\'t connect to your partner\'s phone.</string>

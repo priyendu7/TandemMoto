@@ -50,7 +50,7 @@ class PeerDiscoveryTest {
     private val preconditions = FakePreconditions()
 
     private fun TestScope.discovery(driver: WifiP2pDriver = this@PeerDiscoveryTest.driver) =
-        PeerDiscovery(driver, preconditions, backgroundScope, scanDurationMs = 30_000)
+        PeerDiscovery(driver, preconditions, backgroundScope)
 
     private fun phone(name: String) = NearbyDevice(name, name, Available, isPhone = true)
 
@@ -75,23 +75,58 @@ class PeerDiscoveryTest {
     }
 
     @Test
-    fun locationOffIsReported() = runTest {
+    fun locationOffDoesNotBlockTheSearch() = runTest {
+        // The Redmi Y2 (Android 9) discovers with Location off.
         preconditions.locationOff = true
         val discovery = discovery()
         discovery.start()
         runCurrent()
-        assertEquals(DiscoveryState.LocationOff, discovery.state.value)
-        assertEquals(0, driver.discoverCalls)
+        assertTrue(discovery.state.value is DiscoveryState.Scanning)
+        assertEquals(1, driver.discoverCalls)
     }
 
     @Test
-    fun scansForThirtySecondsThenFinishesWithWhatItFound() = runTest {
+    fun nothingFoundWithLocationOffSuggestsLocation() = runTest {
+        preconditions.locationOff = true
+        val discovery = discovery()
+        discovery.start()
+        advanceTimeBy(60_001)
+        assertEquals(
+            DiscoveryState.Finished(emptyList(), suggestLocation = true),
+            discovery.state.value
+        )
+    }
+
+    @Test
+    fun devicesFoundWithLocationOffDoesNotSuggestLocation() = runTest {
+        preconditions.locationOff = true
+        val discovery = discovery()
+        discovery.start()
+        runCurrent()
+        driver.peers.value = listOf(phone("Galaxy S25"))
+        advanceTimeBy(60_001)
+        assertEquals(DiscoveryState.Finished(listOf(phone("Galaxy S25"))), discovery.state.value)
+    }
+
+    @Test
+    fun unknownWifiStateIsNotTreatedAsOff() = runTest {
+        // The Redmi Y2 never reported its initial Wi-Fi Direct state.
+        driver.enabled.value = null
+        val discovery = discovery()
+        discovery.start()
+        runCurrent()
+        assertTrue(discovery.state.value is DiscoveryState.Scanning)
+        assertEquals(1, driver.discoverCalls)
+    }
+
+    @Test
+    fun scansForTheWholeWindowThenFinishesWithWhatItFound() = runTest {
         val discovery = discovery()
         discovery.start()
         runCurrent()
         assertTrue(discovery.state.value is DiscoveryState.Scanning)
         driver.peers.value = listOf(tv("TV"), phone("Redmi Y2"))
-        advanceTimeBy(29_000)
+        advanceTimeBy(59_000)
         assertEquals(
             DiscoveryState.Scanning(listOf(phone("Redmi Y2"), tv("TV"))),
             discovery.state.value
@@ -108,7 +143,7 @@ class PeerDiscoveryTest {
     fun finishingWithNothingFoundGivesAnEmptyResult() = runTest {
         val discovery = discovery()
         discovery.start()
-        advanceTimeBy(30_001) // one full search window
+        advanceTimeBy(60_001) // one full search window
         assertEquals(DiscoveryState.Finished(emptyList()), discovery.state.value)
     }
 
@@ -179,14 +214,14 @@ class PeerDiscoveryTest {
     fun wifiTurnedOffMidScanWaitsThenStartsAFreshWindow() = runTest {
         val discovery = discovery()
         discovery.start()
-        advanceTimeBy(20_000)
+        advanceTimeBy(40_000)
         driver.enabled.value = false
         runCurrent()
         assertEquals(DiscoveryState.WifiOff, discovery.state.value)
         advanceTimeBy(60_000) // stays waiting, no timeout while Wi-Fi is off
         assertEquals(DiscoveryState.WifiOff, discovery.state.value)
         driver.enabled.value = true
-        advanceTimeBy(29_000)
+        advanceTimeBy(59_000)
         assertTrue(discovery.state.value is DiscoveryState.Scanning)
     }
 
@@ -207,7 +242,7 @@ class PeerDiscoveryTest {
     fun searchAgainStartsANewWindow() = runTest {
         val discovery = discovery()
         discovery.start()
-        advanceTimeBy(30_001) // one full search window
+        advanceTimeBy(60_001) // one full search window
         assertTrue(discovery.state.value is DiscoveryState.Finished)
         discovery.start()
         runCurrent()
