@@ -13,6 +13,8 @@ import com.tandemmoto.link.InstallId
 import com.tandemmoto.link.Link
 import com.tandemmoto.link.LowLatencyWifiLock
 import com.tandemmoto.link.SocketFrameTransport
+import com.tandemmoto.service.LinkService
+import com.tandemmoto.service.LinkSession
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +26,10 @@ private val Context.identityDataStore by preferencesDataStore(name = "identity")
 class TandemMotoApp : Application() {
     /** The app's single Wi-Fi Direct link, shared by Home, Pair, Settings (and later the service). */
     lateinit var link: Link
+        private set
+
+    /** Runs the foreground service while the phones are linked. */
+    lateinit var linkSession: LinkSession
         private set
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -48,6 +54,14 @@ class TandemMotoApp : Application() {
             keepAwake = LowLatencyWifiLock(this)::hold
         )
         link.start()
+        linkSession = LinkSession(
+            status = link.status,
+            scope = appScope,
+            start = { LinkService.start(this) },
+            stop = { LinkService.stop(this) },
+            log = { AppLog.i("Service", it) }
+        )
+        linkSession.begin()
     }
 }
 

@@ -12,6 +12,21 @@
     <string name="permission_precise_location_prompt">Choose precise location to pair</string>
     <string name="permission_allow">Allow</string>
     <string name="permission_open_settings">Open settings</string>
+    <!-- Link notification (foreground service) -->
+    <string name="notification_channel_connection">Connection</string>
+    <string name="notification_channel_connection_summary">Shows the link to your partner\'s phone while the phones are connected</string>
+    <string name="notification_connected">Connected to %1$s</string>
+    <string name="notification_connecting">Looking for %1$s…</string>
+    <string name="notification_not_connected">Not connected to %1$s</string>
+    <string name="notification_partner_app_closed">Open TandemMoto on %1$s</string>
+    <string name="notification_partner_disconnected">%1$s disconnected</string>
+    <string name="notification_wifi_off">Wi-Fi is off</string>
+    <string name="notification_not_paired">Not paired</string>
+    <string name="notification_disconnect">Disconnect</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_notifications_on">On: shows the connection while the screen is off</string>
+    <string name="settings_notifications_off">Off · Tap to turn on and see the connection while the screen is off</string>
+    <string name="permission_notifications_prompt">Allow notifications to see the connection while the screen is off</string>
 
     <!-- Pair -->
     <string name="pair_title">Pair with your partner</string>
@@ -78,8 +93,8 @@
     <string name="status_connected_named">Connected to %1$s</string>
     <string name="status_reconnecting">Reconnecting…</string>
     <string name="status_reconnecting_named">Reconnecting to %1$s…</string>
-    <string name="status_partner_disconnected">Partner disconnected</string>
-    <string name="status_partner_disconnected_named">%1$s disconnected</string>
+    <string name="status_partner_disconnected">Your partner disconnected · Tap to connect</string>
+    <string name="status_partner_disconnected_named">%1$s disconnected · Tap to connect</string>
     <string name="status_partner_on_call">Your partner is on a call</string>
     <string name="status_partner_on_call_named">%1$s is on a call</string>
     <string name="status_headset_disconnected">Headset disconnected</string>

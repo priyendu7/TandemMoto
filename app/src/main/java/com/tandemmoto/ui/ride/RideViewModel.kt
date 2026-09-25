@@ -55,5 +55,6 @@ internal fun LinkStatus.toUi(): ConnectionStatus = when (this) {
         LinkStatus.NotConnected.Reason.PartnerAppClosed -> ConnectionStatus.PartnerAppClosed
         LinkStatus.NotConnected.Reason.UpdateNeeded -> ConnectionStatus.UpdateNeeded
         LinkStatus.NotConnected.Reason.WifiOff -> ConnectionStatus.WifiOff
+        LinkStatus.NotConnected.Reason.PartnerDisconnected -> ConnectionStatus.PartnerDisconnected
     }
 }

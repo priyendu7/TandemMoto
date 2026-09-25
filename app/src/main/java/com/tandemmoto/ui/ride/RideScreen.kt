@@ -19,6 +19,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +33,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tandemmoto.R
 import com.tandemmoto.permissions.AppPermission
+import com.tandemmoto.permissions.AskedOnce
 import com.tandemmoto.permissions.PermissionStatus
 import com.tandemmoto.permissions.PermissionsState
 import com.tandemmoto.ui.components.ConnectionStatus
@@ -53,6 +55,18 @@ fun RideRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val permissions = rememberPermissionRequester()
     val context = LocalContext.current
+    // Notifications (Android 13+, optional) are offered once, the first time the link connects:
+    // that's when the connection notification appears, so the reason is obvious.
+    LaunchedEffect(state.connection) {
+        val askedOnce = AskedOnce(context)
+        if (state.connection == ConnectionStatus.Connected &&
+            permissions.state.status(AppPermission.NOTIFICATIONS) == PermissionStatus.Denied &&
+            !askedOnce.wasAsked(AppPermission.NOTIFICATIONS)
+        ) {
+            askedOnce.markAsked(AppPermission.NOTIFICATIONS)
+            permissions.request(AppPermission.NOTIFICATIONS)
+        }
+    }
     RideScreen(
         state = state,
         permissions = permissions.state,
@@ -154,7 +168,8 @@ private fun ConnectionSection(
             partnerName = partnerName,
             onClickLabel = stringResource(
                 when (connection) {
-                    ConnectionStatus.NotConnected -> R.string.ride_connect_action
+                    ConnectionStatus.NotConnected,
+                    ConnectionStatus.PartnerDisconnected -> R.string.ride_connect_action
                     ConnectionStatus.WifiOff -> R.string.ride_wifi_action
                     else -> R.string.ride_pair_action
                 }
@@ -163,7 +178,7 @@ private fun ConnectionSection(
                 ConnectionStatus.NotPaired,
                 ConnectionStatus.PairedElsewhere,
                 ConnectionStatus.NoLongerPaired -> onOpenPair
-                ConnectionStatus.NotConnected -> onConnect
+                ConnectionStatus.NotConnected, ConnectionStatus.PartnerDisconnected -> onConnect
                 ConnectionStatus.WifiOff -> onOpenWifiSettings
                 else -> null
             }

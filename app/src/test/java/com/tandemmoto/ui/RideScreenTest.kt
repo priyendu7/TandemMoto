@@ -215,6 +215,39 @@ class RideScreenTest {
     }
 
     @Test
+    fun settingsNotificationsRowShowsOffAndAsks() {
+        var clicked = false
+        compose.setContent {
+            TandemMotoTheme {
+                SettingsScreen(
+                    onBack = {},
+                    onExportLogs = {},
+                    notifications = PermissionStatus.Denied,
+                    onNotificationsClick = { clicked = true }
+                )
+            }
+        }
+        compose.onNodeWithText(str(R.string.settings_notifications_off)).performClick()
+        assertTrue(clicked)
+    }
+
+    @Test
+    fun settingsNotificationsRowIsHiddenWhereItDoesNotApply() {
+        compose.setContent { TandemMotoTheme { SettingsScreen(onBack = {}, onExportLogs = {}) } }
+        compose.onNodeWithText(str(R.string.settings_notifications)).assertDoesNotExist()
+    }
+
+    @Test
+    fun partnerDisconnectedTapsToConnect() {
+        showRide(
+            RideUiState(connection = ConnectionStatus.PartnerDisconnected, partnerName = "Redmi")
+        )
+        compose.onNodeWithText(str(R.string.status_partner_disconnected_named, "Redmi"))
+            .performClick()
+        assertTrue(connected)
+    }
+
+    @Test
     fun statusShowsThePairedPhonesName() {
         showRide(RideUiState(connection = ConnectionStatus.Connected, partnerName = "Redmi Y2"))
         compose.onNodeWithText(str(R.string.status_connected_named, "Redmi Y2")).assertExists()

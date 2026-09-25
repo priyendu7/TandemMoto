@@ -205,6 +205,18 @@ class CommandChannelTest {
     }
 
     @Test
+    fun byeDisconnectedEndsTheChannelWithoutRetrying() = runTest {
+        val (ours, theirs) = connectionPair()
+        val channel = channel(SingleConnection(ours))
+        channel.openAccepting()
+        theirs.sendMessage(ourHello)
+        runCurrent()
+        theirs.sendMessage(Message.Bye(Bye.Reason.Disconnected))
+        runCurrent()
+        assertEquals(ChannelState.Refused(Bye.Reason.Disconnected), channel.state.value)
+    }
+
+    @Test
     fun closingStopsEverythingAndLeavesNoCoroutinesRunning() = runTest {
         val partner = FakePartnerApp(backgroundScope)
         val transport = FakeTransport(partner)

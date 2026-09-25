@@ -2,6 +2,7 @@ package com.tandemmoto.permissions
 
 import android.Manifest
 import com.tandemmoto.permissions.AppPermission.NEARBY
+import com.tandemmoto.permissions.AppPermission.NOTIFICATIONS
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -23,7 +24,7 @@ class PermissionsStateTest {
     @Test
     fun android13AndNewerAskForNearbyDevices() {
         listOf(33, 36).forEach { sdk ->
-            assertEquals(listOf(NEARBY), AppPermission.applicable(sdk))
+            assertEquals(listOf(NEARBY, NOTIFICATIONS), AppPermission.applicable(sdk))
             assertEquals(
                 listOf(Manifest.permission.NEARBY_WIFI_DEVICES),
                 NEARBY.permissionsFor(sdk)

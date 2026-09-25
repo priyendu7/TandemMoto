@@ -21,11 +21,17 @@
     <!-- Low-latency Wi-Fi lock while the channel is open (link/LowLatencyWifiLock.kt). -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Foreground service keeping the link alive with the screen off (service/LinkService.kt).
+         connectedDevice is allowed by CHANGE_WIFI_STATE (Android 14+ checks). Needs the Play
+         Console foreground-service declaration: see docs/RELEASING.md. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <!-- Optional (Android 13+): shows the service's notification; it runs without it. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Permissions are added in the PR that builds the feature using them, never ahead of it:
-         RECORD_AUDIO with the intercom (Phase 4); POST_NOTIFICATIONS and the foreground service
-         ones (FOREGROUND_SERVICE, _MICROPHONE, _CONNECTED_DEVICE) with the service, which also
-         needs a Play declaration and demo video per type (see service/README.md);
-         READ_PHONE_STATE with call hold (Phase 5).
+         RECORD_AUDIO and FOREGROUND_SERVICE_MICROPHONE with the intercom (Phase 4, plus its own
+         Play declaration and demo video); READ_PHONE_STATE with call hold (Phase 5).
          No Bluetooth permission: the handlebar remote arrives as media-button events via
          MediaSession, and earbud audio/mic routing goes through AudioManager. -->
 
@@ -46,6 +52,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".service.LinkService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
 
         <!-- Shares the diagnostic log export only when the user asks (Settings → Export). -->
         <provider

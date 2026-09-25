@@ -21,13 +21,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.tandemmoto.BuildConfig
 import com.tandemmoto.R
+import com.tandemmoto.permissions.PermissionStatus
 import com.tandemmoto.ui.components.BackTopBar
 import com.tandemmoto.ui.theme.TandemMotoTheme
 
 private const val SOURCE_URL = "https://github.com/priyendu7/TandemMoto"
 private const val PRIVACY_URL = "$SOURCE_URL/blob/main/docs/PRIVACY.md"
 
-// Links open in the browser, so the app itself needs no INTERNET permission for them.
+// Links open in the browser: the app itself never talks to the internet.
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
@@ -35,7 +36,10 @@ fun SettingsScreen(
     versionName: String = BuildConfig.VERSION_NAME,
     /** The paired partner's name, or null when not paired (the Forget row is hidden). */
     partnerName: String? = null,
-    onForgetPartner: () -> Unit = {}
+    onForgetPartner: () -> Unit = {},
+    /** Android 13+ notifications permission; null where it doesn't apply (row hidden). */
+    notifications: PermissionStatus? = null,
+    onNotificationsClick: () -> Unit = {}
 ) {
     val uriHandler = LocalUriHandler.current
     var confirmForget by rememberSaveable { mutableStateOf(false) }
@@ -80,6 +84,24 @@ fun SettingsScreen(
                         Text(stringResource(R.string.settings_paired_with, partnerName))
                     },
                     modifier = Modifier.clickable { confirmForget = true }
+                )
+                HorizontalDivider()
+            }
+            if (notifications != null) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_notifications)) },
+                    supportingContent = {
+                        Text(
+                            stringResource(
+                                if (notifications == PermissionStatus.Granted) {
+                                    R.string.settings_notifications_on
+                                } else {
+                                    R.string.settings_notifications_off
+                                }
+                            )
+                        )
+                    },
+                    modifier = Modifier.clickable(onClick = onNotificationsClick)
                 )
                 HorizontalDivider()
             }

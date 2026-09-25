@@ -538,6 +538,39 @@ class LinkTest {
         assertEquals(0, driver.discoverCalls)
     }
 
+    // ---- Disconnect (#40) ----
+
+    @Test
+    fun disconnectTellsThePartnerDropsTheGroupAndStops() = runTest {
+        val partner = saved(redmi, Initiator)
+        val link = link(InMemoryPartnerStore(partner))
+        driver.formGroupWith(redmi)
+        runCurrent()
+        assertTrue(link.status.value is LinkStatus.Connected)
+
+        link.disconnect()
+        runCurrent()
+        assertEquals(listOf(Message.Bye(Bye.Reason.Disconnected)), partnerApp.byesReceived)
+        assertEquals(1, driver.removeGroupCalls)
+        assertEquals(LinkStatus.NotConnected(partner.learned()), link.status.value)
+        advanceTimeBy(5 * 60_000L)
+        assertTrue(driver.connectCalls.isEmpty()) // doesn't reconnect by itself
+    }
+
+    @Test
+    fun thePartnerDisconnectingIsShownAndOutlivesTheGroup() = runTest {
+        val partner = saved(redmi, Initiator)
+        val link = link(InMemoryPartnerStore(partner))
+        partnerApp.refuseWith = Bye.Reason.Disconnected
+        driver.formGroupWith(redmi)
+        runCurrent()
+        val expected = LinkStatus.NotConnected(partner.learned(), Reason.PartnerDisconnected)
+        assertEquals(expected, link.status.value)
+        driver.group.value = null
+        runCurrent()
+        assertEquals(expected, link.status.value)
+    }
+
     // ---- Forget ----
 
     @Test
