@@ -8,15 +8,42 @@ enum class StatusKind { Neutral, InProgress, Ok, Info, Problem }
 
 /**
  * Every link/peripheral state the PRD asks the UI to surface (PRD §3 "clear error states").
- * Phase 1 will drive this from the real connection manager.
+ * [namedLabel] is used instead of [label] when the paired phone's name is known ("Connected to
+ * Redmi Y2"); it takes the name as `%1$s`.
  */
-enum class ConnectionStatus(@StringRes val label: Int, val kind: StatusKind) {
+enum class ConnectionStatus(
+    @StringRes val label: Int,
+    val kind: StatusKind,
+    @StringRes val namedLabel: Int? = null
+) {
     NotPaired(R.string.status_not_paired, StatusKind.Neutral),
-    Searching(R.string.status_searching, StatusKind.InProgress),
-    Connected(R.string.status_connected, StatusKind.Ok),
-    Reconnecting(R.string.status_reconnecting, StatusKind.InProgress),
-    PartnerDisconnected(R.string.status_partner_disconnected, StatusKind.Problem),
-    PartnerOnCall(R.string.status_partner_on_call, StatusKind.Info),
+    NotConnected(
+        R.string.status_not_connected,
+        StatusKind.Neutral,
+        R.string.status_not_connected_named
+    ),
+    PairedElsewhere(
+        R.string.status_paired_elsewhere,
+        StatusKind.Problem,
+        R.string.status_paired_elsewhere_named
+    ),
+    Searching(R.string.status_searching, StatusKind.InProgress, R.string.status_searching_named),
+    Connected(R.string.status_connected, StatusKind.Ok, R.string.status_connected_named),
+    Reconnecting(
+        R.string.status_reconnecting,
+        StatusKind.InProgress,
+        R.string.status_reconnecting_named
+    ),
+    PartnerDisconnected(
+        R.string.status_partner_disconnected,
+        StatusKind.Problem,
+        R.string.status_partner_disconnected_named
+    ),
+    PartnerOnCall(
+        R.string.status_partner_on_call,
+        StatusKind.Info,
+        R.string.status_partner_on_call_named
+    ),
     HeadsetDisconnected(R.string.status_headset_disconnected, StatusKind.Problem),
     MicPermissionMissing(R.string.status_mic_permission_missing, StatusKind.Problem)
 }

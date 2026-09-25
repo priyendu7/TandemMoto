@@ -38,6 +38,8 @@ import com.tandemmoto.ui.theme.TandemMotoTheme
 fun ConnectionStatusBar(
     status: ConnectionStatus,
     modifier: Modifier = Modifier,
+    /** The paired phone's name; shown instead of "your partner" when known. */
+    partnerName: String? = null,
     onClickLabel: String? = null,
     onClick: (() -> Unit)? = null
 ) {
@@ -46,7 +48,10 @@ fun ConnectionStatusBar(
         container = container,
         content = content,
         icon = status.kind.icon(status),
-        text = stringResource(status.label),
+        text = status.namedLabel
+            ?.takeIf { !partnerName.isNullOrBlank() }
+            ?.let { stringResource(it, partnerName!!) }
+            ?: stringResource(status.label),
         modifier = modifier
             .then(
                 if (onClick != null) {

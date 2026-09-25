@@ -2,32 +2,33 @@ package com.tandemmoto.ui.setup
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewModelScope
-import com.tandemmoto.diagnostics.AppLog
-import com.tandemmoto.link.AndroidDiscoveryPreconditions
-import com.tandemmoto.link.AndroidWifiP2pDriver
+import com.tandemmoto.link
 import com.tandemmoto.link.DiscoveryState
-import com.tandemmoto.link.PeerDiscovery
+import com.tandemmoto.link.NearbyDevice
+import com.tandemmoto.link.PairingState
 import kotlinx.coroutines.flow.StateFlow
 
-/** Owns discovery for the Pair screen; the screen starts it on resume and stops it on pause. */
+/**
+ * The Pair screen's view of the shared link: discovery plus pairing. The screen opens the
+ * search on resume and closes it on pause (which also withdraws a pending invitation).
+ */
 class PairViewModel(app: Application) : AndroidViewModel(app) {
-    private val driver = AndroidWifiP2pDriver(app)
-    private val discovery = PeerDiscovery(
-        driver = driver,
-        preconditions = AndroidDiscoveryPreconditions(app),
-        scope = viewModelScope,
-        log = { AppLog.i("Link", it) }
-    )
+    private val link = app.link
 
-    val state: StateFlow<DiscoveryState> = discovery.state
+    val discovery: StateFlow<DiscoveryState> = link.discovery.state
+    val pairing: StateFlow<PairingState> = link.pairing
 
-    fun startSearch() = discovery.start()
+    fun onScreenVisible() = link.openPairScreen()
 
-    fun stopSearch() = discovery.stop()
+    fun onScreenHidden() = link.closePairScreen()
 
-    override fun onCleared() {
-        discovery.stop()
-        driver.close()
-    }
+    fun searchAgain() = link.discovery.start()
+
+    fun invite(device: NearbyDevice) = link.invite(device)
+
+    fun confirmReplace() = link.confirmReplace()
+
+    fun cancelInvite() = link.cancelInvite()
+
+    fun dismissPairing() = link.dismissPairing()
 }

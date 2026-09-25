@@ -4,11 +4,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -26,9 +32,31 @@ private const val PRIVACY_URL = "$SOURCE_URL/blob/main/docs/PRIVACY.md"
 fun SettingsScreen(
     onBack: () -> Unit,
     onExportLogs: () -> Unit,
-    versionName: String = BuildConfig.VERSION_NAME
+    versionName: String = BuildConfig.VERSION_NAME,
+    /** The paired partner's name, or null when not paired (the Forget row is hidden). */
+    partnerName: String? = null,
+    onForgetPartner: () -> Unit = {}
 ) {
     val uriHandler = LocalUriHandler.current
+    var confirmForget by rememberSaveable { mutableStateOf(false) }
+    if (confirmForget && partnerName != null) {
+        AlertDialog(
+            onDismissRequest = { confirmForget = false },
+            title = { Text(stringResource(R.string.settings_forget_title, partnerName)) },
+            text = { Text(stringResource(R.string.settings_forget_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmForget = false
+                    onForgetPartner()
+                }) { Text(stringResource(R.string.settings_forget_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmForget = false }) {
+                    Text(stringResource(R.string.pair_cancel))
+                }
+            }
+        )
+    }
     Scaffold(topBar = { BackTopBar(stringResource(R.string.settings_title), onBack) }) { padding ->
         Column(
             modifier = Modifier
@@ -45,6 +73,16 @@ fun SettingsScreen(
                 }
             )
             HorizontalDivider()
+            if (partnerName != null) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_forget_partner)) },
+                    supportingContent = {
+                        Text(stringResource(R.string.settings_paired_with, partnerName))
+                    },
+                    modifier = Modifier.clickable { confirmForget = true }
+                )
+                HorizontalDivider()
+            }
             ListItem(
                 headlineContent = { Text(stringResource(R.string.settings_privacy_policy)) },
                 supportingContent = { Text(stringResource(R.string.settings_privacy_summary)) },

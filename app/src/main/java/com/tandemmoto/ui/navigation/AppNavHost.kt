@@ -1,12 +1,15 @@
 package com.tandemmoto.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.tandemmoto.diagnostics.LogExporter
+import com.tandemmoto.link
 import com.tandemmoto.ui.playlist.PlaylistScreen
 import com.tandemmoto.ui.ride.RideRoute
 import com.tandemmoto.ui.settings.SettingsScreen
@@ -34,16 +37,22 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             )
         }
         composable(Routes.PAIR) {
-            PairRoute(onBack = { navController.popBackStack() })
+            PairRoute(
+                onBack = { navController.popBackStack() },
+                onPaired = { navController.popBackStack() }
+            )
         }
         composable(Routes.PLAYLIST) {
             PlaylistScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.SETTINGS) {
             val context = LocalContext.current
+            val partner by context.link.partner.collectAsStateWithLifecycle()
             SettingsScreen(
                 onBack = { navController.popBackStack() },
-                onExportLogs = { LogExporter.share(context) }
+                onExportLogs = { LogExporter.share(context) },
+                partnerName = partner?.name,
+                onForgetPartner = context.link::forgetPartner
             )
         }
     }

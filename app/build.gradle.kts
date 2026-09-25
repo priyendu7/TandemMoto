@@ -97,6 +97,8 @@ dependencies {
     implementation("androidx.core:core-ktx:1.19.1")
     // System splash screen on every Android version (Android 12+ shows one anyway).
     implementation("androidx.core:core-splashscreen:1.0.1")
+    // Stores the paired partner (link/Partner.kt).
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.navigation:navigation-compose:2.10.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")

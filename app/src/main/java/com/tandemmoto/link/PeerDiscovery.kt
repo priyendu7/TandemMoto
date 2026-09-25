@@ -57,10 +57,25 @@ class PeerDiscovery(
 
     private var job: Job? = null
 
-    /** Starts a fresh search window; restarting an ongoing search is harmless. */
-    fun start() {
+    /**
+     * Starts a fresh search; restarting an ongoing one is harmless. [continuous]: keep discovering
+     * until [stop]/[pause] (the Pair screen, so the phone can always receive an invitation: a phone
+     * only receives one while it's discovering); otherwise one [scanDurationMs] window.
+     */
+    fun start(continuous: Boolean = false) {
         job?.cancel()
-        job = scope.launch { run() }
+        job = scope.launch { run(continuous) }
+    }
+
+    /**
+     * Ends the app's search loop but leaves Android's discovery alone, for right before
+     * connect(): asking Android to stop discovery and connect at once makes connect fail with
+     * ERROR (seen on both P1 and P4). Android ends discovery itself when it connects.
+     */
+    fun pause() {
+        job?.cancel()
+        job = null
+        _state.value = DiscoveryState.Idle
     }
 
     fun stop() {
@@ -69,12 +84,12 @@ class PeerDiscovery(
         job = null
         _state.value = DiscoveryState.Idle
         if (wasRunning) {
-            log("Search stopped (left the screen)")
+            log("Search stopped")
             scope.launch { driver.stopPeerDiscovery() }
         }
     }
 
-    private suspend fun run() {
+    private suspend fun run(continuous: Boolean) {
         when {
             !driver.supported -> return finish(
                 DiscoveryState.Unsupported,
@@ -89,7 +104,7 @@ class PeerDiscovery(
                 log("Wi-Fi Direct off, waiting for it to come back")
                 driver.enabled.first { it == true }
             }
-            when (scanOnce()) {
+            when (scanOnce(continuous)) {
                 Outcome.WifiLost -> continue
                 Outcome.Finished -> {
                     val devices = sorted(driver.peers.value)
@@ -114,9 +129,15 @@ class PeerDiscovery(
         }
     }
 
-    private suspend fun scanOnce(): Outcome = coroutineScope {
+    private suspend fun scanOnce(continuous: Boolean): Outcome = coroutineScope {
         _state.value = DiscoveryState.Scanning(sorted(driver.peers.value))
-        log("Searching for ${scanDurationMs / 1_000} s")
+        log(
+            if (continuous) {
+                "Searching until the screen closes"
+            } else {
+                "Searching for ${scanDurationMs / 1_000} s"
+            }
+        )
         val peersJob = launch {
             driver.peers.collect { peers ->
                 _state.update {
@@ -130,7 +151,7 @@ class PeerDiscovery(
                 }
             }
         }
-        val outcome = withTimeoutOrNull(scanDurationMs) {
+        val outcome = withTimeoutOrNull(if (continuous) Long.MAX_VALUE else scanDurationMs) {
             val wifiLost = async { driver.enabled.first { it == false }.let { Outcome.WifiLost } }
             val discovery = async { keepDiscovering() }
             select {

@@ -34,6 +34,7 @@ class RideScreenTest {
 
     private var requested: AppPermission? = null
     private var openedPair = false
+    private var connected = false
 
     private fun nearby(status: PermissionStatus, sdk: Int = 34, approximateOnly: Boolean = false) =
         PermissionsState(sdk, mapOf(AppPermission.NEARBY to status), approximateOnly)
@@ -48,6 +49,7 @@ class RideScreenTest {
                 permissions = permissions,
                 onRequestPermission = { requested = it },
                 onOpenPair = { openedPair = true },
+                onConnect = { connected = true },
                 onPlayPause = {},
                 onNext = {},
                 onPrevious = {},
@@ -145,5 +147,63 @@ class RideScreenTest {
         }
         compose.onNodeWithText(str(R.string.settings_export_logs)).performClick()
         assertTrue(exported)
+    }
+
+    @Test
+    fun notConnectedTapsToConnect() {
+        showRide(RideUiState(connection = ConnectionStatus.NotConnected))
+        compose.onNodeWithText(str(R.string.status_not_connected)).performClick()
+        assertTrue(connected)
+        assertTrue(!openedPair)
+    }
+
+    @Test
+    fun pairedElsewhereTapsToPairAgain() {
+        showRide(RideUiState(connection = ConnectionStatus.PairedElsewhere))
+        compose.onNodeWithText(str(R.string.status_paired_elsewhere)).performClick()
+        assertTrue(openedPair)
+    }
+
+    @Test
+    fun settingsForgetPartnerAsksBeforeForgetting() {
+        var forgot = false
+        compose.setContent {
+            TandemMotoTheme {
+                SettingsScreen(
+                    onBack = {},
+                    onExportLogs = {},
+                    partnerName = "Redmi Y2",
+                    onForgetPartner = { forgot = true }
+                )
+            }
+        }
+        compose.onNodeWithText(str(R.string.settings_forget_partner)).performClick()
+        assertTrue(!forgot)
+        compose.onNodeWithText(str(R.string.settings_forget_confirm)).performClick()
+        assertTrue(forgot)
+    }
+
+    @Test
+    fun settingsHidesForgetWhenNotPaired() {
+        compose.setContent { TandemMotoTheme { SettingsScreen(onBack = {}, onExportLogs = {}) } }
+        compose.onNodeWithText(str(R.string.settings_forget_partner)).assertDoesNotExist()
+    }
+
+    @Test
+    fun statusShowsThePairedPhonesName() {
+        showRide(RideUiState(connection = ConnectionStatus.Connected, partnerName = "Redmi Y2"))
+        compose.onNodeWithText(str(R.string.status_connected_named, "Redmi Y2")).assertExists()
+        compose.onNodeWithText(str(R.string.status_connected)).assertDoesNotExist()
+    }
+
+    @Test
+    fun notConnectedNamesThePhoneToo() {
+        showRide(
+            RideUiState(connection = ConnectionStatus.NotConnected, partnerName = "Galaxy S25")
+        )
+        compose.onNodeWithText(
+            str(R.string.status_not_connected_named, "Galaxy S25")
+        ).performClick()
+        assertTrue(connected)
     }
 }

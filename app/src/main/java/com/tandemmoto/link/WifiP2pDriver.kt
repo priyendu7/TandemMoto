@@ -16,6 +16,12 @@ data class NearbyDevice(
     val logId: String get() = "peer-" + Integer.toHexString((name + address).hashCode()).takeLast(4)
 }
 
+/**
+ * The Wi-Fi Direct group this phone is in. [peer] is the other phone: a client when this phone is
+ * the group owner, the owner otherwise. Null while Android hasn't said who it is yet.
+ */
+data class GroupInfo(val isGroupOwner: Boolean, val ownerAddress: String?, val peer: NearbyDevice?)
+
 /** Outcome of a WifiP2pManager request (its ActionListener result). */
 enum class P2pResult { Ok, Busy, Error, Unsupported }
 
@@ -35,9 +41,20 @@ interface WifiP2pDriver {
     /** Android is currently discovering (it stops on its own after a while). */
     val discovering: StateFlow<Boolean>
 
+    /** The current group, null when there isn't one. It can outlive the app (spike). */
+    val group: StateFlow<GroupInfo?>
+
     suspend fun discoverPeers(): P2pResult
 
     suspend fun stopPeerDiscovery(): P2pResult
+
+    /** Invites [address]; the first time, the other phone shows Android's accept prompt. */
+    suspend fun connect(address: String): P2pResult
+
+    /** Withdraws a pending invitation (a stuck one survives app restarts, per the spike). */
+    suspend fun cancelConnect(): P2pResult
+
+    suspend fun removeGroup(): P2pResult
 
     fun close()
 }

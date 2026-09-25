@@ -7,6 +7,8 @@ import androidx.compose.ui.test.performClick
 import com.tandemmoto.R
 import com.tandemmoto.link.DiscoveryState
 import com.tandemmoto.link.NearbyDevice
+import com.tandemmoto.link.PairingState
+import com.tandemmoto.link.Partner
 import com.tandemmoto.permissions.AppPermission
 import com.tandemmoto.permissions.PermissionStatus
 import com.tandemmoto.permissions.PermissionsState
@@ -29,20 +31,28 @@ class PairScreenTest {
 
     private val clicks = mutableListOf<String>()
 
-    private fun show(state: DiscoveryState, nearby: PermissionStatus = PermissionStatus.Granted) =
-        compose.setContent {
-            TandemMotoTheme {
-                PairScreen(
-                    state = state,
-                    permissions = PermissionsState(34, mapOf(AppPermission.NEARBY to nearby)),
-                    onRequestPermission = { clicks += "permission" },
-                    onSearchAgain = { clicks += "search" },
-                    onOpenWifiSettings = { clicks += "wifi" },
-                    onOpenLocationSettings = { clicks += "location" },
-                    onBack = {}
-                )
-            }
+    private fun show(
+        state: DiscoveryState,
+        nearby: PermissionStatus = PermissionStatus.Granted,
+        pairing: PairingState = PairingState.Idle
+    ) = compose.setContent {
+        TandemMotoTheme {
+            PairScreen(
+                state = state,
+                pairing = pairing,
+                permissions = PermissionsState(34, mapOf(AppPermission.NEARBY to nearby)),
+                onRequestPermission = { clicks += "permission" },
+                onSearchAgain = { clicks += "search" },
+                onDeviceClick = { clicks += "invite ${it.name}" },
+                onConfirmReplace = { clicks += "replace" },
+                onCancelInvite = { clicks += "cancel" },
+                onDismissPairing = { clicks += "dismiss" },
+                onOpenWifiSettings = { clicks += "wifi" },
+                onOpenLocationSettings = { clicks += "location" },
+                onBack = {}
+            )
         }
+    }
 
     private fun device(name: String, isPhone: Boolean) =
         NearbyDevice(name, name, NearbyDevice.Status.Available, isPhone)
@@ -120,5 +130,58 @@ class PairScreenTest {
     fun unsupportedExplainsWhy() {
         show(DiscoveryState.Unsupported)
         compose.onNodeWithText(str(R.string.pair_unsupported)).assertExists()
+    }
+
+    @Test
+    fun tappingAPhoneInvitesIt() {
+        show(DiscoveryState.Scanning(listOf(device("Redmi Y2", true))))
+        compose.onNodeWithText("Redmi Y2").performClick()
+        assertEquals(listOf("invite Redmi Y2"), clicks)
+    }
+
+    @Test
+    fun invitingShowsWhoAndCanBeCancelled() {
+        show(
+            DiscoveryState.Idle,
+            pairing = PairingState.Inviting(device("Redmi Y2", true))
+        )
+        compose.onNodeWithText(compose.activity.getString(R.string.pair_inviting, "Redmi Y2"))
+            .assertExists()
+        compose.onNodeWithText(str(R.string.pair_inviting_hint)).assertExists()
+        compose.onNodeWithText(str(R.string.pair_cancel)).performClick()
+        assertEquals(listOf("cancel"), clicks)
+    }
+
+    @Test
+    fun noAnswerExplainsWhatToDo() {
+        show(
+            DiscoveryState.Scanning(emptyList()),
+            pairing = PairingState.Failed(PairingState.Failed.Reason.NoAnswer)
+        )
+        compose.onNodeWithText(str(R.string.pair_failed_no_answer)).assertExists()
+        compose.onNodeWithText(str(R.string.pair_ok)).performClick()
+        assertEquals(listOf("dismiss"), clicks)
+    }
+
+    @Test
+    fun replacingAPartnerAsksFirst() {
+        val current = Partner("Galaxy S25", "a", Partner.Role.Initiator, 0)
+        show(
+            DiscoveryState.Scanning(emptyList()),
+            pairing = PairingState.ConfirmReplace(device("Redmi Y2", true), current)
+        )
+        compose.onNodeWithText(str(R.string.pair_replace_title)).assertExists()
+        compose.onNodeWithText(str(R.string.pair_replace_confirm)).performClick()
+        assertEquals(listOf("replace"), clicks)
+    }
+
+    @Test
+    fun devicesAreNotTappableWhileAFailureIsShown() {
+        show(
+            DiscoveryState.Scanning(listOf(device("Redmi Y2", true))),
+            pairing = PairingState.Failed(PairingState.Failed.Reason.Busy)
+        )
+        compose.onNodeWithText("Redmi Y2").performClick()
+        assertEquals(emptyList<String>(), clicks)
     }
 }
