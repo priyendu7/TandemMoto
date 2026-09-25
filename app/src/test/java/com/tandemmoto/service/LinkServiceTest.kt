@@ -26,13 +26,22 @@ class LinkServiceTest {
         val notification = shadowOf(service).lastForegroundNotification
         assertNotNull(notification)
         assertEquals(LinkService.CHANNEL_ID, notification.channelId)
+        // Not paired in a fresh test app: only Close.
         assertEquals(
-            app.getString(R.string.notification_disconnect),
+            app.getString(R.string.notification_close),
             notification.actions.single().title
         )
         val channel = app.getSystemService(NotificationManager::class.java)
             .getNotificationChannel(LinkService.CHANNEL_ID)
         assertEquals(NotificationManager.IMPORTANCE_LOW, channel.importance)
+    }
+
+    @Test
+    fun theConnectActionDoesNotGoForeground() {
+        val intent = Intent(app, LinkService::class.java).setAction(LinkService.ACTION_CONNECT)
+        val service = Robolectric.buildService(LinkService::class.java, intent).create()
+            .startCommand(0, 1).get()
+        assertEquals(null, shadowOf(service).lastForegroundNotification)
     }
 
     @Test

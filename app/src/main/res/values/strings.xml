@@ -23,6 +23,9 @@
     <string name="notification_wifi_off">Wi-Fi is off</string>
     <string name="notification_not_paired">Not paired</string>
     <string name="notification_disconnect">Disconnect</string>
+    <string name="notification_connect">Connect</string>
+    <string name="notification_turn_on_wifi">Turn on Wi-Fi</string>
+    <string name="notification_close">Close</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_on">On: shows the connection while the screen is off</string>
     <string name="settings_notifications_off">Off · Tap to turn on and see the connection while the screen is off</string>

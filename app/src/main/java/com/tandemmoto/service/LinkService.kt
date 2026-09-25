@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
@@ -46,11 +47,18 @@ class LinkService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_DISCONNECT) {
-            AppLog.i(TAG, "Disconnect tapped")
-            app.link.disconnect()
-            app.linkSession.stopNow()
-            return START_NOT_STICKY
+        when (intent?.action) {
+            ACTION_DISCONNECT -> {
+                AppLog.i(TAG, "Disconnect tapped")
+                app.link.disconnect()
+                app.linkSession.stopNow()
+                return START_NOT_STICKY
+            }
+            ACTION_CONNECT -> {
+                AppLog.i(TAG, "Connect tapped")
+                app.link.connectToPartner()
+                return START_NOT_STICKY
+            }
         }
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
@@ -95,18 +103,15 @@ class LinkService : Service() {
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        val disconnect = PendingIntent.getService(
-            this,
-            1,
-            Intent(this, LinkService::class.java).setAction(ACTION_DISCONNECT),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_link)
             .setContentTitle(getString(R.string.app_name))
             .setContentText(getString(text.text, text.name))
             .setContentIntent(open)
-            .addAction(0, getString(R.string.notification_disconnect), disconnect)
+        text.actions.forEach { action ->
+            builder.addAction(0, getString(action.label), pendingIntentFor(action))
+        }
+        return builder
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
@@ -115,11 +120,42 @@ class LinkService : Service() {
             .build()
     }
 
+    private fun pendingIntentFor(action: NotificationAction): PendingIntent {
+        val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        return when (action) {
+            NotificationAction.Disconnect, NotificationAction.Close -> PendingIntent.getService(
+                this,
+                1,
+                Intent(this, LinkService::class.java).setAction(ACTION_DISCONNECT),
+                flags
+            )
+            NotificationAction.Connect -> PendingIntent.getService(
+                this,
+                2,
+                Intent(this, LinkService::class.java).setAction(ACTION_CONNECT),
+                flags
+            )
+            NotificationAction.TurnOnWifi -> PendingIntent.getActivity(
+                this,
+                3,
+                Intent(
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        Settings.Panel.ACTION_WIFI
+                    } else {
+                        Settings.ACTION_WIFI_SETTINGS
+                    }
+                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                flags
+            )
+        }
+    }
+
     companion object {
         private const val TAG = "Service"
         const val CHANNEL_ID = "connection"
         const val NOTIFICATION_ID = 40
         const val ACTION_DISCONNECT = "com.tandemmoto.action.DISCONNECT"
+        const val ACTION_CONNECT = "com.tandemmoto.action.CONNECT"
 
         fun start(context: Context) {
             try {
