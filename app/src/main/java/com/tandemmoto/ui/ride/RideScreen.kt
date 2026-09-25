@@ -106,6 +106,7 @@ fun RideScreen(
         ) {
             ConnectionSection(
                 state.connection,
+                state.partnerName,
                 permissions,
                 onRequestPermission,
                 onOpenPair,
@@ -134,6 +135,7 @@ fun RideScreen(
 @Composable
 private fun ConnectionSection(
     connection: ConnectionStatus,
+    partnerName: String?,
     permissions: PermissionsState,
     onRequestPermission: (AppPermission) -> Unit,
     onOpenPair: () -> Unit,
@@ -142,6 +144,7 @@ private fun ConnectionSection(
     if (permissions.isGranted(AppPermission.NEARBY)) {
         ConnectionStatusBar(
             status = connection,
+            partnerName = partnerName,
             onClickLabel = stringResource(
                 if (connection == ConnectionStatus.NotConnected) {
                     R.string.ride_connect_action

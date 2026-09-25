@@ -21,7 +21,9 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
     private val playback = MutableStateFlow(RideUiState())
 
     val uiState: StateFlow<RideUiState> =
-        combine(playback, link.status) { state, status -> state.copy(connection = status.toUi()) }
+        combine(playback, link.status) { state, status ->
+            state.copy(connection = status.toUi(), partnerName = status.partnerName())
+        }
             .stateIn(viewModelScope, SharingStarted.Eagerly, RideUiState())
 
     /** "Not connected · Tap to connect". */
@@ -33,6 +35,13 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
     fun onNext() = Unit
 
     fun onPrevious() = Unit
+}
+
+internal fun LinkStatus.partnerName(): String? = when (this) {
+    LinkStatus.NotPaired -> null
+    is LinkStatus.Connecting -> partner.name
+    is LinkStatus.Connected -> partner.name
+    is LinkStatus.NotConnected -> partner.name
 }
 
 internal fun LinkStatus.toUi(): ConnectionStatus = when (this) {

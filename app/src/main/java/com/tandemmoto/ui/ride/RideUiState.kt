@@ -4,6 +4,8 @@ import com.tandemmoto.ui.components.ConnectionStatus
 
 data class RideUiState(
     val connection: ConnectionStatus = ConnectionStatus.NotPaired,
+    /** The paired phone's name, for "Connected to Redmi Y2"; null when not paired. */
+    val partnerName: String? = null,
     val nowPlaying: String? = null,
     val isPlaying: Boolean = false
 ) {

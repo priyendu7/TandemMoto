@@ -188,4 +188,22 @@ class RideScreenTest {
         compose.setContent { TandemMotoTheme { SettingsScreen(onBack = {}, onExportLogs = {}) } }
         compose.onNodeWithText(str(R.string.settings_forget_partner)).assertDoesNotExist()
     }
+
+    @Test
+    fun statusShowsThePairedPhonesName() {
+        showRide(RideUiState(connection = ConnectionStatus.Connected, partnerName = "Redmi Y2"))
+        compose.onNodeWithText(str(R.string.status_connected_named, "Redmi Y2")).assertExists()
+        compose.onNodeWithText(str(R.string.status_connected)).assertDoesNotExist()
+    }
+
+    @Test
+    fun notConnectedNamesThePhoneToo() {
+        showRide(
+            RideUiState(connection = ConnectionStatus.NotConnected, partnerName = "Galaxy S25")
+        )
+        compose.onNodeWithText(
+            str(R.string.status_not_connected_named, "Galaxy S25")
+        ).performClick()
+        assertTrue(connected)
+    }
 }
