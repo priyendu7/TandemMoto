@@ -18,6 +18,7 @@ The lab logged every Wi‑Fi Direct event, timing and ping to the in-app diagnos
 | Detecting a drop (airplane mode, disconnect) | **< 1 s**, from Android's own events (`Wi-Fi Direct disabled`, group removed) |
 | Automatic reconnection by Android | ❌ **None.** The app must rediscover and reconnect |
 | Screen off | P4 (Android 9): **stays connected**, slowed down. P1 (Android 16): **socket killed within ~1 s** (`Software caused connection abort`), **unless a foreground service is running**: then it stays connected (≈ 6 min tested) |
+| Range | ✅ Connected at ≈ 18 m (60 ft) with higher latency (p95 ≈ 0.35 s at 1 packet/s); not tested further |
 | Latency | With sparse traffic (1 packet/s): median ≈ 50–250 ms, **p95 up to 2.4 s** (Wi‑Fi power saving). With **steady traffic (20 packets/s): median ≈ 10 ms, p95 ≈ 40–75 ms** ✅. A low-latency Wi‑Fi lock helps a little more |
 
 ## Results by step
@@ -100,7 +101,12 @@ The lock is Android's low-latency mode on P1 and the older "high performance" mo
 
 ### Foreground service (F1/F2)
 - Foreground service on both phones, 1/s, then P1 locked: **no drop for ≈ 6 minutes** (15:44:55–15:50:39); P1 kept pinging every second with median ≈ 35–60 ms. The session ended only when the lab was closed. **The foreground service fixes P1's screen-off socket kill.**
-- P4 locked with its foreground service on was still **throttled by MIUI** (3–4 s gaps, 10 s log ticks stretched to 13–19 s), but stayed connected.
+- P4, left on the desk with its screen off and its foreground service on, was still **throttled by MIUI** (3–4 s gaps, 10 s log ticks stretched to 13–19 s), but stayed connected.
+
+### Range (end of round 2)
+- P1 was carried **≈ 18 m (60 ft)** away with its screen on; P4 stayed behind with its screen off (foreground service on both, 1 packet/s).
+- **Stayed connected, no drop.** At P1, latency rose from ≈ 35 ms to ≈ 60 ms median, with recent round trips at 110–160 ms and p95 ≈ 0.35 s; 1–2 pings missed.
+- Round 1's ~12 m walk (S8) wasn't a clean range test; this one is. Rider and pillion are ~1 m apart on the bike, so range has plenty of margin.
 - Not run: a 10–15 minute locked run with battery %. That belongs in T10 (Phase 5) with the real service.
 
 ### More pitfalls seen in round 2
@@ -142,4 +148,4 @@ The lock is Android's low-latency mode on P1 and the older "high performance" mo
 ## Carried forward (not blocking #22)
 1. **Heartbeat rate vs battery:** find the lowest rate that keeps p95 under ~100 ms (try 5/s and 10/s) and its battery cost. Belongs in #25 / T10.
 2. **Ride-length run:** 10–15+ minutes locked with the foreground service, with battery % (T10, Phase 5).
-3. **Range:** a clean walk-out with both screens on (low priority: rider and pillion are ~1 m apart).
+3. **Range beyond ≈ 18 m:** where the link actually drops (low priority: rider and pillion are ~1 m apart).
