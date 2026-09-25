@@ -18,6 +18,10 @@
     <!-- Spike (#22) only: Android won't open any TCP socket without INTERNET, even one that only
          runs over Wi-Fi Direct. #25 adds it permanently with a PRIVACY.md note. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Spike (#22) lab v2 only: foreground-service and Wi-Fi lock experiments. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- Permissions are added in the PR that builds the feature using them, never ahead of it:
          RECORD_AUDIO with the intercom (Phase 4); POST_NOTIFICATIONS and the foreground service
@@ -44,6 +48,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Spike (#22) lab v2 only. connectedDevice is allowed by CHANGE_WIFI_STATE. -->
+        <service
+            android:name=".spike.LabForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
 
         <!-- Shares the diagnostic log export only when the user asks (Settings → Export). -->
         <provider

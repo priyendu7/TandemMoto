@@ -8,6 +8,9 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.LocationManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.wifi.WifiManager
 import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pDeviceList
@@ -64,7 +67,16 @@ data class LabState(
     val connectToGroupMs: Long? = null,
     val groupToSocketMs: Long? = null,
     val ping: PingSnapshot = PingSnapshot(),
-    val events: List<LabEvent> = emptyList()
+    val events: List<LabEvent> = emptyList(),
+    // Lab v2
+    val wifiNetworkConnected: Boolean = false,
+    val connecting: Boolean = false,
+    /** Peer address → ms from Discover until first seen, for this discovery. */
+    val peerFirstSeenMs: Map<String, Long> = emptyMap(),
+    val pingRate: Int = 1,
+    val wifiLockOn: Boolean = false,
+    val foregroundServiceOn: Boolean = false,
+    val pinging: Boolean = false
 )
 
 /**
@@ -97,6 +109,17 @@ class WifiDirectLab(app: Application) : AndroidViewModel(app) {
 
     @Volatile private var server: ServerSocket? = null
 
+    private val wifiLock: WifiManager.WifiLock? =
+        app.applicationContext.getSystemService(WifiManager::class.java)?.createWifiLock(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+            } else {
+                @Suppress("DEPRECATION")
+                WifiManager.WIFI_MODE_FULL_HIGH_PERF
+            },
+            "TandemMoto:spike"
+        )?.apply { setReferenceCounted(false) }
+
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = onBroadcast(intent)
     }
@@ -121,12 +144,10 @@ class WifiDirectLab(app: Application) : AndroidViewModel(app) {
             var tick = 0
             while (isActive) {
                 delay(1_000)
+                // Stats freeze once the socket ends, so the numbers shown are the last session's.
+                if (!_state.value.pinging) continue
                 _state.update { it.copy(ping = stats.snapshot(now())) }
-                if (++tick % 10 == 0 &&
-                    _state.value.ping.sent > 0
-                ) {
-                    event("Ping ${_state.value.ping}")
-                }
+                if (++tick % 10 == 0) event("Ping ${settings()} ${_state.value.ping}")
             }
         }
     }
@@ -137,11 +158,68 @@ class WifiDirectLab(app: Application) : AndroidViewModel(app) {
         val location = app.getSystemService(LocationManager::class.java)
         val locationOn = location != null && LocationManagerCompat.isLocationEnabled(location)
         val nearby = app.currentPermissionsState().isGranted(AppPermission.NEARBY)
+        val connectivity = app.getSystemService(ConnectivityManager::class.java)
+        val wifiNetwork = connectivity?.activeNetwork
+            ?.let { connectivity.getNetworkCapabilities(it) }
+            ?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
         val before = _state.value
-        if (before.locationOn != locationOn || before.nearbyGranted != nearby) {
-            event("Environment: location on=$locationOn, nearby/location permission=$nearby")
+        if (before.locationOn != locationOn ||
+            before.nearbyGranted != nearby ||
+            before.wifiNetworkConnected != wifiNetwork
+        ) {
+            event(
+                "Environment: location on=$locationOn, nearby/location permission=$nearby, " +
+                    "connected to a Wi-Fi network=$wifiNetwork"
+            )
         }
-        _state.update { it.copy(locationOn = locationOn, nearbyGranted = nearby) }
+        _state.update {
+            it.copy(
+                locationOn = locationOn,
+                nearbyGranted = nearby,
+                wifiNetworkConnected = wifiNetwork
+            )
+        }
+    }
+
+    /** 1 or 20 pings per second from this phone; stats restart so runs don't mix. */
+    fun setPingRate(rate: Int) {
+        _state.update { it.copy(pingRate = rate) }
+        resetStats()
+    }
+
+    fun setWifiLock(on: Boolean) {
+        if (on) {
+            wifiLock?.acquire()
+        } else if (wifiLock?.isHeld == true) {
+            wifiLock.release()
+        }
+        val mode = if (Build.VERSION.SDK_INT >=
+            Build.VERSION_CODES.Q
+        ) {
+            "low latency"
+        } else {
+            "high perf"
+        }
+        _state.update { it.copy(wifiLockOn = wifiLock?.isHeld == true) }
+        event("Wi-Fi lock ($mode) ${if (_state.value.wifiLockOn) "held" else "released"}")
+        resetStats()
+    }
+
+    fun setForegroundService(on: Boolean) {
+        val app = getApplication<Application>()
+        if (on) LabForegroundService.start(app) else LabForegroundService.stop(app)
+        _state.update { it.copy(foregroundServiceOn = on) }
+        event("Foreground service ${if (on) "requested" else "stopped"}")
+    }
+
+    fun resetStats() {
+        stats.reset()
+        _state.update { it.copy(ping = PingSnapshot()) }
+        event("Stats reset: ${settings()}")
+    }
+
+    private fun settings() = _state.value.let {
+        "[rate=${it.pingRate}/s, wifiLock=${it.wifiLockOn}, fgs=${it.foregroundServiceOn}]"
     }
 
     fun setGoIntent(intent: Int) {
@@ -152,7 +230,7 @@ class WifiDirectLab(app: Application) : AndroidViewModel(app) {
     @SuppressLint("MissingPermission") // Checked via nearbyGranted; a SecurityException is logged.
     fun discover() {
         discoverStartedAt = now()
-        _state.update { it.copy(discoveryToFirstPeerMs = null) }
+        _state.update { it.copy(discoveryToFirstPeerMs = null, peerFirstSeenMs = emptyMap()) }
         guarded("Discover") { manager!!.discoverPeers(channel, listener("Discover")) }
     }
 
@@ -164,13 +242,26 @@ class WifiDirectLab(app: Application) : AndroidViewModel(app) {
 
     @SuppressLint("MissingPermission") // Checked via nearbyGranted; a SecurityException is logged.
     fun connect(peer: LabPeer) {
+        // Round 1: a second connect() while a group formed or was forming left the partner stuck
+        // as "invited" with multi-second stalls. Only one phone should connect, once.
+        if (_state.value.groupFormed || _state.value.connecting) {
+            event("Connect ignored: a group is already formed or forming")
+            return
+        }
+        _state.update { it.copy(connecting = true) }
         val config = WifiP2pConfig().apply {
             deviceAddress = peer.address
             groupOwnerIntent = _state.value.goIntent
         }
         connectStartedAt = now()
         event("Connect to ${peer.logId} with group owner intent ${config.groupOwnerIntent}")
-        guarded("Connect") { manager!!.connect(channel, config, listener("Connect")) }
+        guarded("Connect") {
+            manager!!.connect(
+                channel,
+                config,
+                listener("Connect") { _state.update { it.copy(connecting = false) } }
+            )
+        }
     }
 
     fun disconnect() {
@@ -239,6 +330,17 @@ class WifiDirectLab(app: Application) : AndroidViewModel(app) {
             )
         }
         firstPeerMs?.let { event("First peer after $it ms") }
+        if (discoverStartedAt > 0) {
+            val seen = _state.value.peerFirstSeenMs
+            val newOnes = peers.filter { it.address !in seen }
+            if (newOnes.isNotEmpty()) {
+                val atMs = (now() - discoverStartedAt) / 1_000_000
+                _state.update { state ->
+                    state.copy(peerFirstSeenMs = seen + newOnes.associate { it.address to atMs })
+                }
+                newOnes.forEach { event("${it.logId} first seen $atMs ms after Discover") }
+            }
+        }
         event("Peers (${peers.size}): " + peers.joinToString { "${it.logId}=${it.status}" })
     }
 
@@ -254,6 +356,7 @@ class WifiDirectLab(app: Application) : AndroidViewModel(app) {
             _state.update {
                 it.copy(
                     groupFormed = true,
+                    connecting = false,
                     isGroupOwner = info.isGroupOwner,
                     groupOwnerAddress = address,
                     connectToGroupMs = connectMs,
@@ -274,6 +377,7 @@ class WifiDirectLab(app: Application) : AndroidViewModel(app) {
             _state.update {
                 it.copy(
                     groupFormed = false,
+                    connecting = false,
                     isGroupOwner = null,
                     groupOwnerAddress = null,
                     socketState = "Not connected"
@@ -302,6 +406,7 @@ class WifiDirectLab(app: Application) : AndroidViewModel(app) {
                 val socketMs = (now() - groupFormedAt) / 1_000_000
                 _state.update { it.copy(groupToSocketMs = socketMs) }
                 setSocketState("Connected, pinging")
+                _state.update { it.copy(pinging = true) }
                 event("Socket connected $socketMs ms after group formed")
                 runPing(s)
             } catch (e: IOException) {
@@ -310,6 +415,7 @@ class WifiDirectLab(app: Application) : AndroidViewModel(app) {
                     event("Socket ended: ${e.javaClass.simpleName}: ${e.message}")
                 }
             } finally {
+                _state.update { it.copy(pinging = false) }
                 closeSocket()
             }
         }
@@ -343,7 +449,7 @@ class WifiDirectLab(app: Application) : AndroidViewModel(app) {
                 val at = now()
                 stats.recordSent(seq, at)
                 send(PingProtocol.ping(seq, at))
-                delay(1_000)
+                delay(1_000L / _state.value.pingRate)
             }
         }
         val reader = s.getInputStream().bufferedReader()
@@ -399,11 +505,15 @@ class WifiDirectLab(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun listener(action: String) = object : WifiP2pManager.ActionListener {
-        override fun onSuccess() = event("$action: accepted")
+    private fun listener(action: String, onFailed: () -> Unit = {}) =
+        object : WifiP2pManager.ActionListener {
+            override fun onSuccess() = event("$action: accepted")
 
-        override fun onFailure(reason: Int) = event("$action failed: ${reasonName(reason)}")
-    }
+            override fun onFailure(reason: Int) {
+                event("$action failed: ${reasonName(reason)}")
+                onFailed()
+            }
+        }
 
     private fun event(text: String) {
         AppLog.i(TAG, text)
@@ -418,6 +528,8 @@ class WifiDirectLab(app: Application) : AndroidViewModel(app) {
         session?.cancel()
         closeSocket()
         runCatching { getApplication<Application>().unregisterReceiver(receiver) }
+        if (wifiLock?.isHeld == true) wifiLock.release()
+        if (_state.value.foregroundServiceOn) LabForegroundService.stop(getApplication())
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) channel?.close()
         AppLog.i(TAG, "Lab closed")
     }

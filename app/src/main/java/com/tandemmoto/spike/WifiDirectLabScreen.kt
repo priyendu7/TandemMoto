@@ -15,6 +15,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -63,9 +64,18 @@ fun WifiDirectLabRoute(onBack: () -> Unit, lab: WifiDirectLab = viewModel()) {
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(peer.name, style = MaterialTheme.typography.bodyLarge)
-                        Text(peer.status, style = MaterialTheme.typography.bodySmall)
+                        val seen = state.peerFirstSeenMs[peer.address]?.let {
+                            " · seen after $it ms"
+                        }
+                        Text(
+                            peer.status + seen.orEmpty(),
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
-                    Button(onClick = { lab.connect(peer) }) { Text("Connect") }
+                    Button(
+                        onClick = { lab.connect(peer) },
+                        enabled = !state.groupFormed && !state.connecting
+                    ) { Text("Connect") }
                 }
             }
             item {
@@ -91,6 +101,7 @@ private fun StatusCard(state: LabState) {
             Line("Feature declared", state.supported.yesNo())
             Line("Wi-Fi Direct enabled", state.p2pEnabled?.yesNo() ?: "waiting…")
             Line("Location switched on", state.locationOn.yesNo())
+            Line("Connected to a Wi-Fi network", state.wifiNetworkConnected.yesNo())
             Line("Nearby/location permission", state.nearbyGranted.yesNo())
             Line("This device", state.thisDevice ?: "—")
         }
@@ -119,6 +130,24 @@ private fun Controls(state: LabState, lab: WifiDirectLab) {
             }
         }
         Line("Discovering", state.discovering.yesNo())
+        HorizontalDivider()
+        Text("Lab v2 experiments", style = MaterialTheme.typography.titleMedium)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Ping rate:")
+            listOf(1, 20).forEach { rate ->
+                FilterChip(
+                    selected = state.pingRate == rate,
+                    onClick = { lab.setPingRate(rate) },
+                    label = { Text("$rate/s") }
+                )
+            }
+            OutlinedButton(onClick = lab::resetStats) { Text("Reset stats") }
+        }
+        Toggle("Low-latency Wi-Fi lock", state.wifiLockOn, lab::setWifiLock)
+        Toggle("Foreground service", state.foregroundServiceOn, lab::setForegroundService)
     }
 }
 
@@ -151,6 +180,14 @@ private fun ConnectionCard(state: LabState) {
             )
             Line("Longest gap between pongs", ping.maxGapMs.ms())
         }
+    }
+}
+
+@Composable
+private fun Toggle(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Switch(checked = checked, onCheckedChange = onChange)
     }
 }
 
