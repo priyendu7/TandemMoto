@@ -43,7 +43,7 @@
 | Voice codec | Opus (via a small native lib, e.g. libopus) at a low-latency profile | Good quality at low bitrate/latency |
 | Noise suppression / AGC | WebRTC's `AudioProcessing` module (NS + AGC) or Android's built-in `NoiseSuppressor`/`AutomaticGainControl` audio effects where device support allows | Avoids building DSP from scratch |
 | Call detection | `AudioManager` audio-focus loss + `TelephonyCallback` call-state listener (`READ_PHONE_STATE`), with `AudioManager` mode changes (`MODE_IN_CALL` / `MODE_IN_COMMUNICATION`) as a fallback for VoIP apps | Covers cellular and VoIP calls; must tell other apps' calls apart from the app's own voice channel |
-| Background execution | Foreground `Service` with a persistent notification | Required to keep link/mic alive, screen off |
+| Background execution | Foreground `Service` (`connectedDevice`, plus `microphone` from Phase 4) with a persistent notification, from Phase 1 | Required to keep link/mic alive, screen off: the spike showed the S25 killing the socket on screen-off without it |
 | State sync | A small custom protocol (protobuf or simple JSON) over a persistent socket, separate from the audio/file sockets | Keeps command/state messages low-latency and independent of file transfer load |
 | Local storage | App-private storage for cached song files + a lightweight local DB (Room) for playlist metadata | |
 
@@ -59,10 +59,19 @@
 
 ### Phase 1 — Phone-to-phone link
 
+Shaped by the Wi‑Fi Direct spike (#22), measured on Samsung ↔ Xiaomi, Android 16 ↔ 9: see [`spikes/wifi-direct.md`](spikes/wifi-direct.md).
+
 - Wi‑Fi Direct discovery, pairing UI, group formation
+  - Discover until the **remembered partner** appears (1–14 s measured; unrelated Wi‑Fi Direct devices show up too)
+  - **One-initiator rule:** exactly one phone calls `connect()`, decided by a fixed rule, and never while a group exists or is forming (two phones connecting at once deadlocks)
+  - Both phones handle either role: the first pairing fixes the group owner, and `groupOwnerIntent` is ignored after that
 - Persistent socket for command/state channel
+  - Needs the `INTERNET` permission (Android refuses any socket without it), with a `PRIVACY.md` note
+  - **The heartbeat doubles as a keep-awake:** small packets at roughly 5–10/s plus a low-latency Wi‑Fi lock while connected. With sparse traffic the radio dozes (p95 up to 1.4 s); with steady traffic it's ~10 ms
+- **Foreground service** (`connectedDevice`) keeping the link alive with the screen off, moved here from Phase 5: without it the S25 kills the socket as soon as its screen turns off. Ships with its Play Console declaration and demo video
 - Auto-reconnect logic + connection status UI + "peer disconnected" error state
-- **Exit criteria:** two phones can pair, see each other's connection state, and survive a simulated link drop (airplane-mode toggle test) without user intervention
+  - Drops are reported by Android in under 1 s, but Android never reconnects on its own: rediscover, reconnect, reopen the socket (5–20 s budget)
+- **Exit criteria:** two phones can pair, see each other's connection state, survive a simulated link drop (airplane-mode toggle test) without user intervention, and **stay connected for 10 minutes with both screens locked**
 
 ### Phase 2 — Shared local music player
 
@@ -104,7 +113,7 @@
   - On call end (hung up, declined, missed): clear call hold on both phones → Paused + mic mode; no music auto-resume
   - Edge cases: both phones on calls at once (clear only when both have ended), link down during the call (local pause, re-sync call-hold state on reconnect), call starts during a file transfer (transfer continues), phone-state permission denied (fall back to audio-focus detection and warn in setup)
   - **Exit criteria:** an incoming call on either phone pauses music and the intercom on both within ~1s, the call is clearly audible on wired earphones and on BT earbuds, and after the call both phones land in Paused + mic mode with no stuck mic or audio route
-- Foreground service battery/behavior testing over a simulated full ride duration
+- Battery and behavior testing of the foreground service (built in Phase 1) over a simulated full ride duration, including the keep-awake heartbeat's cost
 
 ### Phase 6 — Field validation
 
@@ -132,9 +141,11 @@ Phases 1–2 (link + player) are prerequisites for everything else and carry the
 
 | Risk | Mitigation |
 |---|---|
-| Wi‑Fi Direct behaves inconsistently across OEMs | Early spike in Phase 1 against the target device matrix before building on top of it |
-| Voice latency exceeds 300ms once NS/AGC is added | Bench-test the codec + NS/AGC pipeline in isolation (Phase 4) before integrating; keep NS/AGC toggleable for A/B latency testing |
-| Background/foreground service killed by OEM battery optimizers | Test against known aggressive OEMs (e.g. some Chinese Android skins) early; document required user-facing battery-optimization exemption steps |
+| Wi‑Fi Direct behaves inconsistently across OEMs | Spike done (#22, [`spikes/wifi-direct.md`](spikes/wifi-direct.md)) on Samsung ↔ Xiaomi: works, with quirks (persistent groups fix the group owner, `BUSY` needing a Wi‑Fi toggle). Validate each new phone against [`TEST_MATRIX.md`](TEST_MATRIX.md) |
+| Sparse traffic lets Wi‑Fi doze, so commands arrive late (p95 up to 1.4 s measured) | Heartbeat doubles as a keep-awake (~5–10 packets/s) plus a low-latency Wi‑Fi lock while connected; measured ~10 ms with steady traffic |
+| Both phones call `connect()` at once and deadlock (both stuck *invited*) | One-initiator rule: a fixed rule picks the phone that connects; the other only discovers and accepts |
+| Voice latency exceeds 300ms once NS/AGC is added | The network isn't the bottleneck with steady traffic (~10 ms in the spike). Bench-test the codec + NS/AGC pipeline in isolation (Phase 4) before integrating; keep NS/AGC toggleable for A/B latency testing |
+| Background/foreground service killed by OEM battery optimizers | Confirmed in the spike: without a foreground service the S25 kills the socket on screen-off; with one it stays connected, but MIUI still throttles the app (3–4 s gaps), so keep a ~20–30 s give-up timeout. Document the battery-optimization exemption steps per skin |
 | BT HID remote key mapping varies by remote model | Build an abstraction layer over media button events rather than hardcoding key codes; validate against the test matrix |
 | Call detection is unreliable (VoIP apps, OEM telephony differences, permission denied) or confuses the app's own voice channel with a call | Combine the call-state listener with audio-focus loss; tag the app's own audio session so it's ignored; test on the Phase 0 OEM matrix with cellular + popular VoIP apps |
 | Pillion's BT earbuds get stuck on the app's SCO/HFP route when a call arrives, so the call audio is lost | Release SCO and the mic immediately on call hold, before the call is answered; test on the earbud matrix |
