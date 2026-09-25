@@ -15,10 +15,10 @@
 
     <!-- Pair -->
     <string name="pair_title">Pair with your partner</string>
-    <string name="pair_instructions">Open this screen on your partner\'s phone too, with Wi-Fi on. One of you taps the other\'s phone; the other accepts the invitation. You only pair once.</string>
+    <string name="pair_instructions">Open this screen on both phones, with Wi-Fi on. Then only one of you taps the other\'s phone. The other just keeps this screen open and accepts the invitation. You only pair once.</string>
     <string name="pair_device_action">Pair with this phone</string>
     <string name="pair_inviting">Waiting for %1$s to accept…</string>
-    <string name="pair_inviting_hint">Ask your partner to tap Accept on the invitation on their phone.</string>
+    <string name="pair_inviting_hint">Ask your partner to keep this screen open, without tapping anything, and accept the invitation when it appears.</string>
     <string name="pair_cancel">Cancel</string>
     <string name="pair_ok">OK</string>
     <string name="pair_failed_no_answer">Your partner didn\'t accept. Make sure they\'re on this screen, then try again.</string>

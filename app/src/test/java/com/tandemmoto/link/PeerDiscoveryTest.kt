@@ -218,4 +218,28 @@ class PeerDiscoveryTest {
             PeerDiscovery.sorted(listOf(tv("Aardvark TV"), phone("Bravo"), phone("alpha")))
         )
     }
+
+    @Test
+    fun continuousSearchNeverFinishesByItself() = runTest {
+        val discovery = discovery()
+        discovery.start(continuous = true)
+        advanceTimeBy(10 * 60_000L)
+        assertTrue(discovery.state.value is DiscoveryState.Scanning)
+        driver.discovering.value = false // Android stopped; it restarts
+        runCurrent()
+        assertEquals(2, driver.discoverCalls)
+    }
+
+    @Test
+    fun pauseEndsTheLoopWithoutAskingAndroidToStop() = runTest {
+        val discovery = discovery()
+        discovery.start()
+        runCurrent()
+        discovery.pause()
+        runCurrent()
+        assertEquals(DiscoveryState.Idle, discovery.state.value)
+        assertEquals(0, driver.stopCalls)
+        advanceTimeBy(120_000)
+        assertEquals(1, driver.discoverCalls)
+    }
 }

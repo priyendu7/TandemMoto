@@ -76,13 +76,51 @@ class LinkTest {
     }
 
     @Test
-    fun busyInvitationFailsWithBusy() = runTest {
-        driver.connectResults.addLast(P2pResult.Busy)
+    fun busyEveryTimeFailsWithBusyAfterRetries() = runTest {
+        repeat(Link.CONNECT_ATTEMPTS) { driver.connectResults.addLast(P2pResult.Busy) }
         val link = link()
         link.openPairScreen()
         link.invite(redmi)
-        runCurrent()
+        advanceTimeBy(Link.CONNECT_RETRY_MS * Link.CONNECT_ATTEMPTS)
         assertEquals(PairingState.Failed(PairingState.Failed.Reason.Busy), link.pairing.value)
+        assertEquals(Link.CONNECT_ATTEMPTS, driver.connectCalls.size)
+    }
+
+    @Test
+    fun aRefusedConnectIsRetriedAndThenInvites() = runTest {
+        // Phone test on #24: connect() failed with ERROR right after tapping.
+        driver.connectResults.addLast(P2pResult.Error)
+        val link = link()
+        link.openPairScreen()
+        link.invite(redmi)
+        advanceTimeBy(Link.CONNECT_RETRY_MS + 1)
+        assertEquals(PairingState.Inviting(redmi), link.pairing.value)
+        assertEquals(2, driver.connectCalls.size)
+    }
+
+    @Test
+    fun invitingDoesNotAskAndroidToStopDiscovery() = runTest {
+        // Stopping discovery and connecting at once made connect() fail on both phones.
+        val link = link()
+        link.openPairScreen()
+        runCurrent()
+        val stopsBefore = driver.stopCalls
+        link.invite(redmi)
+        runCurrent()
+        assertEquals(stopsBefore, driver.stopCalls)
+        assertEquals(listOf(redmi.address), driver.connectCalls)
+    }
+
+    @Test
+    fun thePairScreenKeepsListeningWhileOpen() = runTest {
+        // A phone only receives an invitation while it's discovering.
+        val link = link()
+        link.openPairScreen()
+        advanceTimeBy(5 * 60_000L)
+        assertTrue(link.discovery.state.value is DiscoveryState.Scanning)
+        link.closePairScreen()
+        runCurrent()
+        assertEquals(DiscoveryState.Idle, link.discovery.state.value)
     }
 
     @Test

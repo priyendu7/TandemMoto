@@ -98,9 +98,10 @@ class Link(
 
     // ---- Pair screen ----
 
+    /** The Pair screen listens for as long as it's open, so an invitation can always arrive. */
     fun openPairScreen() {
         pairScreenOpen = true
-        if (_pairing.value !is PairingState.Inviting) discovery.start()
+        if (_pairing.value !is PairingState.Inviting) discovery.start(continuous = true)
     }
 
     fun closePairScreen() {
@@ -132,7 +133,7 @@ class Link(
         scope.launch { driver.cancelConnect() }
         _pairing.value = PairingState.Idle
         log("Invitation cancelled")
-        if (pairScreenOpen) discovery.start()
+        if (pairScreenOpen) discovery.start(continuous = true)
     }
 
     /** Clears a finished, failed or declined pairing step. */
@@ -142,10 +143,11 @@ class Link(
 
     private fun startInvite(device: NearbyDevice) {
         _pairing.value = PairingState.Inviting(device)
-        discovery.stop()
+        discovery.pause() // not stop(): see PeerDiscovery.pause
         log("Inviting ${device.logId}")
         inviteJob = scope.launch {
-            when (driver.connect(device.address)) {
+            val result = connectWithRetry(device.address)
+            when (result) {
                 P2pResult.Ok -> Unit
                 P2pResult.Busy -> return@launch failPairing(PairingState.Failed.Reason.Busy)
                 else -> return@launch failPairing(PairingState.Failed.Reason.Error)
@@ -157,10 +159,22 @@ class Link(
         }
     }
 
+    /** connect(), retried a few times: Android can refuse it briefly (BUSY/ERROR). */
+    private suspend fun connectWithRetry(address: String): P2pResult {
+        var result = P2pResult.Error
+        repeat(CONNECT_ATTEMPTS) { attempt ->
+            result = driver.connect(address)
+            if (result == P2pResult.Ok || result == P2pResult.Unsupported) return result
+            log("Connect refused: $result (attempt ${attempt + 1})")
+            if (attempt < CONNECT_ATTEMPTS - 1) delay(CONNECT_RETRY_MS)
+        }
+        return result
+    }
+
     private fun failPairing(reason: PairingState.Failed.Reason) {
         _pairing.value = PairingState.Failed(reason)
         log("Pairing failed: $reason")
-        if (pairScreenOpen) discovery.start()
+        if (pairScreenOpen) discovery.start(continuous = true)
     }
 
     // ---- Connecting to the saved partner ----
@@ -185,7 +199,8 @@ class Link(
                             .first(partner::matches)
                         if (driver.group.value == null) {
                             log("Partner visible, connecting")
-                            driver.connect(found.address)
+                            discovery.pause() // see PeerDiscovery.pause
+                            connectWithRetry(found.address)
                         }
                     }
                 } else {
@@ -305,5 +320,9 @@ class Link(
 
         /** A group with the partner dropped this soon, by them, suggests a rejection. */
         const val REJECTION_WINDOW_MS = 10_000L
+
+        /** connect() attempts before giving up, [CONNECT_RETRY_MS] apart. */
+        const val CONNECT_ATTEMPTS = 3
+        const val CONNECT_RETRY_MS = 1_000L
     }
 }
