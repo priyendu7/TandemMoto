@@ -378,6 +378,26 @@ class LinkTest {
     }
 
     @Test
+    fun aPartnerThatGoesSilentIsNotConnectedNotAClosedApp() = runTest {
+        // #25 phone test: Wi-Fi off on the S25; the Redmi's Android kept the group ~13 s longer.
+        val partner = saved(redmi, Initiator)
+        val link = link(InMemoryPartnerStore(partner))
+        driver.formGroupWith(redmi)
+        runCurrent()
+        partnerApp.answersPings = false // gone: silent, and unreachable
+        transport.partnerApp.value = null
+        advanceTimeBy(CommandChannel.SILENCE_TIMEOUT_MS + CommandChannel.HEARTBEAT_MS)
+        assertEquals(LinkStatus.NotConnected(partner.learned()), link.status.value)
+        advanceTimeBy(Link.PARTNER_APP_TIMEOUT_MS * 2)
+        assertEquals(LinkStatus.NotConnected(partner.learned()), link.status.value)
+
+        partnerApp.answersPings = true // back in range: the channel is still retrying
+        transport.partnerApp.value = partnerApp
+        advanceTimeBy(CommandChannel.SLOW_RETRY_MS + 1)
+        assertEquals(LinkStatus.Connected(partner.learned()), link.status.value)
+    }
+
+    @Test
     fun ourHelloCarriesOurIdAndWhoWeThinkThePartnerIs() = runTest {
         val partner = saved(redmi, Initiator).copy(installId = "partner-install")
         link(InMemoryPartnerStore(partner))

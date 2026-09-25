@@ -40,12 +40,16 @@ persistent command/state socket, auto-reconnect, connection status.
 - **Connected means the partner's app answered**, not just that Android has a group: the group
   outlives the apps. With a group but no answer for 5 s the status says to open TandemMoto on the
   partner's phone, and the socket keeps retrying, so reopening the app reconnects on its own.
-- Heartbeat: both phones send a `Ping` every 200 ms and answer every `Ping` with a `Pong`. It
+- Heartbeat: both phones send a `Ping` every 100 ms and answer every `Ping` with a `Pong`
+  (at 200 ms the phones' p95 went over 100 ms in 2 of 15 ten-second windows). It
   also keeps the radio awake (sparse traffic gave a p95 of up to 1.4 s in the spike), together
   with a low-latency Wi-Fi lock (`LowLatencyWifiLock`) while the channel is open. Round trips
   are logged every 10 s (`RTT median … p95 …`).
-- A connection is lost when the socket closes or breaks (app closed, Wi-Fi off: within ~1 s) or
-  after 6 s without any message. Not 3 s: MIUI freezes the app for 3–4 s with the screen off.
+- A connection is lost when the socket closes or breaks, or after 6 s without any message (not
+  3 s: MIUI freezes the app for 3–4 s with the screen off). A clean close means the partner's
+  app was closed ("Open TandemMoto on …"); silence or a broken socket means the phone went away
+  ("Not connected"). Android can take ~13 s to drop the group after the other phone's Wi-Fi goes
+  off (Redmi), so the channel decides that, not the group.
 - Re-forming a dropped group is auto-reconnect (#27); the channel only reopens the socket while
   the group exists.
 

@@ -378,7 +378,14 @@ class Link(
         val partner = _partner.value ?: return
         when (state) {
             ChannelState.Idle -> appTimer?.cancel()
-            ChannelState.Opening -> {
+            ChannelState.Opening -> if (channel.lastLoss == ChannelLoss.Vanished) {
+                // The phone went quiet or the socket broke: it's gone (Wi-Fi off, out of range),
+                // not a closed app. The channel keeps retrying while Android keeps the group,
+                // which on the Redmi took ~13 s to notice (#25 phone test).
+                appTimer?.cancel()
+                _status.value = LinkStatus.NotConnected(partner)
+                log("Partner went away")
+            } else {
                 if (_status.value is LinkStatus.Connected) {
                     _status.value = LinkStatus.Connecting(partner)
                 }

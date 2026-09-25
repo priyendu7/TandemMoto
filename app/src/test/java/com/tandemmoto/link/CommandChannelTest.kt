@@ -107,6 +107,7 @@ class CommandChannelTest {
         advanceTimeBy(600)
         assertEquals(ChannelState.Opening, channel.state.value)
         assertTrue(logs.any { it.startsWith("Channel lost: nothing heard") })
+        assertEquals(ChannelLoss.Vanished, channel.lastLoss)
         assertEquals(false, awake.last())
     }
 
@@ -122,6 +123,7 @@ class CommandChannelTest {
         runCurrent()
         assertEquals(ChannelState.Opening, channel.state.value)
         assertTrue(logs.any { it == "Channel lost: closed by the partner" })
+        assertEquals(ChannelLoss.ClosedByPartner, channel.lastLoss)
 
         transport.partnerApp.value = FakePartnerApp(backgroundScope) // reopened
         advanceTimeBy(CommandChannel.SLOW_RETRY_MS + 1)
@@ -185,6 +187,7 @@ class CommandChannelTest {
         theirs.send("definitely not json".encodeToByteArray())
         runCurrent()
         assertEquals(ChannelState.Opening, channel.state.value)
+        assertEquals(ChannelLoss.Vanished, channel.lastLoss)
         assertTrue(ours.closed)
     }
 
@@ -198,6 +201,7 @@ class CommandChannelTest {
         theirs.sendMessage(Message.Bye(Bye.Reason.Closing))
         runCurrent()
         assertEquals(ChannelState.Opening, channel.state.value)
+        assertEquals(ChannelLoss.ClosedByPartner, channel.lastLoss)
     }
 
     @Test

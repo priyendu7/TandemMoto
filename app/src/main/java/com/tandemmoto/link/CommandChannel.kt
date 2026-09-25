@@ -36,6 +36,18 @@ sealed interface ChannelState {
     data class Refused(val reason: Bye.Reason) : ChannelState
 }
 
+/** How the last open connection ended; tells a closed app apart from a vanished phone. */
+enum class ChannelLoss {
+    /** No connection has ended since [CommandChannel.open]. */
+    None,
+
+    /** The partner closed it cleanly: its app was closed (the phone is still there). */
+    ClosedByPartner,
+
+    /** Nothing heard, or the socket broke: the phone went away (Wi-Fi off, out of range). */
+    Vanished
+}
+
 /** Where the other phone is: the group owner listens, the client connects to its address. */
 data class Endpoint(val isGroupOwner: Boolean, val ownerHost: String?)
 
@@ -67,6 +79,11 @@ class CommandChannel(
     /** Messages other than the handshake and heartbeat (playback, mic mode… from Phase 3). */
     val incoming: SharedFlow<Message> = _incoming.asSharedFlow()
 
+    /** Set before [state] goes back to [ChannelState.Opening] after a connection ends. */
+    @Volatile
+    var lastLoss = ChannelLoss.None
+        private set
+
     private var job: Job? = null
     private var connection: FrameConnection? = null
     private var seq = 0L
@@ -81,6 +98,7 @@ class CommandChannel(
         check: suspend (Message.Hello) -> Bye.Reason?
     ) {
         close()
+        lastLoss = ChannelLoss.None
         _state.value = ChannelState.Opening
         log("Channel opening as ${if (endpoint.isGroupOwner) "group owner" else "client"}")
         job = scope.launch { run(endpoint, hello, check) }
@@ -147,6 +165,7 @@ class CommandChannel(
                     return
                 }
                 is End.Lost -> {
+                    lastLoss = end.loss
                     _state.value = ChannelState.Opening
                     log("Channel lost: ${end.why}")
                     delay(FAST_RETRY_MS)
@@ -163,7 +182,7 @@ class CommandChannel(
     }
 
     private sealed interface End {
-        data class Lost(val why: String) : End
+        data class Lost(val why: String, val loss: ChannelLoss = ChannelLoss.Vanished) : End
 
         data class Refused(val reason: Bye.Reason) : End
     }
@@ -186,7 +205,8 @@ class CommandChannel(
 
         suspend fun read(): End {
             while (true) {
-                val frame = connection.receive() ?: return End.Lost("closed by the partner")
+                val frame = connection.receive()
+                    ?: return End.Lost("closed by the partner", ChannelLoss.ClosedByPartner)
                 lastHeard = nanoTime()
                 val envelope = MessageCodec.decode(frame)
                 val version = when (envelope) {
@@ -208,7 +228,7 @@ class CommandChannel(
                     is Message.Ping -> write(Message.Pong(message.sentAtNanos))
                     is Message.Pong -> stats.add(nanoTime() - message.sentAtNanos)
                     is Bye -> return if (message.reason == Bye.Reason.Closing) {
-                        End.Lost("the partner closed it")
+                        End.Lost("the partner closed it", ChannelLoss.ClosedByPartner)
                     } else {
                         End.Refused(message.reason)
                     }
@@ -261,8 +281,11 @@ class CommandChannel(
         /** Fixed port on the group owner. */
         const val PORT = 48152
 
-        /** 5 pings/s each way; raise to 100 ms if the phones' p95 misses ~100 ms (#25). */
-        const val HEARTBEAT_MS = 200L
+        /**
+         * 10 pings/s each way. At 5/s the phones' p95 was 55–99 ms with 2 of 15 windows over
+         * 100 ms (148, 165), so it's 10/s now (#25 phone test).
+         */
+        const val HEARTBEAT_MS = 100L
 
         /**
          * Not the ~3 s first planned: MIUI freezes the app for 3–4 s with the screen off (spike).
