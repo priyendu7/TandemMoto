@@ -8,12 +8,14 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.net.wifi.WifiManager
+import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pDeviceList
+import android.net.wifi.p2p.WifiP2pGroup
+import android.net.wifi.p2p.WifiP2pInfo
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
 import android.os.Looper
-import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import androidx.core.location.LocationManagerCompat
 import com.tandemmoto.permissions.AppPermission
@@ -49,6 +51,9 @@ class AndroidWifiP2pDriver(context: Context) : WifiP2pDriver {
     private val _discovering = MutableStateFlow(false)
     override val discovering: StateFlow<Boolean> = _discovering.asStateFlow()
 
+    private val _group = MutableStateFlow<GroupInfo?>(null)
+    override val group: StateFlow<GroupInfo?> = _group.asStateFlow()
+
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
@@ -63,6 +68,18 @@ class AndroidWifiP2pDriver(context: Context) : WifiP2pDriver {
                     )
                     _peers.value = list?.deviceList.orEmpty().map { it.toNearbyDevice() }
                 }
+                WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> onConnectionChanged(
+                    IntentCompat.getParcelableExtra(
+                        intent,
+                        WifiP2pManager.EXTRA_WIFI_P2P_INFO,
+                        WifiP2pInfo::class.java
+                    ),
+                    IntentCompat.getParcelableExtra(
+                        intent,
+                        WifiP2pManager.EXTRA_WIFI_P2P_GROUP,
+                        WifiP2pGroup::class.java
+                    )
+                )
                 WifiP2pManager.WIFI_P2P_DISCOVERY_CHANGED_ACTION ->
                     _discovering.value =
                         intent.getIntExtra(WifiP2pManager.EXTRA_DISCOVERY_STATE, -1) ==
@@ -77,15 +94,60 @@ class AndroidWifiP2pDriver(context: Context) : WifiP2pDriver {
                 addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
                 addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
                 addAction(WifiP2pManager.WIFI_P2P_DISCOVERY_CHANGED_ACTION)
+                addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)
             }
-            // System broadcasts still arrive with RECEIVER_NOT_EXPORTED.
-            ContextCompat.registerReceiver(
-                appContext,
-                receiver,
-                filter,
-                ContextCompat.RECEIVER_NOT_EXPORTED
-            )
+            // These actions are protected: only the system can send them. On Android 13+ the flag
+            // is declared explicitly. Below that, ContextCompat's NOT_EXPORTED emulation guards the
+            // receiver with an app-only permission, which can also filter the sticky state Android
+            // replays on registration (the Redmi Y2 never got it), so register plainly there.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                appContext.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                appContext.registerReceiver(receiver, filter)
+            }
+            readCurrentGroup()
         }
+    }
+
+    /** A group can outlive the app (spike); read the current one instead of waiting. */
+    private fun readCurrentGroup() {
+        runCatching {
+            manager!!.requestConnectionInfo(channel) { info ->
+                if (info?.groupFormed == true) requestGroup { onConnectionChanged(info, it) }
+            }
+        }
+    }
+
+    // Needs the Nearby/location permission; without it the SecurityException is swallowed and
+    // the group is picked up from the next connection broadcast instead.
+    @SuppressLint("MissingPermission")
+    private fun requestGroup(onGroup: (WifiP2pGroup?) -> Unit) {
+        runCatching { manager!!.requestGroupInfo(channel, onGroup) }
+    }
+
+    private fun onConnectionChanged(info: WifiP2pInfo?, group: WifiP2pGroup?) {
+        if (info?.groupFormed != true) {
+            _group.value = null
+            return
+        }
+        if (group == null) {
+            // Some phones leave the group out of the broadcast; ask for it.
+            _group.value = GroupInfo(info.isGroupOwner, info.groupOwnerAddress?.hostAddress, null)
+            requestGroup { requested ->
+                if (requested !=
+                    null
+                ) {
+                    onConnectionChanged(info, requested)
+                }
+            }
+            return
+        }
+        val peer = if (info.isGroupOwner) group.clientList.firstOrNull() else group.owner
+        _group.value = GroupInfo(
+            isGroupOwner = info.isGroupOwner,
+            ownerAddress = info.groupOwnerAddress?.hostAddress,
+            peer = peer?.toNearbyDevice()?.copy(status = NearbyDevice.Status.Connected)
+        )
     }
 
     // Callers check the permission first (DiscoveryPreconditions); an exception maps to Error.
@@ -95,6 +157,18 @@ class AndroidWifiP2pDriver(context: Context) : WifiP2pDriver {
 
     override suspend fun stopPeerDiscovery(): P2pResult =
         request { listener -> manager!!.stopPeerDiscovery(channel, listener) }
+
+    // The first pairing fixes the group owner (spike), so groupOwnerIntent is left to Android.
+    @SuppressLint("MissingPermission")
+    override suspend fun connect(address: String): P2pResult = request { listener ->
+        manager!!.connect(channel, WifiP2pConfig().apply { deviceAddress = address }, listener)
+    }
+
+    override suspend fun cancelConnect(): P2pResult =
+        request { listener -> manager!!.cancelConnect(channel, listener) }
+
+    override suspend fun removeGroup(): P2pResult =
+        request { listener -> manager!!.removeGroup(channel, listener) }
 
     override fun close() {
         if (!supported) return

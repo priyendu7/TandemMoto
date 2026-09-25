@@ -55,6 +55,7 @@ fun RideRoute(
         permissions = permissions.state,
         onRequestPermission = permissions.request,
         onOpenPair = onOpenPair,
+        onConnect = viewModel::onConnect,
         onPlayPause = viewModel::onPlayPause,
         onNext = viewModel::onNext,
         onPrevious = viewModel::onPrevious,
@@ -70,6 +71,7 @@ fun RideScreen(
     permissions: PermissionsState,
     onRequestPermission: (AppPermission) -> Unit,
     onOpenPair: () -> Unit,
+    onConnect: () -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
@@ -102,7 +104,13 @@ fun RideScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            ConnectionSection(state.connection, permissions, onRequestPermission, onOpenPair)
+            ConnectionSection(
+                state.connection,
+                permissions,
+                onRequestPermission,
+                onOpenPair,
+                onConnect
+            )
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(24.dp),
@@ -128,13 +136,24 @@ private fun ConnectionSection(
     connection: ConnectionStatus,
     permissions: PermissionsState,
     onRequestPermission: (AppPermission) -> Unit,
-    onOpenPair: () -> Unit
+    onOpenPair: () -> Unit,
+    onConnect: () -> Unit
 ) {
     if (permissions.isGranted(AppPermission.NEARBY)) {
         ConnectionStatusBar(
             status = connection,
-            onClickLabel = stringResource(R.string.ride_pair_action),
-            onClick = if (connection == ConnectionStatus.NotPaired) onOpenPair else null
+            onClickLabel = stringResource(
+                if (connection == ConnectionStatus.NotConnected) {
+                    R.string.ride_connect_action
+                } else {
+                    R.string.ride_pair_action
+                }
+            ),
+            onClick = when (connection) {
+                ConnectionStatus.NotPaired, ConnectionStatus.PairedElsewhere -> onOpenPair
+                ConnectionStatus.NotConnected -> onConnect
+                else -> null
+            }
         )
     } else {
         PermissionPrompt(
@@ -242,6 +261,7 @@ private fun RidePreview(state: RideUiState, permissions: PermissionsState = near
         permissions = permissions,
         onRequestPermission = {},
         onOpenPair = {},
+        onConnect = {},
         onPlayPause = {},
         onNext = {},
         onPrevious = {},

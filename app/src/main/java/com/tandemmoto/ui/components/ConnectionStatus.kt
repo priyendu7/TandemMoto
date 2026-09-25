@@ -12,6 +12,8 @@ enum class StatusKind { Neutral, InProgress, Ok, Info, Problem }
  */
 enum class ConnectionStatus(@StringRes val label: Int, val kind: StatusKind) {
     NotPaired(R.string.status_not_paired, StatusKind.Neutral),
+    NotConnected(R.string.status_not_connected, StatusKind.Neutral),
+    PairedElsewhere(R.string.status_paired_elsewhere, StatusKind.Problem),
     Searching(R.string.status_searching, StatusKind.InProgress),
     Connected(R.string.status_connected, StatusKind.Ok),
     Reconnecting(R.string.status_reconnecting, StatusKind.InProgress),

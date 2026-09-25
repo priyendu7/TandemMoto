@@ -15,7 +15,18 @@
 
     <!-- Pair -->
     <string name="pair_title">Pair with your partner</string>
-    <string name="pair_instructions">Open this screen on your partner\'s phone too, with Wi-Fi on. You\'ll pair once, before the ride.</string>
+    <string name="pair_instructions">Open this screen on your partner\'s phone too, with Wi-Fi on. One of you taps the other\'s phone; the other accepts the invitation. You only pair once.</string>
+    <string name="pair_device_action">Pair with this phone</string>
+    <string name="pair_inviting">Waiting for %1$s to accept…</string>
+    <string name="pair_inviting_hint">Ask your partner to tap Accept on the invitation on their phone.</string>
+    <string name="pair_cancel">Cancel</string>
+    <string name="pair_ok">OK</string>
+    <string name="pair_failed_no_answer">Your partner didn\'t accept. Make sure they\'re on this screen, then try again.</string>
+    <string name="pair_failed_busy">Wi-Fi Direct is busy. Try again in a moment.</string>
+    <string name="pair_failed_error">Couldn\'t send the invitation. Try again.</string>
+    <string name="pair_replace_title">Replace your partner?</string>
+    <string name="pair_replace_body">You\'re paired with %1$s. Pair with %2$s instead? %1$s won\'t be able to connect any more.</string>
+    <string name="pair_replace_confirm">Replace</string>
     <string name="pair_searching">Looking for nearby phones…</string>
     <string name="pair_phones">Phones</string>
     <string name="pair_other_devices">Other devices</string>
@@ -36,6 +47,7 @@
     <!-- Ride -->
     <string name="ride_open_playlist">Playlist</string>
     <string name="ride_pair_action">Pair with your partner</string>
+    <string name="ride_connect_action">Connect to your partner</string>
     <string name="ride_open_settings">Settings</string>
     <string name="ride_now_playing">Now playing</string>
     <string name="ride_no_song">No song selected</string>
@@ -49,6 +61,8 @@
 
     <!-- Connection status -->
     <string name="status_not_paired">Not paired · Tap to pair</string>
+    <string name="status_not_connected">Not connected · Tap to connect</string>
+    <string name="status_paired_elsewhere">Couldn\'t connect: your partner may be paired with another phone · Tap to pair again</string>
     <string name="status_searching">Looking for your partner…</string>
     <string name="status_connected">Connected to your partner</string>
     <string name="status_reconnecting">Reconnecting…</string>
@@ -69,6 +83,11 @@
     <string name="settings_privacy_summary">No ads, no accounts, no data collection</string>
     <string name="settings_source_code">Source code</string>
     <string name="settings_source_summary">github.com/priyendu7/TandemMoto</string>
+    <string name="settings_forget_partner">Forget partner</string>
+    <string name="settings_paired_with">Paired with %1$s</string>
+    <string name="settings_forget_title">Forget %1$s?</string>
+    <string name="settings_forget_body">You\'ll need to pair again before your next ride.</string>
+    <string name="settings_forget_confirm">Forget</string>
     <string name="settings_export_logs">Export diagnostic logs</string>
     <string name="settings_export_logs_summary">Share a log file to help fix a problem. Nothing is sent automatically.</string>
 

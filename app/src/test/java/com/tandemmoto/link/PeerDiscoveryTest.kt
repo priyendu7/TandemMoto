@@ -1,8 +1,6 @@
 package com.tandemmoto.link
 
-import com.tandemmoto.link.NearbyDevice.Status.Available
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -13,52 +11,15 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PeerDiscoveryTest {
-    private class FakeDriver(override val supported: Boolean = true) : WifiP2pDriver {
-        override val enabled = MutableStateFlow<Boolean?>(true)
-        override val peers = MutableStateFlow<List<NearbyDevice>>(emptyList())
-        override val discovering = MutableStateFlow(false)
-
-        /** Results for successive discoverPeers calls; Ok once they run out. */
-        val discoverResults = ArrayDeque<P2pResult>()
-        var discoverCalls = 0
-        var stopCalls = 0
-
-        override suspend fun discoverPeers(): P2pResult {
-            discoverCalls++
-            val result = discoverResults.removeFirstOrNull() ?: P2pResult.Ok
-            if (result == P2pResult.Ok) discovering.value = true
-            return result
-        }
-
-        override suspend fun stopPeerDiscovery(): P2pResult {
-            stopCalls++
-            discovering.value = false
-            return P2pResult.Ok
-        }
-
-        override fun close() = Unit
-    }
-
-    private class FakePreconditions(var granted: Boolean = true, var locationOff: Boolean = false) :
-        DiscoveryPreconditions {
-        override fun nearbyGranted() = granted
-
-        override fun locationOff() = locationOff
-    }
-
-    private val driver = FakeDriver()
+    private val driver = FakeWifiP2pDriver()
     private val preconditions = FakePreconditions()
 
     private fun TestScope.discovery(driver: WifiP2pDriver = this@PeerDiscoveryTest.driver) =
         PeerDiscovery(driver, preconditions, backgroundScope)
 
-    private fun phone(name: String) = NearbyDevice(name, name, Available, isPhone = true)
-
-    private fun tv(name: String) = NearbyDevice(name, name, Available, isPhone = false)
-
     @Test
     fun unsupportedPhoneNeverAsksAndroid() = runTest {
-        val discovery = discovery(FakeDriver(supported = false))
+        val discovery = discovery(FakeWifiP2pDriver(supported = false))
         discovery.start()
         runCurrent()
         assertEquals(DiscoveryState.Unsupported, discovery.state.value)

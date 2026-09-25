@@ -69,7 +69,7 @@ class PeerDiscovery(
         job = null
         _state.value = DiscoveryState.Idle
         if (wasRunning) {
-            log("Search stopped (left the screen)")
+            log("Search stopped")
             scope.launch { driver.stopPeerDiscovery() }
         }
     }

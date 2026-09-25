@@ -17,6 +17,7 @@ TandemMoto stores, in its private app storage on your phone:
 
 - songs you choose to share, cached so they play without interruption,
 - your shared playlist and basic settings,
+- your paired partner's phone name and Wi-Fi Direct address, so TandemMoto only ever connects to that phone (removed with **Settings → Forget partner**),
 - diagnostic logs (see below).
 
 Uninstalling the app deletes all of it.

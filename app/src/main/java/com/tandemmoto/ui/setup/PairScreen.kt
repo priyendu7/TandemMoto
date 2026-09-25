@@ -3,6 +3,7 @@ package com.tandemmoto.ui.setup
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,14 +14,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +42,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tandemmoto.R
 import com.tandemmoto.link.DiscoveryState
 import com.tandemmoto.link.NearbyDevice
+import com.tandemmoto.link.PairingState
 import com.tandemmoto.permissions.AppPermission
 import com.tandemmoto.permissions.PermissionStatus
 import com.tandemmoto.permissions.PermissionsState
@@ -45,22 +51,34 @@ import com.tandemmoto.ui.components.PermissionPrompt
 import com.tandemmoto.ui.components.rememberPermissionRequester
 import com.tandemmoto.ui.theme.TandemMotoTheme
 
-// Opened from Home's connection bar. Tapping a device to pair arrives with #24.
+// Opened from Home's connection bar. Pairing succeeds → [onPaired] (back to Home).
 @Composable
-fun PairRoute(onBack: () -> Unit, viewModel: PairViewModel = viewModel()) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+fun PairRoute(onBack: () -> Unit, onPaired: () -> Unit, viewModel: PairViewModel = viewModel()) {
+    val state by viewModel.discovery.collectAsStateWithLifecycle()
+    val pairing by viewModel.pairing.collectAsStateWithLifecycle()
     val permissions = rememberPermissionRequester()
     val context = LocalContext.current
     // Searching only while the screen is visible; coming back from settings starts a new search.
     LifecycleResumeEffect(viewModel) {
-        viewModel.startSearch()
-        onPauseOrDispose { viewModel.stopSearch() }
+        viewModel.onScreenVisible()
+        onPauseOrDispose { viewModel.onScreenHidden() }
+    }
+    LaunchedEffect(pairing) {
+        if (pairing is PairingState.Paired) {
+            viewModel.dismissPairing()
+            onPaired()
+        }
     }
     PairScreen(
         state = state,
+        pairing = pairing,
         permissions = permissions.state,
         onRequestPermission = { permissions.request(AppPermission.NEARBY) },
-        onSearchAgain = viewModel::startSearch,
+        onSearchAgain = viewModel::searchAgain,
+        onDeviceClick = viewModel::invite,
+        onConfirmReplace = viewModel::confirmReplace,
+        onCancelInvite = viewModel::cancelInvite,
+        onDismissPairing = viewModel::dismissPairing,
         onOpenWifiSettings = {
             context.startActivity(
                 Intent(
@@ -82,9 +100,14 @@ fun PairRoute(onBack: () -> Unit, viewModel: PairViewModel = viewModel()) {
 @Composable
 fun PairScreen(
     state: DiscoveryState,
+    pairing: PairingState,
     permissions: PermissionsState,
     onRequestPermission: () -> Unit,
     onSearchAgain: () -> Unit,
+    onDeviceClick: (NearbyDevice) -> Unit,
+    onConfirmReplace: () -> Unit,
+    onCancelInvite: () -> Unit,
+    onDismissPairing: () -> Unit,
     onOpenWifiSettings: () -> Unit,
     onOpenLocationSettings: () -> Unit,
     onBack: () -> Unit
@@ -102,16 +125,27 @@ fun PairScreen(
                 stringResource(R.string.pair_instructions),
                 style = MaterialTheme.typography.bodyLarge
             )
+            if (pairing is PairingState.Inviting) {
+                InvitingCard(pairing.device, onCancelInvite)
+                return@Column
+            }
+            if (pairing is PairingState.Failed) {
+                FailedCard(pairing.reason, onDismissPairing)
+            }
+            if (pairing is PairingState.ConfirmReplace) {
+                ReplaceDialog(pairing, onConfirmReplace, onDismissPairing)
+            }
+            val onDevice = if (pairing == PairingState.Idle) onDeviceClick else null
             when (state) {
                 DiscoveryState.Idle, is DiscoveryState.Scanning -> {
                     SearchingIndicator()
-                    DeviceList((state as? DiscoveryState.Scanning)?.devices.orEmpty())
+                    DeviceList((state as? DiscoveryState.Scanning)?.devices.orEmpty(), onDevice)
                 }
                 is DiscoveryState.Finished -> {
                     if (state.devices.isEmpty()) {
                         Message(stringResource(R.string.pair_none_found))
                     } else {
-                        DeviceList(state.devices)
+                        DeviceList(state.devices, onDevice)
                     }
                     ActionButton(stringResource(R.string.pair_search_again), onSearchAgain)
                     if (state.suggestLocation) {
@@ -172,14 +206,22 @@ private fun SearchingIndicator() {
 }
 
 @Composable
-private fun DeviceList(devices: List<NearbyDevice>) {
+private fun DeviceList(devices: List<NearbyDevice>, onDeviceClick: ((NearbyDevice) -> Unit)?) {
     val (phones, others) = devices.partition { it.isPhone }
-    if (phones.isNotEmpty()) DeviceSection(stringResource(R.string.pair_phones), phones)
-    if (others.isNotEmpty()) DeviceSection(stringResource(R.string.pair_other_devices), others)
+    if (phones.isNotEmpty()) {
+        DeviceSection(stringResource(R.string.pair_phones), phones, onDeviceClick)
+    }
+    if (others.isNotEmpty()) {
+        DeviceSection(stringResource(R.string.pair_other_devices), others, onDeviceClick)
+    }
 }
 
 @Composable
-private fun DeviceSection(title: String, devices: List<NearbyDevice>) {
+private fun DeviceSection(
+    title: String,
+    devices: List<NearbyDevice>,
+    onDeviceClick: ((NearbyDevice) -> Unit)?
+) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             title,
@@ -187,7 +229,20 @@ private fun DeviceSection(title: String, devices: List<NearbyDevice>) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         devices.forEach { device ->
-            Column(Modifier.semantics(mergeDescendants = true) {}) {
+            val clickLabel = stringResource(R.string.pair_device_action)
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .then(
+                        if (onDeviceClick != null) {
+                            Modifier.clickable(onClickLabel = clickLabel) { onDeviceClick(device) }
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .semantics(mergeDescendants = true) {}
+            ) {
                 Text(
                     device.name.ifBlank { stringResource(R.string.pair_unnamed_device) },
                     style = MaterialTheme.typography.titleMedium
@@ -201,6 +256,89 @@ private fun DeviceSection(title: String, devices: List<NearbyDevice>) {
             HorizontalDivider()
         }
     }
+}
+
+@Composable
+private fun InvitingCard(device: NearbyDevice, onCancel: () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .padding(16.dp)
+                .semantics { liveRegion = LiveRegionMode.Polite }
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 3.dp)
+                Text(
+                    stringResource(
+                        R.string.pair_inviting,
+                        device.name.ifBlank { stringResource(R.string.pair_unnamed_device) }
+                    ),
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            Text(
+                stringResource(R.string.pair_inviting_hint),
+                style = MaterialTheme.typography.bodyLarge
+            )
+            OutlinedButton(
+                onClick = onCancel,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp)
+            ) {
+                Text(stringResource(R.string.pair_cancel))
+            }
+        }
+    }
+}
+
+@Composable
+private fun FailedCard(reason: PairingState.Failed.Reason, onDismiss: () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .padding(16.dp)
+                .semantics { liveRegion = LiveRegionMode.Polite }
+        ) {
+            Text(
+                stringResource(
+                    when (reason) {
+                        PairingState.Failed.Reason.NoAnswer -> R.string.pair_failed_no_answer
+                        PairingState.Failed.Reason.Busy -> R.string.pair_failed_busy
+                        PairingState.Failed.Reason.Error -> R.string.pair_failed_error
+                    }
+                ),
+                style = MaterialTheme.typography.bodyLarge
+            )
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.pair_ok)) }
+        }
+    }
+}
+
+@Composable
+private fun ReplaceDialog(
+    state: PairingState.ConfirmReplace,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.pair_replace_title)) },
+        text = {
+            Text(stringResource(R.string.pair_replace_body, state.current.name, state.device.name))
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.pair_replace_confirm)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.pair_cancel)) }
+        }
+    )
 }
 
 @Composable
@@ -246,9 +384,14 @@ private fun PairSearchingPreview() {
                     )
                 )
             ),
+            pairing = PairingState.Idle,
             permissions = previewPermissions,
             onRequestPermission = {},
             onSearchAgain = {},
+            onDeviceClick = {},
+            onConfirmReplace = {},
+            onCancelInvite = {},
+            onDismissPairing = {},
             onOpenWifiSettings = {},
             onOpenLocationSettings = {},
             onBack = {}
@@ -262,9 +405,14 @@ private fun PairNothingFoundPreview() {
     TandemMotoTheme(darkTheme = true, dynamicColor = false) {
         PairScreen(
             state = DiscoveryState.Finished(emptyList()),
+            pairing = PairingState.Idle,
             permissions = previewPermissions,
             onRequestPermission = {},
             onSearchAgain = {},
+            onDeviceClick = {},
+            onConfirmReplace = {},
+            onCancelInvite = {},
+            onDismissPairing = {},
             onOpenWifiSettings = {},
             onOpenLocationSettings = {},
             onBack = {}
