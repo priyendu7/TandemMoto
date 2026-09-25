@@ -1,6 +1,6 @@
 # Privacy Policy — TandemMoto
 
-_Last updated: September 24, 2026_
+_Last updated: September 25, 2026_
 
 TandemMoto is free, open-source software. It has no ads and is built to respect your privacy.
 
@@ -18,6 +18,7 @@ TandemMoto stores, in its private app storage on your phone:
 - songs you choose to share, cached so they play without interruption,
 - your shared playlist and basic settings,
 - your paired partner's phone name and Wi-Fi Direct address, so TandemMoto only ever connects to that phone (removed with **Settings → Forget partner**),
+- a random install ID created when you install the app. It isn't based on your phone, your account or any hardware ID, and it's sent only to your partner's phone, so each phone can tell it's talking to the exact app it paired with. Your partner's install ID is kept with the partner details and removed with them. Reinstalling the app creates a new one,
 - diagnostic logs (see below).
 
 Uninstalling the app deletes all of it.
@@ -37,10 +38,12 @@ The app only asks for permissions a feature needs, and only uses them for that f
 | Nearby Wi-Fi devices (Android 13+) | Find and connect directly to your partner's phone over Wi-Fi Direct | Only to your paired partner's phone |
 | Location (Android 12 and older only) | Android requires it for Wi-Fi Direct discovery on these versions. TandemMoto never reads or stores your location | No |
 | Wi-Fi and network state | Set up and monitor the direct phone-to-phone link | No |
+| Network access ("full network access" on Google Play) | Android only lets an app open a connection, even a direct phone-to-phone one, with this permission. TandemMoto uses it only for the Wi-Fi Direct link to your partner's phone | Only to your paired partner's phone |
+| Prevent phone from sleeping (Wi-Fi lock) | Keeps Wi-Fi responsive while the phones are linked, so commands arrive quickly | No |
 
 ## Network use
 
-TandemMoto doesn't connect to the internet. It connects only to your partner's phone, directly, over Wi-Fi Direct. Nothing goes through a router, a cloud service, or any server.
+TandemMoto doesn't connect to the internet. It connects only to your partner's phone, directly, over Wi-Fi Direct. Google Play lists the app as needing "full network access" because Android requires that permission for any connection, including this direct one. Nothing goes through a router, a cloud service, or any server.
 
 ## Google Play
 

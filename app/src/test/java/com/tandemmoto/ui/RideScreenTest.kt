@@ -165,6 +165,22 @@ class RideScreenTest {
     }
 
     @Test
+    fun noLongerPairedTapsToPairAgain() {
+        showRide(RideUiState(connection = ConnectionStatus.NoLongerPaired, partnerName = "Redmi"))
+        compose.onNodeWithText(str(R.string.status_no_longer_paired_named, "Redmi")).performClick()
+        assertTrue(openedPair)
+    }
+
+    @Test
+    fun partnerAppClosedAsksToOpenItAndIsNotATapTarget() {
+        showRide(RideUiState(connection = ConnectionStatus.PartnerAppClosed, partnerName = "Redmi"))
+        compose.onNodeWithText(
+            str(R.string.status_partner_app_closed_named, "Redmi")
+        ).performClick()
+        assertTrue(!connected && !openedPair)
+    }
+
+    @Test
     fun settingsForgetPartnerAsksBeforeForgetting() {
         var forgot = false
         compose.setContent {

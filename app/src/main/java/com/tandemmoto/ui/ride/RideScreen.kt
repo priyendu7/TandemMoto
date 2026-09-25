@@ -153,7 +153,9 @@ private fun ConnectionSection(
                 }
             ),
             onClick = when (connection) {
-                ConnectionStatus.NotPaired, ConnectionStatus.PairedElsewhere -> onOpenPair
+                ConnectionStatus.NotPaired,
+                ConnectionStatus.PairedElsewhere,
+                ConnectionStatus.NoLongerPaired -> onOpenPair
                 ConnectionStatus.NotConnected -> onConnect
                 else -> null
             }

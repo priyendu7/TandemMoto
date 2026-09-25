@@ -65,6 +65,11 @@
     <string name="status_not_connected_named">Not connected to %1$s · Tap to connect</string>
     <string name="status_paired_elsewhere">Couldn\'t connect: your partner may be paired with another phone · Tap to pair again</string>
     <string name="status_paired_elsewhere_named">Couldn\'t connect: %1$s may be paired with another phone · Tap to pair again</string>
+    <string name="status_no_longer_paired">Your partner\'s phone is no longer paired with this one · Tap to pair again</string>
+    <string name="status_no_longer_paired_named">%1$s is no longer paired with this phone · Tap to pair again</string>
+    <string name="status_partner_app_closed">Open TandemMoto on your partner\'s phone</string>
+    <string name="status_partner_app_closed_named">Open TandemMoto on %1$s</string>
+    <string name="status_update_needed">Update TandemMoto on both phones to connect</string>
     <string name="status_searching">Looking for your partner…</string>
     <string name="status_searching_named">Looking for %1$s…</string>
     <string name="status_connected">Connected to your partner</string>
