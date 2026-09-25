@@ -15,7 +15,23 @@
 
     <!-- Pair -->
     <string name="pair_title">Pair with your partner</string>
-    <string name="pair_body">Both of you open TandemMoto on your phones and pair once before the ride. Pairing arrives in the next development phase.</string>
+    <string name="pair_instructions">Open this screen on your partner\'s phone too, with Wi-Fi on. You\'ll pair once, before the ride.</string>
+    <string name="pair_searching">Looking for nearby phones…</string>
+    <string name="pair_phones">Phones</string>
+    <string name="pair_other_devices">Other devices</string>
+    <string name="pair_unnamed_device">Unnamed device</string>
+    <string name="pair_status_available">Available</string>
+    <string name="pair_status_invited">Invited</string>
+    <string name="pair_status_connected">Connected</string>
+    <string name="pair_status_unavailable">Unavailable</string>
+    <string name="pair_none_found">No phones found. Make sure your partner has this screen open with Wi-Fi on, then search again.</string>
+    <string name="pair_search_again">Search again</string>
+    <string name="pair_wifi_off">Wi-Fi is off. TandemMoto uses Wi-Fi to connect directly to your partner\'s phone; you don\'t need to join a network.</string>
+    <string name="pair_open_wifi_settings">Turn on Wi-Fi</string>
+    <string name="pair_location_hint">Location is off. On some phones, finding nearby phones only works with Location switched on. TandemMoto never reads your location.</string>
+    <string name="pair_open_location_settings">Open location settings</string>
+    <string name="pair_stuck">Wi-Fi Direct isn\'t responding. Turn Wi-Fi off and on again, then search again.</string>
+    <string name="pair_unsupported">This phone doesn\'t support Wi-Fi Direct, so it can\'t connect to your partner\'s phone.</string>
 
     <!-- Ride -->
     <string name="ride_open_playlist">Playlist</string>

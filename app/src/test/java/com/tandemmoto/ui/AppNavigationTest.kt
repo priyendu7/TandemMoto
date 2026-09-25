@@ -67,7 +67,7 @@ class AppNavigationTest {
     fun notPairedOpensPairAndBackReturnsHome() {
         start()
         compose.onNodeWithText(str(R.string.status_not_paired)).performClick()
-        compose.onNodeWithText(str(R.string.pair_body)).assertExists()
+        compose.onNodeWithText(str(R.string.pair_instructions)).assertExists()
         assertEquals(Routes.PAIR, navController.currentDestination?.route)
         compose.onNodeWithContentDescription(str(R.string.action_back)).performClick()
         compose.waitForIdle()

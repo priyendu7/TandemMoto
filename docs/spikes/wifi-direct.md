@@ -27,7 +27,7 @@ The lab logged every Wi‑Fi Direct event, timing and ping to the in-app diagnos
 - Both phones: feature declared, Wi‑Fi Direct enabled, loopback socket self-test OK.
 - **P1 without the Nearby devices permission:** `discoverPeers` doesn't throw; it fails through its listener with a generic **`ERROR`**. The app must check the permission itself before calling it.
 - **P1** discovered with **Location switched off** (Android 13+ uses Nearby devices with `neverForLocation`).
-- **P4 (Android 9)** discovered **before the location permission was granted**, with Location switched on.
+- **P4 (Android 9)** discovered **before the location permission was granted**, with Location switched on. Later (#21 testing) it also discovered **with Location switched off**.
 
 ### S1: discovery
 - "First peer" times (0.1–3.8 s) are misleading: **two unrelated Wi‑Fi Direct devices nearby** (`peer-2ee0`, `peer-48fd`) usually appeared first.
@@ -117,7 +117,8 @@ The lock is Android's low-latency mode on P1 and the older "high performance" mo
 ## Recommendations
 
 **#21 Discovery**
-- Check the Nearby/location permission before `discoverPeers` (P1 reports only a generic `ERROR`). On Android ≤ 12, also check Location is switched on.
+- Check the Nearby/location permission before `discoverPeers` (P1 reports only a generic `ERROR`). *Correction from #21 testing:* don't require Location to be switched on: P4 (Android 9) discovers without it. At most, suggest it when a search on Android ≤ 12 finds nothing.
+- Don't wait for Android to report the initial Wi‑Fi Direct state: P4 never sent it (seen in the lab logs and again in #21). Read Wi‑Fi's current state from `WifiManager` instead.
 - Keep discovering until the **remembered partner** appears, with a timeout of **≥ 30 s**, and restart discovery rather than relying on one call. Never auto-pick "the first peer".
 - If Discover keeps failing with `BUSY` (P4: 13 times in a row), ask the user to switch Wi‑Fi off and on; nothing else cleared it.
 

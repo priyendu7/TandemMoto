@@ -86,6 +86,7 @@ Newest first. One row per test run. Link an issue for every ❌.
 
 | Date | App version | Test | Phones | Peripherals | Result | Notes / issue |
 |---|---|---|---|---|---|---|
+| 2026-09-25 | TandemMoto #21 build (PR #41) | T1 Discovery | P1 ↔ P4 | — | ✅ | Each phone listed the other on the Pair screen. P4 searches immediately with Wi‑Fi on (false "Wi‑Fi off" fixed) and discovers with Location off. 60 s search window |
 | 2026-09-25 | Wi‑Fi Direct lab v2 (`pr37-136f1d6`, #22) | Latency L1–L4 | P1 ↔ P4 | — | ✅ with steady traffic | 1 packet/s: p95 up to 1.4 s. 20 packets/s: median ≈ 10 ms, p95 ≈ 40–75 ms. A low-latency Wi‑Fi lock helps ~20–30% more |
 | 2026-09-25 | Wi‑Fi Direct lab v2 (`pr37-136f1d6`, #22) | T4 Range walk-out | P1 ↔ P4 | — | ✅ | P1 carried ≈ 18 m (60 ft), screen on; P4 screen off. Stayed connected; P1 latency ≈ 60 ms median, p95 ≈ 0.35 s at 1 packet/s |
 | 2026-09-25 | Wi‑Fi Direct lab v2 (`pr37-136f1d6`, #22) | Screen off with foreground service | P1 ↔ P4 | — | ✅ | P1 locked with the foreground service: no drop for ≈ 6 min. P4 still throttled by MIUI (3–4 s gaps) but connected |
@@ -113,6 +114,7 @@ Record anything a tester had to change or work around, with the device ID.
 - **P4 has no USB data connection** to the dev laptop (micro‑USB), so no `adb`. Install through Play (`/play-test` or the QA track) or by sideloading the CI debug APK, and use the in-app log export.
 - **W1 is USB audio:** it shows up as a USB headset, not a wired analogue headset. Headset-disconnect detection (Phase 5) must handle `TYPE_USB_HEADSET`.
 - **P1 kills the app's socket when its screen turns off** (`Software caused connection abort`) unless a foreground service is running (confirmed with lab v2); P4 (Android 9) keeps it, throttled, with or without one.
-- **P4's Wi‑Fi Direct can get stuck returning `BUSY`** to Discover/Stop; switching Wi‑Fi off and on clears it. See [`spikes/wifi-direct.md`](spikes/wifi-direct.md).
+- **P4's Wi‑Fi Direct can get stuck returning `BUSY`** to Discover/Stop; switching Wi‑Fi off and on clears it.
+- **P4 never reports its initial Wi‑Fi Direct state** when an app starts listening (P1 does), and **discovers with Location switched off** (Android 9). See [`spikes/wifi-direct.md`](spikes/wifi-direct.md).
 - **Unrelated Wi‑Fi Direct devices nearby** (a TV, printer…) show up in discovery; always match the remembered partner.
 - **P1 discovery without Nearby devices permission** fails with a generic `ERROR` instead of a permission error.
