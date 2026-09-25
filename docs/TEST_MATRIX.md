@@ -15,6 +15,8 @@ Wi‑Fi Direct, Bluetooth media controls, audio routing and battery optimisation
 
 | ID | Model | Android | Skin | Battery optimisation | Owner | Notes |
 |---|---|---|---|---|---|---|
+| 2026-09-25 | TandemMoto #24 build (`pr42-9bed100`, PR #42) | T2 Pair + remembered partner | P1 ↔ P4 | — | ✅ | P4 tapped P1: paired in ≈ 1.7 s. Forget partner on both, then P1 tapped: paired, and P1 made the reconnects after restart. Status shows the partner's phone name. Invite with the partner's Wi‑Fi off: "didn't accept" message after ≈ 45 s, can tap again. Re-pairing two phones that paired before shows **no accept prompt** (Android remembers the group); the decline path was not testable for that reason |
+| 2026-09-25 | TandemMoto #24 build (`pr42-9434f78`, PR #42) | T3 Wi‑Fi off/on and airplane mode (baseline) | P1 ↔ P4 | — | ❌ expected | Drop seen on both. Nothing reconnected until the app was reopened; then the startup attempt reconnected in ≈ 3–17 s with no prompt. Android doesn't reconnect by itself; automatic reconnect is #27 |
 | P1 | Samsung Galaxy S25 | 16 | One UI | Moderate: "Sleeping apps" / "Deep sleeping apps" | @priyendu7 | Android 13+ path (Nearby devices permission) |
 | P2 | Motorola Edge 40 Neo | 14 | My UX (near-stock) | Light | @priyendu7 | Android 13+ path; near-stock baseline |
 | P3 | realme (exact model to confirm) | 10 | realme UI | Aggressive: auto-launch and background restrictions | @priyendu7 | Android ≤ 12 path (precise location permission for Wi‑Fi Direct) |
@@ -117,4 +119,6 @@ Record anything a tester had to change or work around, with the device ID.
 - **P4's Wi‑Fi Direct can get stuck returning `BUSY`** to Discover/Stop; switching Wi‑Fi off and on clears it.
 - **P4 never reports its initial Wi‑Fi Direct state** when an app starts listening (P1 does), and **discovers with Location switched off** (Android 9). See [`spikes/wifi-direct.md`](spikes/wifi-direct.md).
 - **Unrelated Wi‑Fi Direct devices nearby** (a TV, printer…) show up in discovery; always match the remembered partner.
+- **Android auto-accepts invitations from a phone it paired with before** (P1 and P4): the accept prompt only appears the first time two phones pair. TandemMoto's *Forget partner* can't clear Android's remembered group (hidden system API), and neither phone lists it in its Wi‑Fi Direct screen; only *Reset network settings* would.
+- **A Wi‑Fi Direct group outlives the app** (P1 and P4): after closing TandemMoto, Android keeps the phones connected, so "Connected" alone doesn't prove the partner app is running. The heartbeat (#25) fixes this.
 - **P1 discovery without Nearby devices permission** fails with a generic `ERROR` instead of a permission error.
