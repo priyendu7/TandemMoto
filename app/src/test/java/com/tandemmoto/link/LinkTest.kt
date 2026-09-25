@@ -304,8 +304,9 @@ class LinkTest {
 
     @Test
     fun partnerDroppingTheGroupAtOnceSuggestsItPairedElsewhere() = runTest {
+        // Its app never answered (e.g. it can't: it removed the group first).
         val partner = saved(redmi, Initiator)
-        val link = link(InMemoryPartnerStore(partner))
+        val link = link(InMemoryPartnerStore(partner), partnerAppRunning = false)
         driver.peers.value = listOf(redmi)
         runCurrent()
         driver.formGroupWith(redmi)
@@ -313,9 +314,20 @@ class LinkTest {
         driver.group.value = null // the partner removed it straight away
         runCurrent()
         assertEquals(
-            LinkStatus.NotConnected(partner.learned(), Reason.MaybePairedElsewhere),
+            LinkStatus.NotConnected(partner, Reason.MaybePairedElsewhere),
             link.status.value
         )
+    }
+
+    @Test
+    fun aQuickDropAfterThePartnerAnsweredIsNotARejection() = runTest {
+        val partner = saved(redmi, Initiator)
+        val link = link(InMemoryPartnerStore(partner))
+        driver.formGroupWith(redmi)
+        runCurrent()
+        driver.group.value = null
+        runCurrent()
+        assertEquals(LinkStatus.NotConnected(partner.learned()), link.status.value)
     }
 
     @Test
@@ -472,6 +484,58 @@ class LinkTest {
         driver.formGroupWith(redmi) // Android re-sends the same group
         runCurrent()
         assertEquals(1, partnerApp.hellosReceived.size)
+    }
+
+    // ---- Wi-Fi off ----
+
+    @Test
+    fun tappingConnectWithWifiOffSaysSoInsteadOfSearching() = runTest {
+        // #25 phone test: the Redmi said "Looking for …" with its Wi-Fi off.
+        val partner = saved(redmi, Initiator)
+        val link = link(InMemoryPartnerStore(partner))
+        advanceTimeBy(PeerDiscovery.SCAN_DURATION_MS + 1)
+        driver.enabled.value = false
+        runCurrent()
+        assertEquals(LinkStatus.NotConnected(partner, Reason.WifiOff), link.status.value)
+
+        val searches = driver.discoverCalls
+        link.connectToPartner()
+        runCurrent()
+        assertEquals(LinkStatus.NotConnected(partner, Reason.WifiOff), link.status.value)
+        assertEquals(searches, driver.discoverCalls)
+
+        driver.enabled.value = true
+        runCurrent()
+        assertEquals(LinkStatus.NotConnected(partner), link.status.value)
+    }
+
+    @Test
+    fun wifiOffWhileConnectedOrConnectingSaysWifiOff() = runTest {
+        val partner = saved(redmi, Initiator)
+        val link = link(InMemoryPartnerStore(partner)) // the startup attempt is searching
+        driver.enabled.value = false
+        runCurrent()
+        assertEquals(LinkStatus.NotConnected(partner, Reason.WifiOff), link.status.value)
+        assertEquals(DiscoveryState.Idle, link.discovery.state.value)
+
+        driver.enabled.value = true
+        link.connectToPartner()
+        driver.formGroupWith(redmi)
+        runCurrent()
+        assertTrue(link.status.value is LinkStatus.Connected)
+        driver.enabled.value = false
+        driver.group.value = null // Android drops the group with Wi-Fi
+        runCurrent()
+        assertEquals(LinkStatus.NotConnected(partner.learned(), Reason.WifiOff), link.status.value)
+    }
+
+    @Test
+    fun startingWithWifiOffSaysSo() = runTest {
+        driver.enabled.value = false
+        val partner = saved(redmi, Initiator)
+        val link = link(InMemoryPartnerStore(partner))
+        assertEquals(LinkStatus.NotConnected(partner, Reason.WifiOff), link.status.value)
+        assertEquals(0, driver.discoverCalls)
     }
 
     // ---- Forget ----

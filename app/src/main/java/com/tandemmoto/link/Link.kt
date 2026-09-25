@@ -56,7 +56,10 @@ sealed interface LinkStatus {
             PartnerAppClosed,
 
             /** The apps speak different protocol versions. */
-            UpdateNeeded
+            UpdateNeeded,
+
+            /** This phone's Wi-Fi is off. */
+            WifiOff
         }
     }
 }
@@ -112,6 +115,9 @@ class Link(
 
     /** Set right after a group with the partner forms; a quick silent drop suggests rejection. */
     private var justFormed = false
+
+    /** The partner's app answered in this group, so a drop isn't a rejection. */
+    private var answeredInGroup = false
     private var removingOurselves = false
 
     /** The group the channel was opened for, so repeated group broadcasts don't reopen it. */
@@ -126,9 +132,10 @@ class Link(
             _partner.value = store.partner.first()
             _partner.value?.let {
                 log("Saved partner ${it.logId} (${it.role})")
-                _status.value = LinkStatus.NotConnected(it)
+                _status.value = LinkStatus.NotConnected(it, unreachable())
             }
             scope.launch { channel.state.collect { onChannelState(it) } }
+            scope.launch { driver.enabled.collect { onWifi(it) } }
             scope.launch { driver.group.collect { onGroup(it) } }
             connectToPartner()
         }
@@ -225,6 +232,10 @@ class Link(
         val partner = _partner.value ?: return
         if (groupWithPartner || connectJob?.isActive == true) return
         if (_pairing.value is PairingState.Inviting) return
+        if (driver.enabled.value == false) {
+            _status.value = LinkStatus.NotConnected(partner, LinkStatus.NotConnected.Reason.WifiOff)
+            return
+        }
         connectJob = scope.launch {
             // The group watcher may already have found an existing group with the partner.
             if (groupWithPartner) return@launch
@@ -252,7 +263,7 @@ class Link(
             }
             discovery.stop()
             if (connected == null && !groupWithPartner) {
-                _status.value = LinkStatus.NotConnected(partner)
+                _status.value = LinkStatus.NotConnected(partner, unreachable())
                 log("Partner not reached")
             }
         }
@@ -332,6 +343,7 @@ class Link(
     private fun onGroupWithPartner(partner: Partner, group: GroupInfo) {
         if (!groupWithPartner) {
             groupWithPartner = true
+            answeredInGroup = false
             _status.value = LinkStatus.Connecting(partner)
             justFormed = true
             scope.launch {
@@ -383,7 +395,7 @@ class Link(
                 // not a closed app. The channel keeps retrying while Android keeps the group,
                 // which on the Redmi took ~13 s to notice (#25 phone test).
                 appTimer?.cancel()
-                _status.value = LinkStatus.NotConnected(partner)
+                _status.value = LinkStatus.NotConnected(partner, unreachable())
                 log("Partner went away")
             } else {
                 if (_status.value is LinkStatus.Connected) {
@@ -393,6 +405,7 @@ class Link(
             }
             is ChannelState.Open -> {
                 appTimer?.cancel()
+                answeredInGroup = true
                 _status.value = LinkStatus.Connected(partner)
                 log("Connected to ${partner.logId}")
             }
@@ -457,9 +470,10 @@ class Link(
             // The partner's app already said why; keep that.
             current == LinkStatus.NotConnected.Reason.NoLongerPaired ||
                 current == LinkStatus.NotConnected.Reason.UpdateNeeded -> current
-            justFormed && !wasOurs && partner.role == Partner.Role.Initiator ->
+            driver.enabled.value == false -> LinkStatus.NotConnected.Reason.WifiOff
+            justFormed && !wasOurs && !answeredInGroup && partner.role == Partner.Role.Initiator ->
                 LinkStatus.NotConnected.Reason.MaybePairedElsewhere
-            else -> LinkStatus.NotConnected.Reason.Unreachable
+            else -> unreachable()
         }
         _status.value = LinkStatus.NotConnected(partner, reason)
         log(
@@ -469,6 +483,43 @@ class Link(
                 "Group removed"
             }
         )
+    }
+
+    /** Not connected for no reason the partner gave: this phone's Wi-Fi, or just not reached. */
+    private fun unreachable() = if (driver.enabled.value == false) {
+        LinkStatus.NotConnected.Reason.WifiOff
+    } else {
+        LinkStatus.NotConnected.Reason.Unreachable
+    }
+
+    /**
+     * Wi-Fi off stops any attempt and says so; back on, it's an ordinary "Not connected" (tap to
+     * connect; reconnecting by itself is #27). A group, if any, is removed by Android.
+     */
+    private fun onWifi(enabled: Boolean?) {
+        val partner = _partner.value ?: return
+        when (enabled) {
+            false -> {
+                // Only our own attempt's search; the Pair screen shows Wi-Fi off itself.
+                if (connectJob?.isActive == true) {
+                    connectJob?.cancel()
+                    discovery.stop()
+                }
+                _status.value =
+                    LinkStatus.NotConnected(partner, LinkStatus.NotConnected.Reason.WifiOff)
+                log("Wi-Fi off")
+            }
+            true -> {
+                val status = _status.value
+                if (status is LinkStatus.NotConnected &&
+                    status.reason == LinkStatus.NotConnected.Reason.WifiOff
+                ) {
+                    _status.value = LinkStatus.NotConnected(partner)
+                    log("Wi-Fi back on")
+                }
+            }
+            null -> Unit
+        }
     }
 
     private fun GroupInfo.sameGroupAs(other: GroupInfo) = isGroupOwner == other.isGroupOwner &&

@@ -38,6 +38,7 @@ enum class ConnectionStatus(
         R.string.status_partner_app_closed_named
     ),
     UpdateNeeded(R.string.status_update_needed, StatusKind.Problem),
+    WifiOff(R.string.status_wifi_off, StatusKind.Problem),
     Searching(R.string.status_searching, StatusKind.InProgress, R.string.status_searching_named),
     Connected(R.string.status_connected, StatusKind.Ok, R.string.status_connected_named),
     Reconnecting(

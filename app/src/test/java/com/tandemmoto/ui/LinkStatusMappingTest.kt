@@ -26,7 +26,8 @@ class LinkStatusMappingTest {
                 ConnectionStatus.NoLongerPaired,
             LinkStatus.NotConnected(partner, Reason.PartnerAppClosed) to
                 ConnectionStatus.PartnerAppClosed,
-            LinkStatus.NotConnected(partner, Reason.UpdateNeeded) to ConnectionStatus.UpdateNeeded
+            LinkStatus.NotConnected(partner, Reason.UpdateNeeded) to ConnectionStatus.UpdateNeeded,
+            LinkStatus.NotConnected(partner, Reason.WifiOff) to ConnectionStatus.WifiOff
         )
         expected.forEach { (link, ui) -> assertEquals(link.toString(), ui, link.toUi()) }
     }

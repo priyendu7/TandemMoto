@@ -35,6 +35,7 @@ class RideScreenTest {
     private var requested: AppPermission? = null
     private var openedPair = false
     private var connected = false
+    private var openedWifi = false
 
     private fun nearby(status: PermissionStatus, sdk: Int = 34, approximateOnly: Boolean = false) =
         PermissionsState(sdk, mapOf(AppPermission.NEARBY to status), approximateOnly)
@@ -50,6 +51,7 @@ class RideScreenTest {
                 onRequestPermission = { requested = it },
                 onOpenPair = { openedPair = true },
                 onConnect = { connected = true },
+                onOpenWifiSettings = { openedWifi = true },
                 onPlayPause = {},
                 onNext = {},
                 onPrevious = {},
@@ -162,6 +164,13 @@ class RideScreenTest {
         showRide(RideUiState(connection = ConnectionStatus.PairedElsewhere))
         compose.onNodeWithText(str(R.string.status_paired_elsewhere)).performClick()
         assertTrue(openedPair)
+    }
+
+    @Test
+    fun wifiOffTapsToOpenWifiSettings() {
+        showRide(RideUiState(connection = ConnectionStatus.WifiOff))
+        compose.onNodeWithText(str(R.string.status_wifi_off)).performClick()
+        assertTrue(openedWifi && !connected)
     }
 
     @Test
