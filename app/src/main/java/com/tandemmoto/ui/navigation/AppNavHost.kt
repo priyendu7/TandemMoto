@@ -10,7 +10,7 @@ import com.tandemmoto.diagnostics.LogExporter
 import com.tandemmoto.ui.playlist.PlaylistScreen
 import com.tandemmoto.ui.ride.RideRoute
 import com.tandemmoto.ui.settings.SettingsScreen
-import com.tandemmoto.ui.setup.PairScreen
+import com.tandemmoto.ui.setup.PairRoute
 
 object Routes {
     const val RIDE = "ride"
@@ -34,7 +34,7 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             )
         }
         composable(Routes.PAIR) {
-            PairScreen(onBack = { navController.popBackStack() })
+            PairRoute(onBack = { navController.popBackStack() })
         }
         composable(Routes.PLAYLIST) {
             PlaylistScreen(onBack = { navController.popBackStack() })

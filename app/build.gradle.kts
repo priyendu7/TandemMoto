@@ -109,6 +109,8 @@ dependencies {
     //   Opus + WebRTC AudioProcessing via native/AAR deps (see docs/DEVELOPMENT_PLAN.md §2).
 
     testImplementation("junit:junit:4.13.2")
+    // Virtual time for coroutine logic such as the 30 s discovery window (link/PeerDiscovery).
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     // Compose UI tests run on the JVM via Robolectric, so CI's testDebugUnitTest covers them.
     testImplementation(composeBom)
     testImplementation("androidx.compose.ui:ui-test-junit4")
