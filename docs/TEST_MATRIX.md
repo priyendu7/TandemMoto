@@ -18,7 +18,9 @@ Wi‑Fi Direct, Bluetooth media controls, audio routing and battery optimisation
 | P1 | Samsung Galaxy S25 | 16 | One UI | Moderate: "Sleeping apps" / "Deep sleeping apps" | @priyendu7 | Android 13+ path (Nearby devices permission) |
 | P2 | Motorola Edge 40 Neo | 14 | My UX (near-stock) | Light | @priyendu7 | Android 13+ path; near-stock baseline |
 | P3 | realme (exact model to confirm) | 10 | realme UI | Aggressive: auto-launch and background restrictions | @priyendu7 | Android ≤ 12 path (precise location permission for Wi‑Fi Direct) |
-| — | **Wanted:** Xiaomi/Redmi/POCO (HyperOS/MIUI) | any | | Very aggressive | | Most common aggressive skin in India |
+| P4 | Xiaomi Redmi Y2 | 9 | MIUI | Very aggressive: autostart, battery saver, background restrictions | @priyendu7 | Android ≤ 12 path; Xiaomi skin. No USB data connection to the dev laptop: install via Play QA link or APK, read logs via Settings → Export diagnostic logs |
+| — | **Wanted:** Xiaomi/Redmi/POCO on HyperOS | 14+ | | Very aggressive | | Current Xiaomi skin, the most common aggressive skin in India |
+| — | **Not usable:** Xiaomi Redmi 3S | 6 | | | @priyendu7 | Below minSdk 26: the app can't be installed |
 
 ### Handlebar controls
 
@@ -49,9 +51,9 @@ The rider controls music from the bike. TandemMoto expects those controls to rea
 ## Minimum coverage
 
 A phase's device tests count as done when they pass on:
-1. **One mixed-vendor phone pair.** Default: **P1 ↔ P2** (Samsung ↔ Motorola). Wi‑Fi Direct negotiation between different vendors is the riskiest case.
-2. **Both permission paths:** one phone on Android 13+ (P1 or P2) and one on Android 12 or older (**P3**).
-3. **One aggressive-battery phone** for the screen-off tests (T10). Default: **P3**.
+1. **One mixed-vendor phone pair.** Default: **P1 ↔ P2** (Samsung ↔ Motorola), or **P1 ↔ P4** (Samsung ↔ Xiaomi), the pair available for Phase 1. Wi‑Fi Direct negotiation between different vendors is the riskiest case.
+2. **Both permission paths:** one phone on Android 13+ (P1 or P2) and one on Android 12 or older (**P3** or **P4**).
+3. **One aggressive-battery phone** for the screen-off tests (T10). Default: **P4** (MIUI), else **P3**.
 4. **Rider setup** W1 (+ R1 from Phase 3) on one phone, **pillion setup** E1 on the other.
 
 ---
@@ -84,7 +86,7 @@ Newest first. One row per test run. Link an issue for every ❌.
 
 | Date | App version | Test | Phones | Peripherals | Result | Notes / issue |
 |---|---|---|---|---|---|---|
-| | | | | | | |
+| 2026-09-25 | — (Android's own Wi‑Fi Direct screen, not TandemMoto) | Baseline discovery | P1 ↔ P4 | — | ✅ | Each phone listed the other in 2–3 s. Confirms both phones' Wi‑Fi Direct works before the #22 spike |
 
 ---
 
@@ -96,5 +98,10 @@ Record anything a tester had to change or work around, with the device ID.
   - P1 (One UI): Settings → Apps → TandemMoto → Battery → **Unrestricted**; make sure it isn't in *Sleeping apps*.
   - P3 (realme UI): also allow **Auto launch** and **background activity** for TandemMoto.
 - **R1, bike as an audio device:** in everyday use the phone's audio doesn't go to the bike (owner-reported). Recheck during T7 and T9 with TandemMoto running, especially during calls and while the intercom holds the mic, and record which Bluetooth profiles the bike connects with.
+- **Where Android's own Wi‑Fi Direct screen is** (useful as a baseline, with Wi‑Fi on):
+  - P1 (One UI): Settings → Connections → Wi‑Fi → ⋮ (top right) → **Wi‑Fi Direct**.
+  - P4 (MIUI): Settings → Wi‑Fi → Additional settings → **Other connection types** → **Wi‑Fi Direct**. It's easy to miss: it isn't directly under Additional settings.
+  - On Android 9 and older, switch Location on too if discovery finds nothing.
+- **P4 has no USB data connection** to the dev laptop (micro‑USB), so no `adb`. Install through Play (`/play-test` or the QA track) or by sideloading the CI debug APK, and use the in-app log export.
 - **W1 is USB audio:** it shows up as a USB headset, not a wired analogue headset. Headset-disconnect detection (Phase 5) must handle `TYPE_USB_HEADSET`.
 - Wi‑Fi Direct findings from the spike (#22) go here.
