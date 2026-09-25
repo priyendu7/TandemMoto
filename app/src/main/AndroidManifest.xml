@@ -15,6 +15,9 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Spike (#22) only: Android won't open any TCP socket without INTERNET, even one that only
+         runs over Wi-Fi Direct. #25 adds it permanently with a PRIVACY.md note. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Permissions are added in the PR that builds the feature using them, never ahead of it:
          RECORD_AUDIO with the intercom (Phase 4); POST_NOTIFICATIONS and the foreground service

@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.tandemmoto.diagnostics.LogExporter
+import com.tandemmoto.spike.WifiDirectLabRoute
 import com.tandemmoto.ui.playlist.PlaylistScreen
 import com.tandemmoto.ui.ride.RideRoute
 import com.tandemmoto.ui.settings.SettingsScreen
@@ -17,6 +18,7 @@ object Routes {
     const val PAIR = "pair"
     const val PLAYLIST = "playlist"
     const val SETTINGS = "settings"
+    const val SPIKE_LAB = "spike_lab"
 }
 
 /**
@@ -43,8 +45,12 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             val context = LocalContext.current
             SettingsScreen(
                 onBack = { navController.popBackStack() },
-                onExportLogs = { LogExporter.share(context) }
+                onExportLogs = { LogExporter.share(context) },
+                onOpenLab = { navController.navigate(Routes.SPIKE_LAB) }
             )
+        }
+        composable(Routes.SPIKE_LAB) {
+            WifiDirectLabRoute(onBack = { navController.popBackStack() })
         }
     }
 }

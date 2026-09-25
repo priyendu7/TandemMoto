@@ -26,7 +26,8 @@ private const val PRIVACY_URL = "$SOURCE_URL/blob/main/docs/PRIVACY.md"
 fun SettingsScreen(
     onBack: () -> Unit,
     onExportLogs: () -> Unit,
-    versionName: String = BuildConfig.VERSION_NAME
+    versionName: String = BuildConfig.VERSION_NAME,
+    onOpenLab: (() -> Unit)? = null
 ) {
     val uriHandler = LocalUriHandler.current
     Scaffold(topBar = { BackTopBar(stringResource(R.string.settings_title), onBack) }) { padding ->
@@ -63,6 +64,15 @@ fun SettingsScreen(
                 },
                 modifier = Modifier.clickable(onClick = onExportLogs)
             )
+            // Spike (#22) only, never merged.
+            if (onOpenLab != null) {
+                HorizontalDivider()
+                ListItem(
+                    headlineContent = { Text("Wi-Fi Direct lab (spike)") },
+                    supportingContent = { Text("Measure discovery, connect and ping") },
+                    modifier = Modifier.clickable(onClick = onOpenLab)
+                )
+            }
         }
     }
 }
