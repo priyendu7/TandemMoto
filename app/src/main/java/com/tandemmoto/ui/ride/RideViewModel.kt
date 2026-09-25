@@ -48,8 +48,12 @@ internal fun LinkStatus.toUi(): ConnectionStatus = when (this) {
     LinkStatus.NotPaired -> ConnectionStatus.NotPaired
     is LinkStatus.Connecting -> ConnectionStatus.Searching
     is LinkStatus.Connected -> ConnectionStatus.Connected
-    is LinkStatus.NotConnected -> when {
-        maybePairedElsewhere -> ConnectionStatus.PairedElsewhere
-        else -> ConnectionStatus.NotConnected
+    is LinkStatus.NotConnected -> when (reason) {
+        LinkStatus.NotConnected.Reason.Unreachable -> ConnectionStatus.NotConnected
+        LinkStatus.NotConnected.Reason.MaybePairedElsewhere -> ConnectionStatus.PairedElsewhere
+        LinkStatus.NotConnected.Reason.NoLongerPaired -> ConnectionStatus.NoLongerPaired
+        LinkStatus.NotConnected.Reason.PartnerAppClosed -> ConnectionStatus.PartnerAppClosed
+        LinkStatus.NotConnected.Reason.UpdateNeeded -> ConnectionStatus.UpdateNeeded
+        LinkStatus.NotConnected.Reason.WifiOff -> ConnectionStatus.WifiOff
     }
 }

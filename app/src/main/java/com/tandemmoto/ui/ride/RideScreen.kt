@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -37,6 +38,7 @@ import com.tandemmoto.ui.components.ConnectionStatus
 import com.tandemmoto.ui.components.ConnectionStatusBar
 import com.tandemmoto.ui.components.ControlButton
 import com.tandemmoto.ui.components.PermissionPrompt
+import com.tandemmoto.ui.components.openWifiSettings
 import com.tandemmoto.ui.components.rememberPermissionRequester
 import com.tandemmoto.ui.theme.TandemMotoTheme
 
@@ -50,12 +52,14 @@ fun RideRoute(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val permissions = rememberPermissionRequester()
+    val context = LocalContext.current
     RideScreen(
         state = state,
         permissions = permissions.state,
         onRequestPermission = permissions.request,
         onOpenPair = onOpenPair,
         onConnect = viewModel::onConnect,
+        onOpenWifiSettings = context::openWifiSettings,
         onPlayPause = viewModel::onPlayPause,
         onNext = viewModel::onNext,
         onPrevious = viewModel::onPrevious,
@@ -72,6 +76,7 @@ fun RideScreen(
     onRequestPermission: (AppPermission) -> Unit,
     onOpenPair: () -> Unit,
     onConnect: () -> Unit,
+    onOpenWifiSettings: () -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
@@ -110,7 +115,8 @@ fun RideScreen(
                 permissions,
                 onRequestPermission,
                 onOpenPair,
-                onConnect
+                onConnect,
+                onOpenWifiSettings
             )
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -139,22 +145,26 @@ private fun ConnectionSection(
     permissions: PermissionsState,
     onRequestPermission: (AppPermission) -> Unit,
     onOpenPair: () -> Unit,
-    onConnect: () -> Unit
+    onConnect: () -> Unit,
+    onOpenWifiSettings: () -> Unit
 ) {
     if (permissions.isGranted(AppPermission.NEARBY)) {
         ConnectionStatusBar(
             status = connection,
             partnerName = partnerName,
             onClickLabel = stringResource(
-                if (connection == ConnectionStatus.NotConnected) {
-                    R.string.ride_connect_action
-                } else {
-                    R.string.ride_pair_action
+                when (connection) {
+                    ConnectionStatus.NotConnected -> R.string.ride_connect_action
+                    ConnectionStatus.WifiOff -> R.string.ride_wifi_action
+                    else -> R.string.ride_pair_action
                 }
             ),
             onClick = when (connection) {
-                ConnectionStatus.NotPaired, ConnectionStatus.PairedElsewhere -> onOpenPair
+                ConnectionStatus.NotPaired,
+                ConnectionStatus.PairedElsewhere,
+                ConnectionStatus.NoLongerPaired -> onOpenPair
                 ConnectionStatus.NotConnected -> onConnect
+                ConnectionStatus.WifiOff -> onOpenWifiSettings
                 else -> null
             }
         )
@@ -265,6 +275,7 @@ private fun RidePreview(state: RideUiState, permissions: PermissionsState = near
         onRequestPermission = {},
         onOpenPair = {},
         onConnect = {},
+        onOpenWifiSettings = {},
         onPlayPause = {},
         onNext = {},
         onPrevious = {},

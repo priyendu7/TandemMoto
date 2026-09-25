@@ -15,6 +15,11 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- The command channel is a TCP socket over the Wi-Fi Direct group: Android refuses any
+         socket without INTERNET (EPERM, spike #22). The app never talks to the internet. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Low-latency Wi-Fi lock while the channel is open (link/LowLatencyWifiLock.kt). -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- Permissions are added in the PR that builds the feature using them, never ahead of it:
          RECORD_AUDIO with the intercom (Phase 4); POST_NOTIFICATIONS and the foreground service

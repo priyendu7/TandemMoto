@@ -9,13 +9,17 @@ import com.tandemmoto.diagnostics.RollingFileLog
 import com.tandemmoto.link.AndroidDiscoveryPreconditions
 import com.tandemmoto.link.AndroidWifiP2pDriver
 import com.tandemmoto.link.DataStorePartnerStore
+import com.tandemmoto.link.InstallId
 import com.tandemmoto.link.Link
+import com.tandemmoto.link.LowLatencyWifiLock
+import com.tandemmoto.link.SocketFrameTransport
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
 private val Context.partnerDataStore by preferencesDataStore(name = "partner")
+private val Context.identityDataStore by preferencesDataStore(name = "identity")
 
 class TandemMotoApp : Application() {
     /** The app's single Wi-Fi Direct link, shared by Home, Pair, Settings (and later the service). */
@@ -37,7 +41,11 @@ class TandemMotoApp : Application() {
             preconditions = AndroidDiscoveryPreconditions(this),
             store = DataStorePartnerStore(partnerDataStore),
             scope = appScope,
-            log = { AppLog.i("Link", it) }
+            log = { AppLog.i("Link", it) },
+            transport = SocketFrameTransport(),
+            installId = InstallId(identityDataStore)::get,
+            appVersion = BuildConfig.VERSION_NAME,
+            keepAwake = LowLatencyWifiLock(this)::hold
         )
         link.start()
     }

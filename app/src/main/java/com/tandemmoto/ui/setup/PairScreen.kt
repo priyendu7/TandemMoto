@@ -1,7 +1,6 @@
 package com.tandemmoto.ui.setup
 
 import android.content.Intent
-import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +47,7 @@ import com.tandemmoto.permissions.PermissionStatus
 import com.tandemmoto.permissions.PermissionsState
 import com.tandemmoto.ui.components.BackTopBar
 import com.tandemmoto.ui.components.PermissionPrompt
+import com.tandemmoto.ui.components.openWifiSettings
 import com.tandemmoto.ui.components.rememberPermissionRequester
 import com.tandemmoto.ui.theme.TandemMotoTheme
 
@@ -79,17 +79,7 @@ fun PairRoute(onBack: () -> Unit, onPaired: () -> Unit, viewModel: PairViewModel
         onConfirmReplace = viewModel::confirmReplace,
         onCancelInvite = viewModel::cancelInvite,
         onDismissPairing = viewModel::dismissPairing,
-        onOpenWifiSettings = {
-            context.startActivity(
-                Intent(
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        Settings.Panel.ACTION_WIFI
-                    } else {
-                        Settings.ACTION_WIFI_SETTINGS
-                    }
-                )
-            )
-        },
+        onOpenWifiSettings = context::openWifiSettings,
         onOpenLocationSettings = {
             context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
         },

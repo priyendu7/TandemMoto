@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jlleitschuh.gradle.ktlint")
     id("com.github.triplet.play")
 }
@@ -99,6 +100,8 @@ dependencies {
     implementation("androidx.core:core-splashscreen:1.0.1")
     // Stores the paired partner (link/Partner.kt).
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+    // Command channel messages (state/Message.kt): JSON, see state/README.md for why not protobuf.
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     implementation("androidx.navigation:navigation-compose:2.10.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")

@@ -20,7 +20,9 @@ data class Partner(
     val name: String,
     val address: String,
     val role: Role,
-    val pairedAtMillis: Long
+    val pairedAtMillis: Long,
+    /** The partner app's install ID, learned from its first Hello (#25); null until then. */
+    val installId: String? = null
 ) {
     enum class Role { Initiator, Acceptor }
 
@@ -52,7 +54,7 @@ class DataStorePartnerStore(private val dataStore: DataStore<Preferences>) : Par
         val address = prefs[ADDRESS] ?: return@map null
         val role = prefs[ROLE]?.let { runCatching { Partner.Role.valueOf(it) }.getOrNull() }
             ?: return@map null
-        Partner(name, address, role, prefs[PAIRED_AT] ?: 0L)
+        Partner(name, address, role, prefs[PAIRED_AT] ?: 0L, prefs[INSTALL_ID])
     }
 
     override suspend fun save(partner: Partner) {
@@ -61,6 +63,13 @@ class DataStorePartnerStore(private val dataStore: DataStore<Preferences>) : Par
             it[ADDRESS] = partner.address
             it[ROLE] = partner.role.name
             it[PAIRED_AT] = partner.pairedAtMillis
+            if (partner.installId !=
+                null
+            ) {
+                it[INSTALL_ID] = partner.installId
+            } else {
+                it.remove(INSTALL_ID)
+            }
         }
     }
 
@@ -73,5 +82,6 @@ class DataStorePartnerStore(private val dataStore: DataStore<Preferences>) : Par
         val ADDRESS = stringPreferencesKey("address")
         val ROLE = stringPreferencesKey("role")
         val PAIRED_AT = longPreferencesKey("paired_at")
+        val INSTALL_ID = stringPreferencesKey("install_id")
     }
 }
