@@ -49,7 +49,10 @@ sealed interface Message {
             ProtocolMismatch,
 
             /** An ordinary close; the other side may reconnect. */
-            Closing
+            Closing,
+
+            /** The user tapped Disconnect: don't reconnect until someone connects again. */
+            Disconnected
         }
     }
 }

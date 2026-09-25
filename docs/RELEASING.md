@@ -101,6 +101,23 @@ Approve the run when GitHub asks (the `play-production` environment gate). Googl
 5. **First upload is manual** (the Play API can't create the first release): download the AAB from a CI run — or build locally with the upload key — and upload it in *Testing → Internal testing → Create new release*. Package name `com.tandemmoto` is locked in from then on.
 6. *Testing → Internal testing → Testers*: create an email list, add testers, and share the opt-in link with them.
 
+### Foreground service declaration (from #40)
+
+The app runs a foreground service of type **connectedDevice** while the phones are linked (`service/LinkService.kt`). Play requires a declaration for it before a release with it can go out on a testing or production track. Internal app sharing (`/play-test`) doesn't need it.
+
+*Policy → App content → Foreground service permissions*: tick **Connected device** and fill in:
+
+- **Task description** (paste):
+  > TandemMoto links a rider's and a pillion's phones directly over Wi-Fi Direct so they can share music and talk while riding. While the two phones are linked, a foreground service keeps that direct connection alive with the screens locked (the phones are in pockets while riding). It starts when the link connects with the app open, shows an ongoing notification with the connection status and a Disconnect button, and stops on Disconnect, when the partner is forgotten, or after two minutes without a connection. Without it, Android closes the connection within a second of the screen locking.
+- **Why it must start immediately / can't be deferred**: the link carries live playback commands and (later) voice between the two phones; it must stay up for the whole ride.
+- **Demo video** (unlisted YouTube link, 30–60 s, screen recording from one phone is enough):
+  1. Open TandemMoto on both phones; Home shows *Connected to …*.
+  2. Pull down the notification shade: the *Connected to …* notification with **Disconnect**.
+  3. Lock the screen for a few seconds, unlock: still connected.
+  4. Tap **Disconnect** in the notification: it disappears, Home shows *Not connected*.
+
+Phase 4 adds the **microphone** type (intercom) with its own declaration and video.
+
 ### Service account for CI
 
 1. Google Cloud Console → create (or pick) a project → **enable the *Google Play Android Developer API***.

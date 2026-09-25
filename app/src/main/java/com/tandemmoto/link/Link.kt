@@ -59,7 +59,10 @@ sealed interface LinkStatus {
             UpdateNeeded,
 
             /** This phone's Wi-Fi is off. */
-            WifiOff
+            WifiOff,
+
+            /** The partner tapped Disconnect. */
+            PartnerDisconnected
         }
     }
 }
@@ -269,6 +272,25 @@ class Link(
         }
     }
 
+    /**
+     * The user's Disconnect (notification action): tell the partner's app, drop the group and stop
+     * trying. Home then offers Tap to connect.
+     */
+    fun disconnect() {
+        val partner = _partner.value ?: return
+        scope.launch {
+            connectJob?.cancel()
+            discovery.stop()
+            channel.send(Bye(Bye.Reason.Disconnected))
+            channel.close()
+            removingOurselves = true
+            driver.cancelConnect()
+            if (driver.group.value != null) driver.removeGroup()
+            _status.value = LinkStatus.NotConnected(partner, unreachable())
+            log("Disconnected by the user")
+        }
+    }
+
     fun forgetPartner() {
         val partner = _partner.value ?: return
         scope.launch {
@@ -413,6 +435,7 @@ class Link(
                 appTimer?.cancel()
                 val reason = when (state.reason) {
                     Bye.Reason.ProtocolMismatch -> LinkStatus.NotConnected.Reason.UpdateNeeded
+                    Bye.Reason.Disconnected -> LinkStatus.NotConnected.Reason.PartnerDisconnected
                     else -> LinkStatus.NotConnected.Reason.NoLongerPaired
                 }
                 _status.value = LinkStatus.NotConnected(partner, reason)
@@ -469,7 +492,8 @@ class Link(
         val reason = when {
             // The partner's app already said why; keep that.
             current == LinkStatus.NotConnected.Reason.NoLongerPaired ||
-                current == LinkStatus.NotConnected.Reason.UpdateNeeded -> current
+                current == LinkStatus.NotConnected.Reason.UpdateNeeded ||
+                current == LinkStatus.NotConnected.Reason.PartnerDisconnected -> current
             driver.enabled.value == false -> LinkStatus.NotConnected.Reason.WifiOff
             justFormed && !wasOurs && !answeredInGroup && partner.role == Partner.Role.Initiator ->
                 LinkStatus.NotConnected.Reason.MaybePairedElsewhere

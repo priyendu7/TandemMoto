@@ -40,6 +40,8 @@ The app only asks for permissions a feature needs, and only uses them for that f
 | Wi-Fi and network state | Set up and monitor the direct phone-to-phone link | No |
 | Network access ("full network access" on Google Play) | Android only lets an app open a connection, even a direct phone-to-phone one, with this permission. TandemMoto uses it only for the Wi-Fi Direct link to your partner's phone | Only to your paired partner's phone |
 | Prevent phone from sleeping (Wi-Fi lock) | Keeps Wi-Fi responsive while the phones are linked, so commands arrive quickly | No |
+| Run foreground service (connected device) | Keeps the link to your partner's phone alive while the screen is locked, with an ongoing notification. Stops when you tap Disconnect, forget your partner, or after two minutes without a connection | No |
+| Notifications (Android 13+, optional) | Shows that ongoing connection notification, with its Disconnect button. Without it the link still works; Android just hides the notification | No |
 
 ## Network use
 

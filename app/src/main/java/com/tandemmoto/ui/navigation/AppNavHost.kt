@@ -1,5 +1,7 @@
 package com.tandemmoto.ui.navigation
 
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
@@ -10,6 +12,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.tandemmoto.diagnostics.LogExporter
 import com.tandemmoto.link
+import com.tandemmoto.permissions.AppPermission
+import com.tandemmoto.ui.components.rememberPermissionRequester
 import com.tandemmoto.ui.playlist.PlaylistScreen
 import com.tandemmoto.ui.ride.RideRoute
 import com.tandemmoto.ui.settings.SettingsScreen
@@ -48,11 +52,23 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
         composable(Routes.SETTINGS) {
             val context = LocalContext.current
             val partner by context.link.partner.collectAsStateWithLifecycle()
+            val permissions = rememberPermissionRequester()
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onExportLogs = { LogExporter.share(context) },
                 partnerName = partner?.name,
-                onForgetPartner = context.link::forgetPartner
+                onForgetPartner = context.link::forgetPartner,
+                notifications = permissions.state.statuses[AppPermission.NOTIFICATIONS],
+                onNotificationsClick = {
+                    if (permissions.state.isGranted(AppPermission.NOTIFICATIONS)) {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                        )
+                    } else {
+                        permissions.request(AppPermission.NOTIFICATIONS)
+                    }
+                }
             )
         }
     }

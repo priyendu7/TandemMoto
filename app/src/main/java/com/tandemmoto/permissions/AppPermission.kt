@@ -12,12 +12,17 @@ import com.tandemmoto.R
  *
  * Permissions are added here in the PR that builds the feature using them: audio files with the
  * music library (Phase 2, if it scans the device instead of using the file picker), the
- * microphone with the intercom (Phase 4), notifications with the foreground service, phone state
- * with call hold (Phase 5).
+ * microphone with the intercom (Phase 4), phone state with call hold (Phase 5).
  */
 enum class AppPermission {
     /** Connection bar: Wi-Fi Direct discovery (PRD §5.1); nearby devices, location before 13. */
-    NEARBY;
+    NEARBY,
+
+    /**
+     * Android 13+: shows the link's notification (the foreground service runs without it). Optional
+     * and asked once, the first time the link connects; Settings can turn it on later.
+     */
+    NOTIFICATIONS;
 
     /**
      * Android permissions to request on [sdk], empty when none are needed there. The first entry
@@ -34,6 +39,12 @@ enum class AppPermission {
                     Manifest.permission.ACCESS_COARSE_LOCATION
                 )
             }
+        NOTIFICATIONS ->
+            if (sdk >= Build.VERSION_CODES.TIRAMISU) {
+                listOf(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                emptyList()
+            }
     }
 
     /**
@@ -47,6 +58,7 @@ enum class AppPermission {
             approximateOnly -> R.string.permission_precise_location_prompt
             else -> R.string.permission_location_prompt
         }
+        NOTIFICATIONS -> R.string.permission_notifications_prompt
     }
 
     companion object {
