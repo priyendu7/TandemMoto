@@ -86,6 +86,7 @@ Newest first. One row per test run. Link an issue for every ❌.
 
 | Date | App version | Test | Phones | Peripherals | Result | Notes / issue |
 |---|---|---|---|---|---|---|
+| 2026-09-25 | TandemMoto #21 build (PR #41) | T1 Discovery | P1 ↔ P4 | — | ✅ | Each phone listed the other on the Pair screen. P4 searches immediately with Wi‑Fi on (false "Wi‑Fi off" fixed) and discovers with Location off. 60 s search window |
 | 2026-09-25 | Wi‑Fi Direct lab v2 (`pr37-136f1d6`, #22) | Latency L1–L4 | P1 ↔ P4 | — | ✅ with steady traffic | 1 packet/s: p95 up to 1.4 s. 20 packets/s: median ≈ 10 ms, p95 ≈ 40–75 ms. A low-latency Wi‑Fi lock helps ~20–30% more |
 | 2026-09-25 | Wi‑Fi Direct lab v2 (`pr37-136f1d6`, #22) | T4 Range walk-out | P1 ↔ P4 | — | ✅ | P1 carried ≈ 18 m (60 ft), screen on; P4 screen off. Stayed connected; P1 latency ≈ 60 ms median, p95 ≈ 0.35 s at 1 packet/s |
 | 2026-09-25 | Wi‑Fi Direct lab v2 (`pr37-136f1d6`, #22) | Screen off with foreground service | P1 ↔ P4 | — | ✅ | P1 locked with the foreground service: no drop for ≈ 6 min. P4 still throttled by MIUI (3–4 s gaps) but connected |
