@@ -1,12 +1,14 @@
 package com.tandemmoto.ui
 
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.tandemmoto.R
 import com.tandemmoto.permissions.AppPermission
 import com.tandemmoto.permissions.PermissionStatus
@@ -14,6 +16,7 @@ import com.tandemmoto.permissions.PermissionsState
 import com.tandemmoto.ui.components.ConnectionStatus
 import com.tandemmoto.ui.ride.RideScreen
 import com.tandemmoto.ui.ride.RideUiState
+import com.tandemmoto.ui.settings.PartnerSongsUi
 import com.tandemmoto.ui.settings.SettingsScreen
 import com.tandemmoto.ui.theme.TandemMotoTheme
 import org.junit.Assert.assertEquals
@@ -208,6 +211,25 @@ class RideScreenTest {
         assertTrue(!forgot)
         compose.onNodeWithText(str(R.string.settings_forget_confirm)).performClick()
         assertTrue(forgot)
+    }
+
+    @Test
+    fun settingsScrollsToExportLogsWithEverythingShown() {
+        // Phone test on #50: with Songs from partner, Export logs was off the screen.
+        compose.setContent {
+            TandemMotoTheme {
+                SettingsScreen(
+                    onBack = {},
+                    onExportLogs = {},
+                    partnerName = "Redmi Y2",
+                    notifications = PermissionStatus.Granted,
+                    partnerSongs = PartnerSongsUi()
+                )
+            }
+        }
+        compose.onNodeWithText(
+            str(R.string.settings_export_logs)
+        ).performScrollTo().assertIsDisplayed()
     }
 
     @Test

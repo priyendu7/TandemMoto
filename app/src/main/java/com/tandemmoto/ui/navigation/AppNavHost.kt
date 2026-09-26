@@ -10,12 +10,14 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.tandemmoto.TandemMotoApp
 import com.tandemmoto.diagnostics.LogExporter
 import com.tandemmoto.link
 import com.tandemmoto.permissions.AppPermission
 import com.tandemmoto.ui.components.rememberPermissionRequester
 import com.tandemmoto.ui.playlist.PlaylistRoute
 import com.tandemmoto.ui.ride.RideRoute
+import com.tandemmoto.ui.settings.PartnerSongsUi
 import com.tandemmoto.ui.settings.SettingsScreen
 import com.tandemmoto.ui.setup.PairRoute
 
@@ -53,11 +55,24 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             val context = LocalContext.current
             val partner by context.link.partner.collectAsStateWithLifecycle()
             val permissions = rememberPermissionRequester()
+            val app = context.applicationContext as TandemMotoApp
+            val window by app.windowSettings.settings.collectAsStateWithLifecycle()
+            val transfers by app.transfers.state.collectAsStateWithLifecycle()
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onExportLogs = { LogExporter.share(context) },
                 partnerName = partner?.name,
                 onForgetPartner = context.link::forgetPartner,
+                partnerSongs = partner?.let {
+                    PartnerSongsUi(
+                        window = window,
+                        storedCount = transfers.stored.size,
+                        storedBytes = transfers.storedBytes,
+                        aheadLimitedTo = transfers.aheadLimitedTo
+                    )
+                },
+                onWindowChange = app.windowSettings::update,
+                onRemovePartnerSongs = app.transfers::removeAll,
                 notifications = permissions.state.statuses[AppPermission.NOTIFICATIONS],
                 onNotificationsClick = {
                     if (permissions.state.isGranted(AppPermission.NOTIFICATIONS)) {

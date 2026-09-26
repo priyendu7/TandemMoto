@@ -2,6 +2,8 @@ package com.tandemmoto
 
 import android.app.Application
 import android.content.Context
+import android.os.StatFs
+import androidx.core.net.toUri
 import androidx.datastore.preferences.preferencesDataStore
 import com.tandemmoto.diagnostics.AppLog
 import com.tandemmoto.diagnostics.LogLevel
@@ -21,10 +23,15 @@ import com.tandemmoto.playlist.PlaylistSync
 import com.tandemmoto.playlist.RidePlaylist
 import com.tandemmoto.service.LinkService
 import com.tandemmoto.service.LinkSession
+import com.tandemmoto.transfer.SongStore
+import com.tandemmoto.transfer.SongTransfers
+import com.tandemmoto.transfer.TransferConnection
+import com.tandemmoto.transfer.WindowSettingsStore
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 
 private val Context.partnerDataStore by preferencesDataStore(name = "partner")
 private val Context.identityDataStore by preferencesDataStore(name = "identity")
@@ -41,6 +48,19 @@ class TandemMotoApp : Application() {
     /** The shared ride playlist (#49). */
     lateinit var ridePlaylist: RidePlaylist
         private set
+
+    /** Song transfer and the song window (#50). */
+    lateinit var transfers: SongTransfers
+        private set
+
+    lateinit var windowSettings: WindowSettingsStore
+        private set
+
+    /**
+     * The current song's place in the ride playlist, which the song window follows. The player
+     * (#51) moves it; until then it's the first song.
+     */
+    val currentSongIndex = MutableStateFlow(0)
 
     /** Runs the foreground service while the phones are linked. */
     lateinit var linkSession: LinkSession
@@ -94,6 +114,26 @@ class TandemMotoApp : Application() {
             scope = appScope,
             log = { AppLog.i("Playlist", it) }
         ).start()
+        windowSettings = WindowSettingsStore(this)
+        transfers = SongTransfers(
+            playlist = ridePlaylist.state,
+            library = library.state,
+            currentIndex = currentSongIndex,
+            settings = windowSettings.settings,
+            channelState = link.channel.state,
+            incoming = link.channel.incoming,
+            send = link.channel::send,
+            endpoint = link.endpoint,
+            connection = TransferConnection(SocketFrameTransport(), appScope) {
+                AppLog.i("Transfer", it)
+            },
+            store = SongStore(File(filesDir, "partner_songs")),
+            freeBytes = { StatFs(filesDir.path).availableBytes },
+            openSong = { uri -> contentResolver.openInputStream(uri.toUri()) },
+            scope = appScope,
+            log = { AppLog.i("Transfer", it) }
+        )
+        transfers.start()
         linkSession = LinkSession(
             status = link.status,
             scope = appScope,

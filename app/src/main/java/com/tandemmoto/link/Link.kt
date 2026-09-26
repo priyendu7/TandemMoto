@@ -112,6 +112,11 @@ class Link(
 
     val channel = CommandChannel(transport, scope, nanoTime, log, keepAwake)
 
+    private val _endpoint = MutableStateFlow<Endpoint?>(null)
+
+    /** Where the partner's phone is while in a group with it: for the song transfer (#50). */
+    val endpoint: StateFlow<Endpoint?> = _endpoint.asStateFlow()
+
     private val _partner = MutableStateFlow<Partner?>(null)
     val partner: StateFlow<Partner?> = _partner.asStateFlow()
 
@@ -419,13 +424,19 @@ class Link(
                 justFormed = false
             }
         }
-        openChannel(group, check = ::checkPartnerHello)
+        openChannel(group, withPartner = true, check = ::checkPartnerHello)
     }
 
-    private fun openChannel(group: GroupInfo, check: suspend (Message.Hello) -> Bye.Reason?) {
+    private fun openChannel(
+        group: GroupInfo,
+        withPartner: Boolean,
+        check: suspend (Message.Hello) -> Bye.Reason?
+    ) {
         if (channelGroup?.sameGroupAs(group) == true) return
         channelGroup = group
-        channel.open(Endpoint(group.isGroupOwner, group.ownerAddress), ::hello, check)
+        val endpoint = Endpoint(group.isGroupOwner, group.ownerAddress)
+        if (withPartner) _endpoint.value = endpoint
+        channel.open(endpoint, ::hello, check)
     }
 
     private fun hello() = _partner.value.let {
@@ -518,7 +529,7 @@ class Link(
     private fun guard(peer: NearbyDevice, group: GroupInfo) {
         if (guardJob?.isActive == true) return
         log("Group with ${peer.logId}, not the partner: removing it")
-        openChannel(group) { Bye.Reason.NotYourPartner }
+        openChannel(group, withPartner = false) { Bye.Reason.NotYourPartner }
         guardJob = scope.launch {
             withTimeoutOrNull(GUARD_TIMEOUT_MS) {
                 channel.state.first { it is ChannelState.Refused }
@@ -531,6 +542,7 @@ class Link(
     }
 
     private fun onGroupRemoved() {
+        _endpoint.value = null
         val wasOurs = removingOurselves
         removingOurselves = false
         val toReconnect = removingToReconnect
