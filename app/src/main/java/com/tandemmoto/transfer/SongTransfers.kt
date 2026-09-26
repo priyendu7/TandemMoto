@@ -188,14 +188,26 @@ class SongTransfers(
                     aheadLimitedTo = plan.aheadLimitedTo
                 )
             }
+            val fetchable = plan.wanted.filter {
+                it.id !in stored &&
+                    it.id !in unavailable &&
+                    (failures[it.id] ?: 0) < MAX_FAILURES
+            }
+            // The song that's playing comes first: another download stops for it (what arrived
+            // is kept, and it resumes after), so "Getting song…" isn't stuck behind it.
+            val currentId = ride.songs.getOrNull(currentIndex.value)?.id
+            val downloading = active
+            if (downloading != null &&
+                downloading != currentId &&
+                fetchable.any { it.id == currentId }
+            ) {
+                log("${logId(currentId!!)} is playing: it comes before ${logId(downloading)}")
+                stopActive()
+            }
             if (active != null || !linked || !connection.ready.value) {
                 null
             } else {
-                plan.wanted.firstOrNull {
-                    it.id !in stored &&
-                        it.id !in unavailable &&
-                        (failures[it.id] ?: 0) < MAX_FAILURES
-                }
+                fetchable.firstOrNull { it.id == currentId } ?: fetchable.firstOrNull()
             }
         }
         sendInventory()

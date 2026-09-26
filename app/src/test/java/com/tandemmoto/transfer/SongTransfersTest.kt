@@ -250,6 +250,23 @@ class SongTransfersTest {
     }
 
     @Test
+    fun theSongThatsPlayingComesBeforeOtherDownloads() = runTest {
+        val songs = songs(12)
+        val (s25, redmi) = phones(songs)
+        // The request for the second song gets no answer, so it stays the active download.
+        redmi.deliver = { message ->
+            !(message is Message.SongRequest && message.id == songs[1].first.id)
+        }
+        link(s25, redmi)
+        assertEquals(setOf(songs[0].first.id), redmi.store.stored().keys)
+        // Playback jumps to the third song: it doesn't wait for the second (20 s stall).
+        redmi.current.value = 2
+        advanceTimeBy(2_000)
+        assertTrue(redmi.logs.toString(), songs[2].first.id in redmi.store.stored().keys)
+        assertTrue(redmi.logs.any { it.contains("is playing: it comes before") })
+    }
+
+    @Test
     fun aCorruptedSongIsFetchedAgain() = runTest {
         val songs = songs(1)
         val (s25, redmi) = phones(songs)

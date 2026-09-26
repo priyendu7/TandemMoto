@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -38,6 +39,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -57,6 +59,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -64,6 +67,7 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -73,6 +77,7 @@ import com.tandemmoto.R
 import com.tandemmoto.library.ImportSummary
 import com.tandemmoto.library.Song
 import com.tandemmoto.ui.components.BackTopBar
+import com.tandemmoto.ui.components.SongSeekBar
 import com.tandemmoto.ui.theme.TandemMotoTheme
 import kotlin.math.abs
 import kotlinx.coroutines.Job
@@ -111,7 +116,9 @@ fun PlaylistRoute(
         onCheckFolders = viewModel::checkFolders,
         onRemove = viewModel::remove,
         onMove = viewModel::move,
-        onPlay = viewModel::play
+        onPlay = viewModel::play,
+        onPlayPause = viewModel::playPause,
+        onSeek = viewModel::seek
     )
 }
 
@@ -146,7 +153,9 @@ fun PlaylistScreen(
     onRemove: (String) -> Unit,
     onMove: (Int, Int) -> Unit,
     snackbar: SnackbarHostState = remember { SnackbarHostState() },
-    onPlay: (Int) -> Unit = {}
+    onPlay: (Int) -> Unit = {},
+    onPlayPause: () -> Unit = {},
+    onSeek: (Long) -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -156,7 +165,10 @@ fun PlaylistScreen(
                 PlaylistTopBar(state, onBack, onAddSongs, onAddFolder, onCheckFolders)
             }
         },
-        snackbarHost = { SnackbarHost(snackbar) }
+        snackbarHost = { SnackbarHost(snackbar) },
+        bottomBar = {
+            state.nowPlaying?.let { NowPlayingBarView(it, onPlayPause, onSeek) }
+        }
     ) { padding ->
         Box(
             modifier = Modifier
@@ -168,6 +180,56 @@ fun PlaylistScreen(
                 state.rows.isEmpty() -> EmptyPlaylist(onAddSongs, onAddFolder)
                 else -> SongList(state, onRemove, onMove, onPlay)
             }
+        }
+    }
+}
+
+/** The song playing, with play/pause and a seek bar, under the list. */
+@Composable
+private fun NowPlayingBarView(bar: NowPlayingBar, onPlayPause: () -> Unit, onSeek: (Long) -> Unit) {
+    Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .navigationBarsPadding()
+                .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = bar.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    bar.artist?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                IconButton(onClick = onPlayPause, modifier = Modifier.size(56.dp)) {
+                    Icon(
+                        painter = painterResource(
+                            if (bar.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
+                        ),
+                        contentDescription = stringResource(
+                            if (bar.isPlaying) R.string.ride_pause else R.string.ride_play
+                        ),
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
+            SongSeekBar(
+                positionMs = bar.positionMs,
+                durationMs = bar.durationMs,
+                enabled = true,
+                onSeek = onSeek,
+                modifier = Modifier.padding(end = 8.dp)
+            )
         }
     }
 }

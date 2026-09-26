@@ -1,6 +1,6 @@
 package com.tandemmoto.ui
 
-import com.tandemmoto.ui.ride.formatTime
+import com.tandemmoto.ui.components.formatTime
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
