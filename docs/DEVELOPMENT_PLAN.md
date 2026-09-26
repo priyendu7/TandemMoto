@@ -83,13 +83,15 @@ Decided in planning (issues #48–#52):
 - **Local player** (#51): Media3 ExoPlayer + `MediaSessionService`; "Getting song…" for a song not on the phone yet, skipping only as the last resort. The link service (#40) merges into it: **one** media-style notification with the link status
 - **Exit criteria** (#52): selecting a song on one phone results in it being cached and playable on the other before playback starts
 
-### Phase 3 — Playback command mirroring + rider hardware input
+### Phase 3 — Playback command mirroring
 
-- Bike HID remote → intercepted as standard Android media button events → routed into MediaSession
-- Pillion in-app controls → same MediaSession actions
-- Mirror play/pause/skip/seek across the command channel so both phones' players stay in the same state
-- A new song starts only when **both** phones have it ("Getting song on …"): song windows are per phone (#50)
-- **Exit criteria:** either phone's control (remote or on-screen) changes playback state on both phones within a fraction of a second
+Decided in planning (issues #60–#62):
+
+- **Mirroring** (#60): one **shared playback state** (song, playing/paused, position, time, Lamport stamp), not forwarded button presses; the newest control wins, as in the ride playlist. Every control goes through it: Home (with a seek bar), Playlist, the notification, the lock screen and earbuds. The heartbeat's `Pong` carries the receiver's time for the clock offset. Link down: each phone plays on its own; on reconnect the newest control wins
+- **Start together** (#61): a new song starts only when **both** phones have it ("Getting song on …"), at a start time planned ~0.3 s ahead; the phones correct drift over ~0.5 s. A song one phone can't play is skipped on both and marked "Can't play on …"
+- **Exit criteria** (#62): either phone's control changes playback on both within 0.3 s (p95), and the phones are within 0.2 s after a start
+
+**Handlebar remote spike** (after Phase 3): the bike's own switches (Harley X440 T) reach the rider's phone as Bluetooth input through the bike's TFT. The spike covers what key codes arrive, mapping them to play/pause/next/previous, a "Test your buttons" screen, and where audio goes while the bike is connected. Build an abstraction over media button events rather than hard-coding key codes
 
 ### Phase 4 — Mic mode + voice channel
 
