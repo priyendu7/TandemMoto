@@ -58,8 +58,8 @@ persistent command/state socket, auto-reconnect, connection status.
   visible and backs off 1, 2, 4, 8 s after an attempt that forms no group within 15 s; the
   acceptor never connects. Android never reconnects by itself (spike #22).
 - `Link` starts a window at startup ("Looking for …"), after a drop ("Reconnecting to …"), when
-  Wi-Fi comes back, when the Pair screen closes, and on a tap. After the window: "Not connected ·
-  Tap to connect". Wi-Fi off pauses it without using up the window.
+  Wi-Fi comes back, when the Pair screen closes, and on a tap. After the window: "Couldn't reach … ·
+  Tap to try again" (after Disconnect it's "Not connected · Tap to connect" instead). Wi-Fi off pauses it without using up the window.
 - A partner that goes silent while Android keeps the group (the Redmi kept a dead one ~13 s) gets
   that group removed, so a fresh one can form. Removing the active group keeps Android's saved one
   (no prompt on reconnect).

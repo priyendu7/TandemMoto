@@ -43,8 +43,11 @@ sealed interface LinkStatus {
     data class NotConnected(val partner: Partner, val reason: Reason = Reason.Unreachable) :
         LinkStatus {
         enum class Reason {
-            /** No group with the partner, and not trying: the window ended, or Disconnect. */
+            /** Tried for a whole window without reaching the partner; not trying now. */
             Unreachable,
+
+            /** This phone's user tapped Disconnect; not trying until Connect. */
+            Disconnected,
 
             /**
              * The partner accepted and then at once dropped the group without a word, which is what
@@ -297,7 +300,7 @@ class Link(
             removingOurselves = true
             driver.cancelConnect()
             if (driver.group.value != null) driver.removeGroup()
-            _status.value = LinkStatus.NotConnected(partner, unreachable())
+            _status.value = LinkStatus.NotConnected(partner, disconnectedReason())
             log("Disconnected by the user")
         }
     }
@@ -516,6 +519,7 @@ class Link(
             current == LinkStatus.NotConnected.Reason.NoLongerPaired ||
                 current == LinkStatus.NotConnected.Reason.UpdateNeeded ||
                 current == LinkStatus.NotConnected.Reason.PartnerDisconnected -> current
+            !wantsLink -> disconnectedReason()
             driver.enabled.value == false -> LinkStatus.NotConnected.Reason.WifiOff
             justFormed &&
                 !wasOurs &&
@@ -540,6 +544,13 @@ class Link(
             LinkStatus.NotConnected.Reason.Unreachable -> reconnect(Attempt.Drop)
             else -> Unit // Wi-Fi off waits for Wi-Fi; not paired / update: nothing to retry
         }
+    }
+
+    /** Not trying because the user disconnected (Wi-Fi off takes precedence: it says what to fix). */
+    private fun disconnectedReason() = if (driver.enabled.value == false) {
+        LinkStatus.NotConnected.Reason.WifiOff
+    } else {
+        LinkStatus.NotConnected.Reason.Disconnected
     }
 
     /** Not connected for no reason the partner gave: this phone's Wi-Fi, or just not reached. */
@@ -573,7 +584,14 @@ class Link(
                     status.reason == LinkStatus.NotConnected.Reason.WifiOff
                 ) {
                     log("Wi-Fi back on")
-                    _status.value = LinkStatus.NotConnected(partner)
+                    _status.value = LinkStatus.NotConnected(
+                        partner,
+                        if (wantsLink) {
+                            LinkStatus.NotConnected.Reason.Unreachable
+                        } else {
+                            LinkStatus.NotConnected.Reason.Disconnected
+                        }
+                    )
                     reconnect(Attempt.Drop)
                 }
             }

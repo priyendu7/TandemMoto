@@ -55,7 +55,7 @@ fun RideRoute(
     onOpenPair: () -> Unit,
     onOpenPlaylist: () -> Unit,
     onOpenSettings: () -> Unit,
-    viewModel: RideViewModel = viewModel()
+    viewModel: RideViewModel = viewModel(factory = RideViewModel.Factory)
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val permissions = rememberPermissionRequester()
@@ -199,6 +199,7 @@ private fun ConnectionSection(
             onClickLabel = stringResource(
                 when (connection) {
                     ConnectionStatus.NotConnected -> R.string.ride_connect_action
+                    ConnectionStatus.Unreachable -> R.string.ride_try_again_action
                     ConnectionStatus.WifiOff -> R.string.ride_wifi_action
                     ConnectionStatus.Connected,
                     ConnectionStatus.Searching,
@@ -211,7 +212,7 @@ private fun ConnectionSection(
                 ConnectionStatus.NotPaired,
                 ConnectionStatus.PairedElsewhere,
                 ConnectionStatus.NoLongerPaired -> onOpenPair
-                ConnectionStatus.NotConnected -> onConnect
+                ConnectionStatus.NotConnected, ConnectionStatus.Unreachable -> onConnect
                 ConnectionStatus.WifiOff -> onOpenWifiSettings
                 ConnectionStatus.Connected,
                 ConnectionStatus.Searching,

@@ -15,6 +15,7 @@ Wi‑Fi Direct, Bluetooth media controls, audio routing and battery optimisation
 
 | ID | Model | Android | Skin | Battery optimisation | Owner | Notes |
 |---|---|---|---|---|---|---|
+| 2026-09-26 | TandemMoto #26 build (`pr47-2493c01`, PR #47) | Status bar states + TalkBack | P1 ↔ P4 | — | ✅ | Give-up after 2 min shows "Couldn't reach … · Tap to try again" and a tap reconnects; Disconnect shows "Not connected · Tap to connect". TalkBack (P1): each change read once, the bar reads the status then "double-tap to …" |
 | 2026-09-26 | TandemMoto #27 build (`pr45-9ccf8a4`, PR #45) | T3 Airplane mode / Wi‑Fi off-on, auto-reconnect | P1 ↔ P4 | — | ✅ | No taps on either phone. Connected again 5.5–7.5 s after Wi‑Fi returned (target 5–20 s), also with both screens locked. P4's silent-partner detection removed the dead group at once |
 | 2026-09-26 | TandemMoto #27 build (`pr45-9ccf8a4`, PR #45) | T4 Out of range and back | P1 ↔ P4 | — | ✅ | Reconnecting… while away (33 s incl. walking back), then Connected with no taps |
 | 2026-09-26 | TandemMoto #27 build (`pr45-9ccf8a4`, PR #45) | Disconnect, reconnect, give-up | P1 ↔ P4 | — | ✅ | Disconnect on P1 → P4 shows "… disconnected" and listens; one Connect tap on P1 reconnected both in 7 s. Partner's Wi‑Fi off > 2 min → "Not connected · Tap to connect"; one tap on P1 then reconnected |
