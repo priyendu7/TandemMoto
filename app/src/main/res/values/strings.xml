@@ -68,6 +68,10 @@
     <string name="ride_pair_action">Pair with your partner</string>
     <string name="ride_connect_action">Connect to your partner</string>
     <string name="ride_wifi_action">Open Wi-Fi settings</string>
+    <string name="ride_disconnect_action">Disconnect</string>
+    <string name="ride_your_partner">your partner</string>
+    <string name="ride_disconnect_title">Disconnect from %1$s?</string>
+    <string name="ride_disconnect_body">The phones stop sharing and won\'t reconnect until you tap Connect. %1$s will see that you disconnected.</string>
     <string name="ride_open_settings">Settings</string>
     <string name="ride_now_playing">Now playing</string>
     <string name="ride_no_song">No song selected</string>

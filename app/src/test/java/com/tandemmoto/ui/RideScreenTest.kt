@@ -36,6 +36,7 @@ class RideScreenTest {
     private var openedPair = false
     private var connected = false
     private var openedWifi = false
+    private var disconnected = false
 
     private fun nearby(status: PermissionStatus, sdk: Int = 34, approximateOnly: Boolean = false) =
         PermissionsState(sdk, mapOf(AppPermission.NEARBY to status), approximateOnly)
@@ -51,6 +52,7 @@ class RideScreenTest {
                 onRequestPermission = { requested = it },
                 onOpenPair = { openedPair = true },
                 onConnect = { connected = true },
+                onDisconnect = { disconnected = true },
                 onOpenWifiSettings = { openedWifi = true },
                 onPlayPause = {},
                 onNext = {},
@@ -246,6 +248,25 @@ class RideScreenTest {
         compose.onNodeWithText(str(R.string.status_partner_disconnected_named, "Redmi"))
             .performClick()
         assertTrue(!connected && !openedPair)
+    }
+
+    @Test
+    fun tappingConnectedAsksBeforeDisconnecting() {
+        showRide(RideUiState(connection = ConnectionStatus.Connected, partnerName = "Redmi"))
+        compose.onNodeWithText(str(R.string.status_connected_named, "Redmi")).performClick()
+        assertTrue(!disconnected)
+        compose.onNodeWithText(str(R.string.ride_disconnect_title, "Redmi")).assertExists()
+        compose.onNodeWithText(str(R.string.notification_disconnect)).performClick()
+        assertTrue(disconnected)
+    }
+
+    @Test
+    fun cancellingTheDisconnectDialogKeepsTheLink() {
+        showRide(RideUiState(connection = ConnectionStatus.Reconnecting, partnerName = "Redmi"))
+        compose.onNodeWithText(str(R.string.status_reconnecting_named, "Redmi")).performClick()
+        compose.onNodeWithText(str(R.string.pair_cancel)).performClick()
+        assertTrue(!disconnected)
+        compose.onNodeWithText(str(R.string.ride_disconnect_title, "Redmi")).assertDoesNotExist()
     }
 
     @Test
