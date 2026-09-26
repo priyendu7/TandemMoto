@@ -75,17 +75,20 @@ Shaped by the Wi‑Fi Direct spike (#22), measured on Samsung ↔ Xiaomi, Androi
 
 ### Phase 2 — Shared local music player
 
-- Local music library (device storage scan or user-added files)
-- ExoPlayer + MediaSessionService integration
-- Playlist sync: shared playlist state pushed over the command channel
-- File transfer: chunked, resumable transfer of song files pre-ride, with progress UI
-- **Exit criteria:** selecting a song on one phone results in it being cached and playable on the other before playback starts
+Decided in planning (issues #48–#52):
+
+- **My songs** (#48): added with Android's **file picker** only (no storage permission, no library scan). Songs are **remembered in place, not copied**. A content fingerprint (SHA‑256) is the song ID; the same file, or the same title + artist + duration (±2 s), counts as one song
+- **Ride playlist** (#49): one shared, ordered list; either phone edits; saved across restarts (a small JSON file, not Room); synced over the command channel with versioned state; combined on the first connection with a partner; a new partner keeps your songs and drops the previous partner's
+- **Song transfer and the song window** (#50): chunked, resumable, verified transfer on its own socket. Each phone keeps only a **window of the partner's songs** (default 2 behind · current · 7 ahead, editable per phone), shrinking to what fits above 500 MB free. Nothing fits → download on demand when the song's turn comes (≥ 100 MB kept free)
+- **Local player** (#51): Media3 ExoPlayer + `MediaSessionService`; "Getting song…" for a song not on the phone yet, skipping only as the last resort. The link service (#40) merges into it: **one** media-style notification with the link status
+- **Exit criteria** (#52): selecting a song on one phone results in it being cached and playable on the other before playback starts
 
 ### Phase 3 — Playback command mirroring + rider hardware input
 
 - Bike HID remote → intercepted as standard Android media button events → routed into MediaSession
 - Pillion in-app controls → same MediaSession actions
 - Mirror play/pause/skip/seek across the command channel so both phones' players stay in the same state
+- A new song starts only when **both** phones have it ("Getting song on …"): song windows are per phone (#50)
 - **Exit criteria:** either phone's control (remote or on-screen) changes playback state on both phones within a fraction of a second
 
 ### Phase 4 — Mic mode + voice channel
