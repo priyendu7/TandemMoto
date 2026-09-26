@@ -7,6 +7,7 @@ import com.tandemmoto.link.Partner
 import com.tandemmoto.service.NotificationAction.Close
 import com.tandemmoto.service.NotificationAction.Connect
 import com.tandemmoto.service.NotificationAction.Disconnect
+import com.tandemmoto.service.NotificationAction.Stop
 import com.tandemmoto.service.NotificationAction.TurnOnWifi
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -23,7 +24,7 @@ class LinkNotificationTextTest {
             LinkStatus.NotPaired to
                 NotificationText(R.string.notification_not_paired, null, listOf(Close)),
             LinkStatus.Connecting(partner) to
-                NotificationText(R.string.notification_connecting, name, listOf(Disconnect)),
+                NotificationText(R.string.notification_connecting, name, listOf(Stop)),
             LinkStatus.Connected(partner) to
                 NotificationText(R.string.notification_connected, name, listOf(Disconnect)),
             notConnected(Reason.Unreachable) to
@@ -46,7 +47,7 @@ class LinkNotificationTextTest {
                 listOf(Close)
             ),
             LinkStatus.Reconnecting(partner) to
-                NotificationText(R.string.notification_reconnecting, name, listOf(Disconnect)),
+                NotificationText(R.string.notification_reconnecting, name, listOf(Stop)),
             notConnected(Reason.NoLongerPaired) to
                 NotificationText(R.string.notification_not_connected, name, listOf(Close)),
             notConnected(Reason.UpdateNeeded) to

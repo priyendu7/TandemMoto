@@ -21,13 +21,14 @@
     <string name="notification_not_connected">Not connected to %1$s</string>
     <string name="notification_unreachable">Couldn\'t reach %1$s</string>
     <string name="notification_partner_app_closed">Open TandemMoto on %1$s</string>
-    <string name="notification_partner_disconnected">%1$s disconnected</string>
+    <string name="notification_partner_disconnected">%1$s disconnected · Ask them to tap Connect</string>
     <string name="notification_wifi_off">Wi-Fi is off</string>
     <string name="notification_not_paired">Not paired</string>
     <string name="notification_disconnect">Disconnect</string>
     <string name="notification_connect">Connect</string>
     <string name="notification_turn_on_wifi">Turn on Wi-Fi</string>
     <string name="notification_close">Close</string>
+    <string name="notification_stop">Stop</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_on">On: shows the connection while the screen is off</string>
     <string name="settings_notifications_off">Off · Tap to turn on and see the connection while the screen is off</string>
@@ -71,6 +72,9 @@
     <string name="ride_wifi_action">Open Wi-Fi settings</string>
     <string name="ride_disconnect_action">Disconnect</string>
     <string name="ride_try_again_action">Try again</string>
+    <string name="ride_stop_action">Stop</string>
+    <string name="ride_stop_title">Stop looking for %1$s?</string>
+    <string name="ride_stop_body">TandemMoto stops searching and won\'t try again until you tap Connect.</string>
     <string name="ride_your_partner">your partner</string>
     <string name="ride_disconnect_title">Disconnect from %1$s?</string>
     <string name="ride_disconnect_body">The phones stop sharing and won\'t reconnect until you tap Connect. %1$s will see that you disconnected.</string>
@@ -112,8 +116,8 @@
     <string name="status_connected_named">Connected to %1$s</string>
     <string name="status_reconnecting">Reconnecting…</string>
     <string name="status_reconnecting_named">Reconnecting to %1$s…</string>
-    <string name="status_partner_disconnected">Your partner disconnected</string>
-    <string name="status_partner_disconnected_named">%1$s disconnected</string>
+    <string name="status_partner_disconnected">Your partner disconnected · Ask them to tap Connect</string>
+    <string name="status_partner_disconnected_named">%1$s disconnected · Ask them to tap Connect</string>
     <string name="status_partner_on_call">Your partner is on a call</string>
     <string name="status_partner_on_call_named">%1$s is on a call</string>
     <string name="status_headset_disconnected">Headset disconnected</string>

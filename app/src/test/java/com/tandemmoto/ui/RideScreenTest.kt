@@ -268,12 +268,32 @@ class RideScreenTest {
     }
 
     @Test
+    fun whileSearchingTheActionIsStopNotDisconnect() {
+        showRide(RideUiState(connection = ConnectionStatus.Searching, partnerName = "Redmi"))
+        compose.onNodeWithText(str(R.string.status_searching_named, "Redmi")).performClick()
+        compose.onNodeWithText(str(R.string.ride_stop_title, "Redmi")).assertExists()
+        compose.onNodeWithText(str(R.string.ride_stop_action)).performClick()
+        assertTrue(disconnected)
+    }
+
+    @Test
+    fun partnerDisconnectedSaysTheyNeedToTapConnect() {
+        showRide(
+            RideUiState(connection = ConnectionStatus.PartnerDisconnected, partnerName = "Redmi")
+        )
+        compose.onNodeWithText(
+            str(R.string.status_partner_disconnected_named, "Redmi")
+        ).assertExists()
+        assertTrue(str(R.string.status_partner_disconnected_named, "Redmi").contains("tap Connect"))
+    }
+
+    @Test
     fun cancellingTheDisconnectDialogKeepsTheLink() {
         showRide(RideUiState(connection = ConnectionStatus.Reconnecting, partnerName = "Redmi"))
         compose.onNodeWithText(str(R.string.status_reconnecting_named, "Redmi")).performClick()
         compose.onNodeWithText(str(R.string.pair_cancel)).performClick()
         assertTrue(!disconnected)
-        compose.onNodeWithText(str(R.string.ride_disconnect_title, "Redmi")).assertDoesNotExist()
+        compose.onNodeWithText(str(R.string.ride_stop_title, "Redmi")).assertDoesNotExist()
     }
 
     @Test

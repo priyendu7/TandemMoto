@@ -122,7 +122,9 @@ class LinkService : Service() {
     private fun pendingIntentFor(action: NotificationAction): PendingIntent {
         val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         return when (action) {
-            NotificationAction.Disconnect, NotificationAction.Close -> PendingIntent.getService(
+            NotificationAction.Disconnect,
+            NotificationAction.Stop,
+            NotificationAction.Close -> PendingIntent.getService(
                 this,
                 1,
                 Intent(this, LinkService::class.java).setAction(ACTION_DISCONNECT),
