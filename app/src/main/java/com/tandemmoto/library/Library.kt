@@ -27,8 +27,13 @@ data class LibraryState(
     val missing: Set<String> = emptySet(),
     val reading: List<PendingSong> = emptyList(),
     val folders: List<String> = emptyList(),
+    /** Ride playlist song ID → this phone's own copy (see [LibraryData.copyOf]). */
+    val copyOf: Map<String, String> = emptyMap(),
     val loaded: Boolean = false
-)
+) {
+    /** This phone has a file for [id]: its own song, or its copy of the partner's. */
+    fun hasFile(id: String): Boolean = songs.any { it.id == id } || id in copyOf
+}
 
 /** The outcome of one Add songs / Add a folder, for the summary message. */
 data class ImportSummary(
@@ -56,7 +61,9 @@ class Library(
     private val store: LibraryStore,
     private val scope: CoroutineScope,
     private val log: (String) -> Unit = {},
-    io: CoroutineDispatcher = Dispatchers.IO
+    io: CoroutineDispatcher = Dispatchers.IO,
+    /** Songs already in the ride playlist from the partner's phone (#49), checked when adding. */
+    private val partnerSongs: () -> List<Song> = { emptyList() }
 ) {
     /** Two files read at a time: fast enough, and gentle on an older phone. */
     private val reading = io.limitedParallelism(READ_PARALLELISM)
@@ -68,6 +75,11 @@ class Library(
 
     private val _summaries = MutableSharedFlow<ImportSummary>(extraBufferCapacity = 8)
     val summaries: SharedFlow<ImportSummary> = _summaries.asSharedFlow()
+
+    private val _added = MutableSharedFlow<List<Song>>(extraBufferCapacity = 8)
+
+    /** Newly added songs (not duplicates or copies), for the ride playlist (#49). */
+    val added: SharedFlow<List<Song>> = _added.asSharedFlow()
 
     /** Single files that can still be added before Android's permission limit. */
     val fileSlotsLeft: Int get() = (source.maxAccessCount - source.heldAccessCount()).coerceAtLeast(
@@ -135,7 +147,10 @@ class Library(
         scope.launch {
             changes.withLock {
                 val song = data.songs.firstOrNull { it.id == id } ?: return@withLock
-                var next = data.copy(songs = data.songs - song)
+                var next = data.copy(
+                    songs = data.songs - song,
+                    copyOf = data.copyOf.filterValues { it != song.id }
+                )
                 if (song.folder == null) {
                     source.releaseAccess(song.uri)
                 } else {
@@ -157,17 +172,30 @@ class Library(
         }
     }
 
-    /** Reorders: the song at [from] goes to [to] (list indexes). */
-    fun move(from: Int, to: Int) {
+    /**
+     * The partner's song [rideId] left the playlist: this phone's copy of it (if any) goes too.
+     */
+    fun removeCopyOf(rideId: String) {
         scope.launch {
-            changes.withLock {
-                val songs = data.songs.toMutableList()
-                if (from !in songs.indices || to !in songs.indices || from == to) return@withLock
-                songs.add(to, songs.removeAt(from))
-                data = data.copy(songs = songs)
+            val copy = changes.withLock {
+                val id = data.copyOf[rideId] ?: return@withLock null
+                data = data.copy(copyOf = data.copyOf - rideId)
                 save()
-            }
+                id
+            } ?: return@launch
+            remove(copy)
         }
+    }
+
+    /**
+     * The partner's song [rideId] was dropped (a new partner): this phone's copy of it becomes a
+     * song of its own again, returned so the ride playlist can add it.
+     */
+    suspend fun releaseCopy(rideId: String): Song? = changes.withLock {
+        val id = data.copyOf[rideId] ?: return@withLock null
+        data = data.copy(copyOf = data.copyOf - rideId)
+        save()
+        data.songs.firstOrNull { it.id == id }
     }
 
     /** Marks songs whose file is gone; on start and whenever the Playlist opens. */
@@ -207,7 +235,7 @@ class Library(
         val pending =
             withContext(reading) { uris.map { PendingSong(it, source.displayName(it) ?: "") } }
         _state.update { it.copy(reading = it.reading + pending) }
-        var added = 0
+        val newSongs = mutableListOf<Song>()
         var duplicates = alreadyThere
         var unreadable = refused
         coroutineScope {
@@ -231,8 +259,16 @@ class Library(
                             if (folder == null) source.releaseAccess(uri)
                         }
                         else -> {
-                            added++
+                            // The partner already added this track: keep the file as this
+                            // phone's copy of their song instead of a second entry.
+                            val partners = Duplicates.findIn(partnerSongs(), song)
                             data = data.copy(songs = data.songs + song)
+                            if (partners != null) {
+                                duplicates++
+                                data = data.copy(copyOf = data.copyOf + (partners.id to song.id))
+                            } else {
+                                newSongs += song
+                            }
                             save()
                         }
                     }
@@ -248,9 +284,11 @@ class Library(
                 }
             }
         }
+        val added = newSongs.size
         log(
             "Added $added songs ($duplicates already there, $unreadable unreadable, $overLimit over the limit)"
         )
+        if (newSongs.isNotEmpty()) _added.emit(newSongs)
         _summaries.emit(
             ImportSummary(added, duplicates, unreadable, overLimit, fromFolder = folder != null)
         )
@@ -263,7 +301,7 @@ class Library(
     }
 
     private fun publish() {
-        _state.update { it.copy(songs = data.songs, folders = data.folders) }
+        _state.update { it.copy(songs = data.songs, folders = data.folders, copyOf = data.copyOf) }
     }
 
     private companion object {

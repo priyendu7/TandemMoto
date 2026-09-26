@@ -10,10 +10,14 @@ import com.tandemmoto.library.ImportSummary
 import com.tandemmoto.library.Library
 import com.tandemmoto.library.LibraryState
 import com.tandemmoto.library.Song
+import com.tandemmoto.link.LinkStatus
+import com.tandemmoto.link.Partner
+import com.tandemmoto.playlist.RidePlaylist
+import com.tandemmoto.playlist.RidePlaylistState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
 /** One row of the Playlist screen. */
@@ -25,34 +29,73 @@ sealed interface PlaylistRow {
         override val key get() = "reading:$uri"
     }
 
-    data class Entry(val song: Song, val missing: Boolean) : PlaylistRow {
+    /**
+     * A song in the ride playlist. [mine]: added on this phone; otherwise the partner's.
+     * [onThisPhone]: this phone has a file for it (its own, or its copy of the partner's).
+     */
+    data class Entry(
+        val song: Song,
+        val missing: Boolean,
+        val mine: Boolean = true,
+        val onThisPhone: Boolean = true
+    ) : PlaylistRow {
         override val key get() = song.id
     }
 }
+
+/** Whether edits reach the partner now. */
+enum class Sharing { NotPaired, Shared, WaitingToSync }
 
 data class PlaylistUiState(
     val rows: List<PlaylistRow> = emptyList(),
     val loaded: Boolean = false,
     val hasFolders: Boolean = false,
     /** Single files that can still be added before Android's permission limit. */
-    val fileSlotsLeft: Int = Int.MAX_VALUE
+    val fileSlotsLeft: Int = Int.MAX_VALUE,
+    val sharing: Sharing = Sharing.NotPaired,
+    val partnerName: String? = null
 ) {
     /** Songs only (reading rows excluded), in playlist order: what move indexes refer to. */
     val songCount: Int get() = rows.count { it is PlaylistRow.Entry }
 }
 
-internal fun LibraryState.toUi(fileSlotsLeft: Int) = PlaylistUiState(
-    rows = songs.map { PlaylistRow.Entry(it, it.id in missing) } +
-        reading.map { PlaylistRow.Reading(it.uri, it.name) },
-    loaded = loaded,
-    hasFolders = folders.isNotEmpty(),
-    fileSlotsLeft = fileSlotsLeft
+internal fun playlistUi(
+    ride: RidePlaylistState,
+    library: LibraryState,
+    partner: Partner?,
+    connected: Boolean,
+    fileSlotsLeft: Int
+) = PlaylistUiState(
+    rows = ride.songs.map { entry ->
+        val mine = entry.owner == ride.me
+        PlaylistRow.Entry(
+            song = entry.asSong(),
+            missing = mine && entry.id in library.missing,
+            mine = mine,
+            onThisPhone = library.hasFile(entry.id)
+        )
+    } + library.reading.map { PlaylistRow.Reading(it.uri, it.name) },
+    loaded = ride.loaded && library.loaded,
+    hasFolders = library.folders.isNotEmpty(),
+    fileSlotsLeft = fileSlotsLeft,
+    sharing = when {
+        partner == null -> Sharing.NotPaired
+        connected -> Sharing.Shared
+        else -> Sharing.WaitingToSync
+    },
+    partnerName = partner?.name
 )
 
-class PlaylistViewModel(private val library: Library) : ViewModel() {
-    val uiState: StateFlow<PlaylistUiState> = library.state
-        .map { it.toUi(library.fileSlotsLeft) }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, PlaylistUiState())
+class PlaylistViewModel(
+    private val library: Library,
+    private val playlist: RidePlaylist,
+    partner: StateFlow<Partner?>,
+    linkStatus: StateFlow<LinkStatus>
+) : ViewModel() {
+    val uiState: StateFlow<PlaylistUiState> =
+        combine(playlist.state, library.state, partner, linkStatus) { ride, songs, who, status ->
+            playlistUi(ride, songs, who, status is LinkStatus.Connected, library.fileSlotsLeft)
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, PlaylistUiState())
 
     val summaries: Flow<ImportSummary> = library.summaries
 
@@ -65,16 +108,17 @@ class PlaylistViewModel(private val library: Library) : ViewModel() {
 
     fun checkFolders() = library.checkFolders()
 
-    fun remove(id: String) = library.remove(id)
+    /** Removes the song from the playlist on both phones (the owner lets go of the file). */
+    fun remove(id: String) = playlist.remove(id)
 
-    fun move(from: Int, to: Int) = library.move(from, to)
+    fun move(from: Int, to: Int) = playlist.move(from, to)
 
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                     as TandemMotoApp
-                PlaylistViewModel(app.library)
+                PlaylistViewModel(app.library, app.ridePlaylist, app.link.partner, app.link.status)
             }
         }
     }

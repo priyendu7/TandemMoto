@@ -17,7 +17,8 @@ TandemMoto stores, in its private app storage on your phone:
 
 - songs you choose to share, cached so they play without interruption,
 - your shared playlist and basic settings,
-- the songs you add: which files or folders you picked (the app keeps permission to read them; the files stay where they are and are never copied), and each song's title, artist, duration, size and a fingerprint of its contents. Nothing about your songs leaves your phone yet; sharing them with your partner's phone comes with the shared playlist. Removing a song, or clearing the app's data, forgets it,
+- the songs you add: which files or folders you picked (the app keeps permission to read them; the files stay where they are and are never copied), and each song's title, artist, duration, size and a fingerprint of its contents. To share the ride playlist, each song's title, artist, length and size (and its fingerprint) are sent to your paired partner's phone only, directly over the Wi‑Fi Direct link; the song files themselves aren't sent yet. Removing a song, or clearing the app's data, forgets it,
+- the shared ride playlist: your songs and your partner's (title, artist, length, size, who added it and its place in the list), so you both see the same list. Pairing with a different partner removes the previous partner's songs from it,
 - your paired partner's phone name and Wi-Fi Direct address, so TandemMoto only ever connects to that phone (removed with **Settings → Forget partner**),
 - a random install ID created when you install the app. It isn't based on your phone, your account or any hardware ID, and it's sent only to your partner's phone, so each phone can tell it's talking to the exact app it paired with. Your partner's install ID is kept with the partner details and removed with them. Reinstalling the app creates a new one,
 - diagnostic logs (see below).

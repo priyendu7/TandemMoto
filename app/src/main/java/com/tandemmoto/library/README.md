@@ -11,8 +11,11 @@
 - `Song.id` is the SHA‑256 **fingerprint** of the file (`Fingerprint`), the same on both phones for
   the same file. `Duplicates`: the same fingerprint, or the same title + artist (ignoring case and
   spacing) with a duration within 2 s, is one song.
-- `Library` keeps the order, removes (giving the permission back; a folder's last song lets go of
-  the folder), reorders, re-checks folders for new songs, and marks songs whose file is gone as
+- The order lives in the shared ride playlist (`playlist/`, #49); the library is this phone's
+  files, including its own copies of the partner's songs (`copyOf`), checked against the
+  partner's songs when adding.
+- `Library` removes (giving the permission back; a folder's last song lets go of
+  the folder), re-checks folders for new songs, and marks songs whose file is gone as
   missing. Saved as one JSON file (`JsonFileLibraryStore`), not Room.
 - `SongSource` is the Android boundary (`AndroidSongSource`: `MediaMetadataRetriever` for tags,
   the storage access framework for folders and permissions), so the rules run on the JVM.

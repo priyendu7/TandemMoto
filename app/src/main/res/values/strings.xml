@@ -140,6 +140,12 @@
     <string name="playlist_length_hours">%1$d h %2$d min</string>
     <string name="playlist_on_this_phone">On this phone</string>
     <string name="playlist_file_missing">File missing</string>
+    <string name="playlist_added_by_you">Added by you</string>
+    <string name="playlist_from_named">From %1$s</string>
+    <string name="playlist_sharing_not_paired">Pair with your partner to share this playlist</string>
+    <string name="playlist_sharing_shared">Shared with your partner</string>
+    <string name="playlist_sharing_shared_named">Shared with %1$s</string>
+    <string name="playlist_sharing_waiting">Not connected · changes sync when you reconnect</string>
     <string name="playlist_song_details">%1$s · %2$s</string>
     <string name="playlist_already_there_one">Already in the playlist</string>
     <string name="playlist_no_songs_in_folder">No songs found in that folder</string>

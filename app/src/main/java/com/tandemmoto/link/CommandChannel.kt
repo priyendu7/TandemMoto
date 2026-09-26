@@ -232,7 +232,9 @@ class CommandChannel(
                     } else {
                         End.Refused(message.reason)
                     }
-                    // Phase 3+ message types get a branch here that emits to _incoming once Open.
+                    is Message.PlaylistEntries ->
+                        if (_state.value is ChannelState.Open) _incoming.emit(message)
+                    // New message types get a branch here that emits to _incoming once Open.
                 }
             }
         }

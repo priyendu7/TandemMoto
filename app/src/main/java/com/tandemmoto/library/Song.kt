@@ -30,5 +30,10 @@ data class LibraryData(
     /** Folders added with "Add a folder"; each holds one permission for everything inside. */
     val folders: List<String> = emptyList(),
     /** Songs removed from a folder, so "Check folders for new songs" doesn't add them back. */
-    val removedFromFolders: Set<String> = emptySet()
+    val removedFromFolders: Set<String> = emptySet(),
+    /**
+     * This phone's own file for a partner's song (the same track, another file; #49): ride
+     * playlist song ID → this phone's song ID. It's played instead of downloading (#50, #51).
+     */
+    val copyOf: Map<String, String> = emptyMap()
 )

@@ -177,19 +177,6 @@ class LibraryTest {
     }
 
     @Test
-    fun songsCanBeReordered() = runTest {
-        listOf("a", "b", "c").forEach { source.file(it, it.uppercase()) }
-        val library = library()
-        summaryOf(library) { library.addFiles(listOf("a", "b", "c")) }
-        library.move(2, 0)
-        runCurrent()
-        assertEquals(listOf("C", "A", "B"), library.titles)
-        library.move(0, 5) // out of range: ignored
-        runCurrent()
-        assertEquals(listOf("C", "A", "B"), store.data.songs.map { it.title })
-    }
-
-    @Test
     fun missingFilesAreMarkedNotRemoved() = runTest {
         source.file("a", "Alpha")
         source.file("b", "Bravo")
@@ -208,11 +195,9 @@ class LibraryTest {
         source.file("b", "Bravo")
         val first = library()
         summaryOf(first) { first.addFiles(listOf("a", "b")) }
-        first.move(1, 0)
-        runCurrent()
 
         val again = library() // same store: the app restarted
-        assertEquals(listOf("Bravo", "Alpha"), again.titles)
+        assertEquals(listOf("Alpha", "Bravo"), again.titles)
         assertTrue(again.state.value.loaded)
     }
 

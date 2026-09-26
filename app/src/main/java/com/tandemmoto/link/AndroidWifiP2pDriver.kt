@@ -15,6 +15,7 @@ import android.net.wifi.p2p.WifiP2pGroup
 import android.net.wifi.p2p.WifiP2pInfo
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
+import android.os.Handler
 import android.os.Looper
 import androidx.core.content.IntentCompat
 import androidx.core.location.LocationManagerCompat
@@ -29,6 +30,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 /** [WifiP2pDriver] over the platform WifiP2pManager and its broadcasts. */
 class AndroidWifiP2pDriver(context: Context) : WifiP2pDriver {
     private val appContext = context.applicationContext
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val manager: WifiP2pManager? = appContext.getSystemService(WifiP2pManager::class.java)
     private val channel: WifiP2pManager.Channel? =
         manager?.initialize(appContext, Looper.getMainLooper(), null)
@@ -125,29 +127,35 @@ class AndroidWifiP2pDriver(context: Context) : WifiP2pDriver {
         runCatching { manager!!.requestGroupInfo(channel, onGroup) }
     }
 
+    /** Times this group's details were asked for again (see [onConnectionChanged]). */
+    private var detailAsks = 0
+
     private fun onConnectionChanged(info: WifiP2pInfo?, group: WifiP2pGroup?) {
         if (info?.groupFormed != true) {
+            detailAsks = 0
             _group.value = null
             return
         }
-        if (group == null) {
-            // Some phones leave the group out of the broadcast; ask for it.
-            _group.value = GroupInfo(info.isGroupOwner, info.groupOwnerAddress?.hostAddress, null)
-            requestGroup { requested ->
-                if (requested !=
-                    null
-                ) {
-                    onConnectionChanged(info, requested)
-                }
-            }
-            return
-        }
-        val peer = if (info.isGroupOwner) group.clientList.firstOrNull() else group.owner
+        // Some phones leave the group out of the broadcast, or send it before the other phone is
+        // listed: the peer is unknown, so ask again a few times. The Redmi Y2 once reported a
+        // group without saying with whom and the app waited forever (#49 phone test).
+        val peer = group?.let { if (info.isGroupOwner) it.clientList.firstOrNull() else it.owner }
         _group.value = GroupInfo(
             isGroupOwner = info.isGroupOwner,
             ownerAddress = info.groupOwnerAddress?.hostAddress,
             peer = peer?.toNearbyDevice()?.copy(status = NearbyDevice.Status.Connected)
         )
+        if (peer != null) {
+            detailAsks = 0
+            return
+        }
+        if (detailAsks >= GROUP_DETAIL_ASKS) return
+        detailAsks++
+        mainHandler.postDelayed({
+            if (_group.value != null && _group.value?.peer == null) {
+                requestGroup { requested -> onConnectionChanged(info, requested) }
+            }
+        }, GROUP_DETAIL_RETRY_MS)
     }
 
     // Callers check the permission first (DiscoveryPreconditions); an exception maps to Error.
@@ -217,6 +225,12 @@ class AndroidWifiP2pDriver(context: Context) : WifiP2pDriver {
         },
         isPhone = primaryDeviceType.orEmpty().startsWith("10-")
     )
+
+    private companion object {
+        /** About 2 s of asking for a group's details before [Link] decides without them. */
+        const val GROUP_DETAIL_ASKS = 5
+        const val GROUP_DETAIL_RETRY_MS = 400L
+    }
 }
 
 class AndroidDiscoveryPreconditions(context: Context) : DiscoveryPreconditions {

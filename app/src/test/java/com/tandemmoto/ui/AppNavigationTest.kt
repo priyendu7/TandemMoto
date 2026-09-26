@@ -78,7 +78,8 @@ class AppNavigationTest {
     fun playlistOpensAndReturns() {
         start()
         compose.onNodeWithContentDescription(str(R.string.ride_open_playlist)).performClick()
-        compose.onNodeWithText(str(R.string.playlist_empty)).assertExists()
+        // Its contents load from disk; what they show is covered by PlaylistScreenTest.
+        compose.onNodeWithText(str(R.string.playlist_title)).assertExists()
         compose.onNodeWithContentDescription(str(R.string.action_back)).performClick()
         compose.onNodeWithText(str(R.string.status_not_paired)).assertExists()
     }
