@@ -1,9 +1,11 @@
 package com.tandemmoto.ui
 
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -158,6 +160,34 @@ class PlaylistScreenTest {
         // Second from the top: "Move up" already goes to the top, so no "Move to top".
         compose.onNodeWithContentDescription(str(R.string.playlist_more, "Bravo")).performClick()
         compose.onNodeWithText(str(R.string.playlist_move_top)).assertDoesNotExist()
+    }
+
+    @Test
+    fun movingTheTopRowToTheBottomKeepsTheViewWhereItWas() {
+        // Phone test on #48: Move to bottom on the row at the top of the screen scrolled along.
+        val many = (1..40).map { Song("s$it", "u$it", "Song $it", "Artist", 200_000, 1) }
+        val rows = mutableStateOf(many.map { PlaylistRow.Entry(it, false) as PlaylistRow })
+        compose.setContent {
+            TandemMotoTheme {
+                PlaylistScreen(
+                    state = PlaylistUiState(rows = rows.value, loaded = true),
+                    onBack = {},
+                    onAddSongs = {},
+                    onAddFolder = {},
+                    onCheckFolders = {},
+                    onRemove = {},
+                    onMove = { from, to ->
+                        rows.value = rows.value.toMutableList().apply { add(to, removeAt(from)) }
+                    }
+                )
+            }
+        }
+        compose.onNodeWithText("Song 1").assertIsDisplayed()
+        compose.onNodeWithContentDescription(str(R.string.playlist_more, "Song 1")).performClick()
+        compose.onNodeWithText(str(R.string.playlist_move_bottom)).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Song 2").assertIsDisplayed() // still at the top, not at song 40
+        compose.onNodeWithText("Song 1").assertIsNotDisplayed()
     }
 
     @Test

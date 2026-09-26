@@ -40,6 +40,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -273,6 +274,23 @@ private fun SongList(
     var autoScroll by remember { mutableStateOf<Job?>(null) }
     if (dragging == null) order = state.rows
     val songCount = state.songCount
+
+    // A list keeps its scroll tied to the row at the top of the screen, so moving that row (e.g.
+    // Move to bottom) scrolled the view along with it (phone test on #48). After a reorder, stay
+    // where the view was instead.
+    val keys = state.rows.map { it.key }
+    val lastKeys = remember { arrayOf(keys) }
+    if (keys != lastKeys[0]) {
+        val reorderOnly = dragging == null &&
+            keys.size == lastKeys[0].size &&
+            keys.toSet() == lastKeys[0].toSet()
+        val index = listState.firstVisibleItemIndex
+        val itemOffset = listState.firstVisibleItemScrollOffset
+        lastKeys[0] = keys
+        if (reorderOnly) {
+            SideEffect { scope.launch { listState.scrollToItem(index, itemOffset) } }
+        }
+    }
 
     /** Swaps the dragged row with its neighbour once it's past half of it. */
     fun swapIfPastNeighbour() {
