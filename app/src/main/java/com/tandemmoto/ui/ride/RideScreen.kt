@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,6 +46,7 @@ import com.tandemmoto.ui.components.ConnectionStatus
 import com.tandemmoto.ui.components.ConnectionStatusBar
 import com.tandemmoto.ui.components.ControlButton
 import com.tandemmoto.ui.components.PermissionPrompt
+import com.tandemmoto.ui.components.SongSeekBar
 import com.tandemmoto.ui.components.openWifiSettings
 import com.tandemmoto.ui.components.rememberPermissionRequester
 import com.tandemmoto.ui.theme.TandemMotoTheme
@@ -84,7 +86,8 @@ fun RideRoute(
         onNext = viewModel::onNext,
         onPrevious = viewModel::onPrevious,
         onOpenPlaylist = onOpenPlaylist,
-        onOpenSettings = onOpenSettings
+        onOpenSettings = onOpenSettings,
+        onSeek = viewModel::onSeek
     )
 }
 
@@ -102,7 +105,8 @@ fun RideScreen(
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     onOpenPlaylist: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onSeek: (Long) -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -149,6 +153,15 @@ fun RideScreen(
             ) {
                 NowPlayingCard(state)
                 Spacer(Modifier.weight(1f))
+                if (state.nowPlaying != null) {
+                    SongSeekBar(
+                        positionMs = state.positionMs,
+                        durationMs = state.durationMs,
+                        enabled = state.controlsEnabled,
+                        onSeek = onSeek,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
                 PlaybackControls(state, onPlayPause, onNext, onPrevious)
                 IntercomIndicator(state.intercomOn)
             }
@@ -266,9 +279,13 @@ private fun NowPlayingCard(state: RideUiState) {
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            // Song names are often file names: two lines at most, so a long one can't push the
+            // controls off a small screen.
             Text(
                 text = state.nowPlaying ?: stringResource(R.string.ride_no_song),
-                style = MaterialTheme.typography.headlineMedium
+                style = MaterialTheme.typography.headlineSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
             val below = when {
                 state.gettingSong ->
@@ -281,7 +298,9 @@ private fun NowPlayingCard(state: RideUiState) {
                 Text(
                     text = below,
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -403,7 +422,13 @@ private fun RideNotPairedPreview() {
 private fun RideConnectedPreview() {
     TandemMotoTheme(darkTheme = true, dynamicColor = false) {
         RidePreview(
-            RideUiState(connection = ConnectionStatus.Connected, nowPlaying = "Highway Song")
+            RideUiState(
+                connection = ConnectionStatus.Connected,
+                nowPlaying = "Highway Song",
+                hasSongs = true,
+                positionMs = 83_000,
+                durationMs = 245_000
+            )
         )
     }
 }

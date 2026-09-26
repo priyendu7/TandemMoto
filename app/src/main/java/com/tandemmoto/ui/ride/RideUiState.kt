@@ -13,11 +13,14 @@ data class RideUiState(
     val isPlaying: Boolean = false,
     /** The current song isn't on this phone yet: "Getting song…" (#51). */
     val gettingSong: Boolean = false,
-    val hasSongs: Boolean = false
+    val hasSongs: Boolean = false,
+    /** Where the current song is and how long it is, for the seek bar (0: not known yet). */
+    val positionMs: Long = 0,
+    val durationMs: Long = 0
 ) {
     /**
-     * Each phone plays the ride playlist locally in Phase 2 (#51), linked or not; mirroring the
-     * controls to the partner is Phase 3.
+     * Each phone plays the ride playlist, linked or not; while linked, every control is mirrored
+     * to the partner (#60).
      */
     val controlsEnabled: Boolean get() = hasSongs
 

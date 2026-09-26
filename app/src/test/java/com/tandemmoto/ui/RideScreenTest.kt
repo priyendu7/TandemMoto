@@ -1,6 +1,10 @@
 package com.tandemmoto.ui
 
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties.StateDescription
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -9,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import com.tandemmoto.R
 import com.tandemmoto.permissions.AppPermission
 import com.tandemmoto.permissions.PermissionStatus
@@ -41,6 +46,7 @@ class RideScreenTest {
     private var openedWifi = false
     private var disconnected = false
     private var playPaused = false
+    private var seekedTo: Long? = null
 
     private fun nearby(status: PermissionStatus, sdk: Int = 34, approximateOnly: Boolean = false) =
         PermissionsState(sdk, mapOf(AppPermission.NEARBY to status), approximateOnly)
@@ -62,9 +68,41 @@ class RideScreenTest {
                 onNext = {},
                 onPrevious = {},
                 onOpenPlaylist = {},
-                onOpenSettings = {}
+                onOpenSettings = {},
+                onSeek = { seekedTo = it }
             )
         }
+    }
+
+    private val playingSong = RideUiState(
+        connection = ConnectionStatus.Connected,
+        nowPlaying = "Highway Song",
+        hasSongs = true,
+        isPlaying = true,
+        positionMs = 83_000,
+        durationMs = 245_000
+    )
+
+    @Test
+    fun theSeekBarShowsWhereTheSongIs() {
+        showRide(playingSong)
+        compose.onNodeWithContentDescription(str(R.string.ride_seek))
+            .assertIsEnabled()
+            .assert(SemanticsMatcher.expectValue(StateDescription, "1:23 of 4:05"))
+    }
+
+    @Test
+    fun lettingGoOfTheSeekBarSeeksOnce() {
+        showRide(playingSong)
+        compose.onNodeWithContentDescription(str(R.string.ride_seek))
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(120_000f) }
+        assertEquals(120_000L, seekedTo)
+    }
+
+    @Test
+    fun theSeekBarWaitsForTheSongsLength() {
+        showRide(playingSong.copy(durationMs = 0, positionMs = 0))
+        compose.onNodeWithContentDescription(str(R.string.ride_seek)).assertIsNotEnabled()
     }
 
     @Test

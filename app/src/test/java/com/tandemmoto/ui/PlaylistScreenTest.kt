@@ -3,7 +3,9 @@ package com.tandemmoto.ui
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties.StateDescription
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.hasAnyDescendant
@@ -12,8 +14,10 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import com.tandemmoto.R
 import com.tandemmoto.library.Song
+import com.tandemmoto.ui.playlist.NowPlayingBar
 import com.tandemmoto.ui.playlist.PlaylistRow
 import com.tandemmoto.ui.playlist.PlaylistScreen
 import com.tandemmoto.ui.playlist.PlaylistUiState
@@ -42,6 +46,8 @@ class PlaylistScreenTest {
     private var addedFolder = false
     private val removed = mutableListOf<String>()
     private val moves = mutableListOf<Pair<Int, Int>>()
+    private var playPaused = false
+    private var seekedTo: Long? = null
 
     private fun str(id: Int, vararg args: Any) = compose.activity.getString(id, *args)
 
@@ -54,13 +60,36 @@ class PlaylistScreenTest {
                 onAddFolder = { addedFolder = true },
                 onCheckFolders = {},
                 onRemove = { removed += it },
-                onMove = { from, to -> moves += from to to }
+                onMove = { from, to -> moves += from to to },
+                onPlayPause = { playPaused = true },
+                onSeek = { seekedTo = it }
             )
         }
     }
 
     private fun songs(vararg entries: PlaylistRow) =
         PlaylistUiState(rows = entries.toList(), loaded = true)
+
+    @Test
+    fun theSongPlayingHasABarWithPlayPauseAndASeekBar() {
+        show(
+            songs(PlaylistRow.Entry(alpha, missing = false, current = true)).copy(
+                nowPlaying = NowPlayingBar("Alpha", "Artist", true, 83_000, 245_000)
+            )
+        )
+        compose.onNodeWithContentDescription(str(R.string.ride_seek))
+            .assert(SemanticsMatcher.expectValue(StateDescription, "1:23 of 4:05"))
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(120_000f) }
+        assertEquals(120_000L, seekedTo)
+        compose.onNodeWithContentDescription(str(R.string.ride_pause)).performClick()
+        assertTrue(playPaused)
+    }
+
+    @Test
+    fun withNothingPlayingThereIsNoBar() {
+        show(songs(PlaylistRow.Entry(alpha, missing = false)))
+        compose.onNodeWithContentDescription(str(R.string.ride_seek)).assertDoesNotExist()
+    }
 
     @Test
     fun anEmptyPlaylistOffersBothWaysToAdd() {

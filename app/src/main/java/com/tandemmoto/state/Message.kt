@@ -1,6 +1,7 @@
 package com.tandemmoto.state
 
 import com.tandemmoto.playlist.RideEntry
+import com.tandemmoto.playlist.Stamp
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -32,12 +33,15 @@ sealed interface Message {
         val role: String
     ) : Message
 
-    /** Heartbeat; answered with a [Pong] carrying the same [sentAtNanos] (the sender's clock). */
+    /**
+     * Heartbeat; answered with a [Pong] carrying the same [sentAtNanos] (the sender's clock) and
+     * [Pong.repliedAtNanos] (the answering phone's clock, 0 from apps before #60).
+     */
     @Serializable
     data class Ping(val sentAtNanos: Long) : Message
 
     @Serializable
-    data class Pong(val sentAtNanos: Long) : Message
+    data class Pong(val sentAtNanos: Long, val repliedAtNanos: Long = 0) : Message
 
     /**
      * Ride playlist songs (#49): on every connection each phone sends its whole list in batches
@@ -58,6 +62,21 @@ sealed interface Message {
     /** Every song this phone can play (its own, its copies, its downloads), for "On both phones". */
     @Serializable
     data class SongsOnPhone(val ids: List<String>) : Message
+
+    /**
+     * Shared playback (#60): what the sender's player is doing after its latest control. [songId]
+     * is playing (or paused) at [positionMs] as of [atNanos] on the sender's clock; the newest
+     * [stamp] wins on both phones. [control] names what caused it, for logs.
+     */
+    @Serializable
+    data class PlaybackState(
+        val songId: String?,
+        val playing: Boolean,
+        val positionMs: Long,
+        val atNanos: Long,
+        val stamp: Stamp,
+        val control: String
+    ) : Message
 
     /** The sender is closing the connection, and why. */
     @Serializable
@@ -121,6 +140,8 @@ object MessageCodec {
                 Message.SongsOnPhone.serializer(),
                 message
             )
+            is Message.PlaybackState ->
+                json.encodeToJsonElement(Message.PlaybackState.serializer(), message)
         }
         val envelope = buildJsonObject {
             put("v", version)
@@ -148,6 +169,7 @@ object MessageCodec {
                 SONG_REQUEST -> payload.decodeAs(Message.SongRequest.serializer())
                 SONG_UNAVAILABLE -> payload.decodeAs(Message.SongUnavailable.serializer())
                 SONGS_ON_PHONE -> payload.decodeAs(Message.SongsOnPhone.serializer())
+                PLAYBACK -> payload.decodeAs(Message.PlaybackState.serializer())
                 else -> return Envelope.Unknown(version, type)
             }
             return Envelope.Known(version, seq, message)
@@ -176,6 +198,7 @@ object MessageCodec {
         is Message.SongRequest -> SONG_REQUEST
         is Message.SongUnavailable -> SONG_UNAVAILABLE
         is Message.SongsOnPhone -> SONGS_ON_PHONE
+        is Message.PlaybackState -> PLAYBACK
     }
 
     private const val HELLO = "hello"
@@ -186,4 +209,5 @@ object MessageCodec {
     private const val SONG_REQUEST = "song_request"
     private const val SONG_UNAVAILABLE = "song_unavailable"
     private const val SONGS_ON_PHONE = "songs_on_phone"
+    private const val PLAYBACK = "playback"
 }
