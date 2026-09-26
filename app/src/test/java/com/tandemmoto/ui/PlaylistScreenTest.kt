@@ -299,6 +299,12 @@ class PlaylistScreenTest {
     }
 
     @Test
+    fun aSongThisPhoneCantDecodeSaysSo() {
+        show(songs(PlaylistRow.Entry(alpha, false, cantPlay = true)))
+        compose.onNodeWithText(str(R.string.playlist_cant_play)).assertIsDisplayed()
+    }
+
+    @Test
     fun durationsReadLikeAClock() {
         assertEquals("3:45", formatDuration(225_000))
         assertEquals("0:05", formatDuration(5_400))

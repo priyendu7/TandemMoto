@@ -15,6 +15,8 @@
     <!-- Link notification (foreground service) -->
     <string name="notification_channel_connection">Connection</string>
     <string name="notification_channel_connection_summary">Shows the link to your partner\'s phone while the phones are connected</string>
+    <string name="notification_channel_player">Music</string>
+    <string name="notification_channel_player_summary">The song that\'s playing, with play, pause and skip</string>
     <string name="notification_connected">Connected to %1$s</string>
     <string name="notification_connecting">Looking for %1$s…</string>
     <string name="notification_reconnecting">Reconnecting to %1$s…</string>
@@ -166,6 +168,7 @@
     <string name="playlist_length_hours">%1$d h %2$d min</string>
     <string name="playlist_on_this_phone">On this phone</string>
     <string name="playlist_file_missing">File missing</string>
+    <string name="playlist_cant_play">Can\'t play on this phone (audio format not supported)</string>
     <string name="playlist_added_by_you">Added by you</string>
     <string name="playlist_on_both_phones">On both phones ✓</string>
     <string name="playlist_not_on_partner">Not on %1$s yet</string>

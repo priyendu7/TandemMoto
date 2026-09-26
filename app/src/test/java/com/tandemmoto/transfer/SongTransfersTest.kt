@@ -236,6 +236,20 @@ class SongTransfersTest {
     }
 
     @Test
+    fun switchingSongsMidTransferKeepsTheConnectionOpen() = runTest {
+        // Phone test on #51: stopping a send by cancelling it interrupted the socket and closed
+        // the whole transfer connection.
+        val songs = songs(12, size = 2_000_000)
+        val (s25, redmi) = phones(songs)
+        link(s25, redmi)
+        // Mid-way, the Redmi's current song jumps far ahead: the first songs leave the window.
+        redmi.current.value = 11
+        advanceTimeBy(10_000)
+        assertFalse(s25.logs.toString(), s25.logs.any { it == "conn: Transfer connection closed" })
+        assertTrue(songs[11].first.id in redmi.store.stored().keys)
+    }
+
+    @Test
     fun aCorruptedSongIsFetchedAgain() = runTest {
         val songs = songs(1)
         val (s25, redmi) = phones(songs)

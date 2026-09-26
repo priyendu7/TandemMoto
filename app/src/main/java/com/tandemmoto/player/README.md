@@ -5,7 +5,7 @@ play/pause/skip/seek between the phones and adds the handlebar remote.
 
 - `Playback`: Media3 **ExoPlayer** plus a **MediaSession** (lock screen, notification, headset and
   Bluetooth buttons), owned by the app, not a `MediaSessionService`: the foreground service and
-  its one notification stay ours (`service/LinkService`), so the link keeps its foreground
+  its notifications stay ours (`service/LinkService`), so the link keeps its foreground
   service even with an empty playlist. Audio focus and "becoming noisy" (earphones unplugged)
   pause it.
 - Every song is queued as `tandem://song/<id>`; `SongDataSource` resolves it when the player opens
@@ -16,3 +16,6 @@ play/pause/skip/seek between the phones and adds the handlebar remote.
 - `QueueSync`: edits from either phone reach the player as add/remove/move steps, so the current
   song keeps playing through a reorder.
 - The current song's place goes to the song window (#50), which downloads around it.
+- A song whose audio format the phone can't decode raises no error (ExoPlayer just has no audio
+  track): `Playback` checks the tracks, logs the format, marks it "Can't play on this phone" and
+  skips it (the Redmi Y2 on Android 9 with two large files, #51 phone test).

@@ -44,7 +44,9 @@ sealed interface PlaylistRow {
         /** Where the song is between the phones (#50); null when not paired. */
         val badge: SongBadge? = null,
         /** The player's current song (#51). */
-        val current: Boolean = false
+        val current: Boolean = false,
+        /** This phone can't decode its audio format (#51). */
+        val cantPlay: Boolean = false
     ) : PlaylistRow {
         override val key get() = song.id
     }
@@ -156,7 +158,8 @@ class PlaylistViewModel(
     linkStatus: StateFlow<LinkStatus>,
     transfers: StateFlow<TransferState>,
     currentSong: Flow<String?> = flowOf(null),
-    private val playAt: (Int) -> Unit = {}
+    private val playAt: (Int) -> Unit = {},
+    cantPlay: Flow<Set<String>> = flowOf(emptySet())
 ) : ViewModel() {
     private val linked = linkStatus.map { it is LinkStatus.Connected }
 
@@ -171,6 +174,16 @@ class PlaylistViewModel(
                     library.fileSlotsLeft,
                     now.moving,
                     current
+                )
+            }.combine(cantPlay) { ui, unplayable ->
+                ui.copy(
+                    rows = ui.rows.map { row ->
+                        if (row is PlaylistRow.Entry && row.song.id in unplayable) {
+                            row.copy(cantPlay = true)
+                        } else {
+                            row
+                        }
+                    }
                 )
             }.stateIn(viewModelScope, SharingStarted.Eagerly, PlaylistUiState())
 
@@ -213,7 +226,8 @@ class PlaylistViewModel(
                     app.link.status,
                     app.transfers.state,
                     app.playback.state.map { it.currentId },
-                    app.playback::playAt
+                    app.playback::playAt,
+                    app.playback.state.map { it.cantPlay }
                 )
             }
         }

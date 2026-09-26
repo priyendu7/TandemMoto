@@ -6,12 +6,12 @@ screen off. Without one, the S25 closed the socket within a second of the screen
 
 ## Link service (#40), and music (#51)
 
-- Since #51 the same service also runs while music plays (type `mediaPlayback`), with **one**
-  notification: media style with the song, ⏮ ⏯ ⏭ and the link's line and button, or just the link
-  when there are no songs. `LinkSession` runs it while the link wants it **or** music plays, so
-  Disconnect doesn't stop the music.
-
-
+- Since #51 the same service also runs while music plays (type `mediaPlayback`). `LinkSession`
+  runs it while the link wants it **or** music plays, so Disconnect doesn't stop the music. Its
+  own notification stays the link's; a second, **media** notification (song and ⏮ ⏯ ⏭, tied to
+  the MediaSession) is shown while there are songs. On Android 13+ that one becomes the media
+  card, which shows only the song, so the link's line couldn't share it (S25 phone test). Both
+  are cleared when the service stops, so none is left behind that can't be removed (Redmi).
 - `LinkService`: type `connectedDevice` (allowed by `CHANGE_WIFI_STATE`), no work of its own. Its
   notification ("Connection" channel, low importance, silent) follows the link status and has a
   **Disconnect** action: `Link.disconnect()` sends `Bye(Disconnected)` so the partner shows

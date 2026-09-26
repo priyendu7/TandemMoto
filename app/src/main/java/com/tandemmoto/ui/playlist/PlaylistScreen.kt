@@ -555,9 +555,15 @@ private fun SongRow(
             )
         },
         supportingContent = {
-            if (entry.missing) {
+            if (entry.missing || entry.cantPlay) {
                 Text(
-                    stringResource(R.string.playlist_file_missing),
+                    stringResource(
+                        if (entry.missing) {
+                            R.string.playlist_file_missing
+                        } else {
+                            R.string.playlist_cant_play
+                        }
+                    ),
                     color = MaterialTheme.colorScheme.error
                 )
             } else {
@@ -568,7 +574,7 @@ private fun SongRow(
         },
         trailingContent = {
             Box {
-                if (entry.missing) {
+                if (entry.missing || entry.cantPlay) {
                     Icon(
                         Icons.Filled.Warning,
                         contentDescription = null,

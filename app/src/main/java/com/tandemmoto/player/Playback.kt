@@ -8,6 +8,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
@@ -34,7 +35,9 @@ data class PlaybackState(
     /** The user wants it playing (it may be waiting for the song: [gettingSong]). */
     val playWhenReady: Boolean = false,
     /** The current song isn't on this phone yet: "Getting song…". */
-    val gettingSong: Boolean = false
+    val gettingSong: Boolean = false,
+    /** Songs whose audio format this phone can't decode (skipped; phone test on #51). */
+    val cantPlay: Set<String> = emptySet()
 )
 
 /**
@@ -102,6 +105,8 @@ class Playback(
             override fun onEvents(player: Player, events: Player.Events) = publish()
 
             override fun onPlayerError(error: PlaybackException) = skipUnplayable(error)
+
+            override fun onTracksChanged(tracks: Tracks) = checkDecodable(tracks)
         })
     }
 
@@ -152,6 +157,7 @@ class Playback(
         WaitRules.decide(id == currentId, now() - currentSince, linked(), storageFull())
 
     override fun waiting(id: String, waiting: Boolean) {
+        log("song-${id.take(8)} ${if (waiting) "isn't here yet: waiting" else "stopped waiting"}")
         waitingFor = if (waiting) id else waitingFor.takeUnless { it == id }
         _state.update { it.copy(gettingSong = waitingFor != null && waitingFor == currentId) }
     }
@@ -200,7 +206,8 @@ class Playback(
      * than stop, as long as there is one.
      */
     private fun skipUnplayable(error: PlaybackException) {
-        log("Skipping song-${currentId?.take(8)}: ${error.errorCodeName}")
+        val cause = error.cause?.let { " (${it.javaClass.simpleName}: ${it.message})" }.orEmpty()
+        log("Skipping song-${currentId?.take(8)}: ${error.errorCodeName}$cause")
         val wasPlaying = player.playWhenReady
         if (player.hasNextMediaItem()) {
             player.seekToNextMediaItem()
@@ -208,6 +215,34 @@ class Playback(
             if (wasPlaying) player.play()
         } else {
             player.stop()
+        }
+    }
+
+    /**
+     * A song whose audio this phone can't decode doesn't raise an error: ExoPlayer just has no
+     * audio track to play (the Redmi Y2 on Android 9 with two large files, #51 phone test). Mark
+     * it, log its format, and move on.
+     */
+    private fun checkDecodable(tracks: Tracks) {
+        val id = player.currentMediaItem?.mediaId ?: return
+        if (!tracks.containsType(C.TRACK_TYPE_AUDIO) ||
+            tracks.isTypeSupported(C.TRACK_TYPE_AUDIO)
+        ) {
+            return
+        }
+        val format = tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_AUDIO }?.getTrackFormat(0)
+        log(
+            "Can't play song-${id.take(8)} on this phone: ${format?.sampleMimeType}, " +
+                "${format?.sampleRate} Hz, ${format?.channelCount} ch, " +
+                "encoding ${format?.pcmEncoding}, ${format?.bitrate} bit/s"
+        )
+        _state.update { it.copy(cantPlay = it.cantPlay + id) }
+        val wasPlaying = player.playWhenReady
+        if (player.hasNextMediaItem()) {
+            player.seekToNextMediaItem()
+            if (wasPlaying) player.play()
+        } else {
+            player.pause()
         }
     }
 
