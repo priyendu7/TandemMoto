@@ -566,6 +566,50 @@ class LinkTest {
         assertEquals(1, partnerApp.hellosReceived.size)
     }
 
+    // ---- A group Android doesn't name (#49 phone test) ----
+
+    @Test
+    fun aGroupWithAnUnnamedPeerIsCheckedWithHelloAfterAGracePeriod() = runTest {
+        val partner = saved(s25, Acceptor)
+        val link = link(InMemoryPartnerStore(partner))
+        driver.group.value =
+            GroupInfo(isGroupOwner = false, ownerAddress = "192.168.49.1", peer = null)
+        runCurrent()
+        assertTrue(link.status.value !is LinkStatus.Connected)
+        advanceTimeBy(Link.UNKNOWN_PEER_GRACE_MS + 1)
+        assertEquals(LinkStatus.Connected(partner.learned()), link.status.value)
+
+        // Android names it later: the open connection isn't reopened.
+        driver.formGroupWith(s25, isGroupOwner = false)
+        runCurrent()
+        assertEquals(1, partnerApp.hellosReceived.size)
+        assertEquals(LinkStatus.Connected(partner.learned()), link.status.value)
+    }
+
+    @Test
+    fun aPeerNamedWithinTheGracePeriodIsHandledNormally() = runTest {
+        val partner = saved(s25, Acceptor)
+        val link = link(InMemoryPartnerStore(partner))
+        driver.group.value =
+            GroupInfo(isGroupOwner = false, ownerAddress = "192.168.49.1", peer = null)
+        runCurrent()
+        driver.formGroupWith(s25, isGroupOwner = false)
+        advanceTimeBy(Link.UNKNOWN_PEER_GRACE_MS * 2)
+        assertEquals(LinkStatus.Connected(partner.learned()), link.status.value)
+        assertEquals(1, partnerApp.hellosReceived.size)
+    }
+
+    @Test
+    fun anUnnamedGroupThatIsNotThePartnerIsRefusedByHello() = runTest {
+        val partner = saved(s25, Acceptor).copy(installId = "the-real-partner")
+        val link = link(InMemoryPartnerStore(partner))
+        driver.group.value =
+            GroupInfo(isGroupOwner = false, ownerAddress = "192.168.49.1", peer = null)
+        advanceTimeBy(Link.UNKNOWN_PEER_GRACE_MS + 1)
+        assertTrue(link.status.value !is LinkStatus.Connected)
+        assertEquals(listOf(Message.Bye(Bye.Reason.NotYourPartner)), partnerApp.byesReceived)
+    }
+
     // ---- Wi-Fi off ----
 
     @Test

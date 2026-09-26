@@ -147,6 +147,7 @@ class Link(
     private var channelGroup: GroupInfo? = null
     private var appTimer: Job? = null
     private var guardJob: Job? = null
+    private var unknownPeerJob: Job? = null
 
     /** Loads the saved partner, watches the group, channel and Wi-Fi, and starts connecting. */
     fun start() {
@@ -332,7 +333,12 @@ class Link(
             onGroupRemoved()
             return
         }
-        val peer = group.peer ?: return // Android hasn't said who it is yet
+        val peer = group.peer
+        if (peer == null) {
+            onUnknownPeer()
+            return
+        }
+        unknownPeerJob?.cancel()
         val partner = _partner.value
         val inviting = _pairing.value as? PairingState.Inviting
         when {
@@ -341,6 +347,28 @@ class Link(
             partner != null && partner.matches(peer) -> onPartnerGroup(partner, peer, group)
             pairScreenOpen -> completePairing(peer, Partner.Role.Acceptor, group)
             else -> guard(peer, group)
+        }
+    }
+
+    /**
+     * A group formed, but Android hasn't said with which phone. The driver keeps asking; if it
+     * still doesn't know after [UNKNOWN_PEER_GRACE_MS], treat it as the partner's group and let
+     * the Hello decide: its install-ID check refuses any other phone. The Redmi Y2 once never
+     * said, and the app waited forever while the S25 sat in the group (#49 phone test).
+     */
+    private fun onUnknownPeer() {
+        if (unknownPeerJob?.isActive == true || groupWithPartner) return
+        log("Group formed, but Android didn't say with whom yet")
+        unknownPeerJob = scope.launch {
+            delay(UNKNOWN_PEER_GRACE_MS)
+            val group = driver.group.value ?: return@launch
+            val partner = _partner.value ?: return@launch
+            if (group.peer != null || groupWithPartner) return@launch
+            if (pairScreenOpen || _pairing.value is PairingState.Inviting) return@launch
+            log("Still not said: checking with the partner's app instead")
+            reconnectJob?.cancel()
+            discovery.stop()
+            onGroupWithPartner(partner, group)
         }
     }
 
@@ -599,9 +627,10 @@ class Link(
         }
     }
 
+    /** The same group; a peer Android named late (see [onUnknownPeer]) doesn't make it another. */
     private fun GroupInfo.sameGroupAs(other: GroupInfo) = isGroupOwner == other.isGroupOwner &&
         ownerAddress == other.ownerAddress &&
-        peer?.address == other.peer?.address
+        (peer == null || other.peer == null || peer.address == other.peer.address)
 
     private fun NearbyDevice.isSamePhone(other: NearbyDevice) =
         address.isNotBlank() && address == other.address || name.isNotBlank() && name == other.name
@@ -618,6 +647,9 @@ class Link(
          * channel normally opens ~0.6 s after the group forms (spike).
          */
         const val PARTNER_APP_TIMEOUT_MS = 5_000L
+
+        /** How long to wait for Android to name a group's other phone before asking its app. */
+        const val UNKNOWN_PEER_GRACE_MS = 3_000L
 
         /** How long the wrong-device guard waits to tell the other app before removing the group. */
         const val GUARD_TIMEOUT_MS = 3_000L
