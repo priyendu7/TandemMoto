@@ -1,5 +1,6 @@
 package com.tandemmoto.ui.components
 
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -13,7 +14,7 @@ import com.tandemmoto.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BackTopBar(title: String, onBack: () -> Unit) {
+fun BackTopBar(title: String, onBack: () -> Unit, actions: @Composable RowScope.() -> Unit = {}) {
     TopAppBar(
         title = { Text(title) },
         navigationIcon = {
@@ -23,6 +24,7 @@ fun BackTopBar(title: String, onBack: () -> Unit) {
                     contentDescription = stringResource(R.string.action_back)
                 )
             }
-        }
+        },
+        actions = actions
     )
 }

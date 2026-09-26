@@ -14,7 +14,7 @@ import com.tandemmoto.diagnostics.LogExporter
 import com.tandemmoto.link
 import com.tandemmoto.permissions.AppPermission
 import com.tandemmoto.ui.components.rememberPermissionRequester
-import com.tandemmoto.ui.playlist.PlaylistScreen
+import com.tandemmoto.ui.playlist.PlaylistRoute
 import com.tandemmoto.ui.ride.RideRoute
 import com.tandemmoto.ui.settings.SettingsScreen
 import com.tandemmoto.ui.setup.PairRoute
@@ -47,7 +47,7 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             )
         }
         composable(Routes.PLAYLIST) {
-            PlaylistScreen(onBack = { navController.popBackStack() })
+            PlaylistRoute(onBack = { navController.popBackStack() })
         }
         composable(Routes.SETTINGS) {
             val context = LocalContext.current
