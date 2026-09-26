@@ -24,15 +24,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.tandemmoto.ui.theme.TandemMotoTheme
 
 /**
- * Always-visible strip showing the link state, announced by TalkBack when it changes. With
- * [onClick] it's also the way in to pairing (e.g. tapping "Not paired").
+ * Always-visible strip showing the link state. The screen shows "label · hint"; TalkBack reads
+ * only the label, announces it when it changes (polite live region), and offers the tap as a
+ * button with [onClickLabel] ("double-tap to connect"), so the action isn't read twice.
  */
 @Composable
 fun ConnectionStatusBar(
@@ -44,23 +48,33 @@ fun ConnectionStatusBar(
     onClick: (() -> Unit)? = null
 ) {
     val (container, content) = status.kind.colors()
+    val label = status.namedLabel
+        ?.takeIf { !partnerName.isNullOrBlank() }
+        ?.let { stringResource(it, partnerName!!) }
+        ?: stringResource(status.label)
+    // The hint only makes sense when tapping does something.
+    val hint = status.hint?.takeIf { onClick != null }?.let { stringResource(it) }
     StatusStrip(
         container = container,
         content = content,
         icon = status.kind.icon(status),
-        text = status.namedLabel
-            ?.takeIf { !partnerName.isNullOrBlank() }
-            ?.let { stringResource(it, partnerName!!) }
-            ?: stringResource(status.label),
+        text = if (hint != null) "$label · $hint" else label,
         modifier = modifier
             .then(
                 if (onClick != null) {
-                    Modifier.clickable(onClickLabel = onClickLabel, onClick = onClick)
+                    Modifier.clickable(
+                        onClickLabel = onClickLabel,
+                        role = Role.Button,
+                        onClick = onClick
+                    )
                 } else {
                     Modifier
                 }
             )
-            .semantics { liveRegion = LiveRegionMode.Polite }
+            .clearAndSetSemantics {
+                text = AnnotatedString(label)
+                liveRegion = LiveRegionMode.Polite
+            }
     )
 }
 

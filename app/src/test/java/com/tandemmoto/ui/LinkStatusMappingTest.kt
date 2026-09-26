@@ -20,7 +20,8 @@ class LinkStatusMappingTest {
             LinkStatus.Connecting(partner) to ConnectionStatus.Searching,
             LinkStatus.Reconnecting(partner) to ConnectionStatus.Reconnecting,
             LinkStatus.Connected(partner) to ConnectionStatus.Connected,
-            LinkStatus.NotConnected(partner) to ConnectionStatus.NotConnected,
+            LinkStatus.NotConnected(partner) to ConnectionStatus.Unreachable,
+            LinkStatus.NotConnected(partner, Reason.Disconnected) to ConnectionStatus.NotConnected,
             LinkStatus.NotConnected(partner, Reason.MaybePairedElsewhere) to
                 ConnectionStatus.PairedElsewhere,
             LinkStatus.NotConnected(partner, Reason.NoLongerPaired) to

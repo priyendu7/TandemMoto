@@ -27,6 +27,8 @@ class LinkNotificationTextTest {
             LinkStatus.Connected(partner) to
                 NotificationText(R.string.notification_connected, name, listOf(Disconnect)),
             notConnected(Reason.Unreachable) to
+                NotificationText(R.string.notification_unreachable, name, listOf(Connect, Close)),
+            notConnected(Reason.Disconnected) to
                 NotificationText(R.string.notification_not_connected, name, listOf(Connect, Close)),
             notConnected(Reason.MaybePairedElsewhere) to
                 NotificationText(R.string.notification_not_connected, name, listOf(Connect, Close)),

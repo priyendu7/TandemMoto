@@ -634,11 +634,18 @@ class LinkTest {
         runCurrent()
         assertEquals(listOf(Message.Bye(Bye.Reason.Disconnected)), partnerApp.byesReceived)
         assertEquals(1, driver.removeGroupCalls)
-        assertEquals(LinkStatus.NotConnected(partner.learned()), link.status.value)
+        val disconnected = LinkStatus.NotConnected(partner.learned(), Reason.Disconnected)
+        assertEquals(disconnected, link.status.value)
         driver.peers.value = listOf(redmi) // even with the partner in sight
         advanceTimeBy(5 * 60_000L)
         assertTrue(driver.connectCalls.isEmpty()) // doesn't reconnect by itself
-        assertEquals(LinkStatus.NotConnected(partner.learned()), link.status.value)
+        assertEquals(disconnected, link.status.value)
+
+        driver.enabled.value = false // a Wi-Fi toggle doesn't turn it into "couldn't reach"
+        runCurrent()
+        driver.enabled.value = true
+        runCurrent()
+        assertEquals(disconnected, link.status.value)
 
         link.connectToPartner() // one tap on this phone
         runCurrent()

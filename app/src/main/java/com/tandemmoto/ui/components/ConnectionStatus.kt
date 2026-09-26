@@ -9,28 +9,43 @@ enum class StatusKind { Neutral, InProgress, Ok, Info, Problem }
 /**
  * Every link/peripheral state the PRD asks the UI to surface (PRD §3 "clear error states").
  * [namedLabel] is used instead of [label] when the paired phone's name is known ("Connected to
- * Redmi Y2"); it takes the name as `%1$s`.
+ * Redmi Y2"); it takes the name as `%1$s`. [hint] is the tap action, shown after the label
+ * ("Not connected · Tap to connect") but not read by TalkBack, which announces the action itself.
  */
 enum class ConnectionStatus(
     @StringRes val label: Int,
     val kind: StatusKind,
-    @StringRes val namedLabel: Int? = null
+    @StringRes val namedLabel: Int? = null,
+    @StringRes val hint: Int? = null
 ) {
-    NotPaired(R.string.status_not_paired, StatusKind.Neutral),
+    NotPaired(R.string.status_not_paired, StatusKind.Neutral, hint = R.string.status_hint_pair),
+
+    /** The user disconnected: tap to connect again. */
     NotConnected(
         R.string.status_not_connected,
         StatusKind.Neutral,
-        R.string.status_not_connected_named
+        R.string.status_not_connected_named,
+        R.string.status_hint_connect
+    ),
+
+    /** Tried for the whole reconnect window without reaching the partner (#27). */
+    Unreachable(
+        R.string.status_unreachable,
+        StatusKind.Problem,
+        R.string.status_unreachable_named,
+        R.string.status_hint_try_again
     ),
     PairedElsewhere(
         R.string.status_paired_elsewhere,
         StatusKind.Problem,
-        R.string.status_paired_elsewhere_named
+        R.string.status_paired_elsewhere_named,
+        R.string.status_hint_pair_again
     ),
     NoLongerPaired(
         R.string.status_no_longer_paired,
         StatusKind.Problem,
-        R.string.status_no_longer_paired_named
+        R.string.status_no_longer_paired_named,
+        R.string.status_hint_pair_again
     ),
     PartnerAppClosed(
         R.string.status_partner_app_closed,
@@ -38,7 +53,7 @@ enum class ConnectionStatus(
         R.string.status_partner_app_closed_named
     ),
     UpdateNeeded(R.string.status_update_needed, StatusKind.Problem),
-    WifiOff(R.string.status_wifi_off, StatusKind.Problem),
+    WifiOff(R.string.status_wifi_off, StatusKind.Problem, hint = R.string.status_hint_wifi),
     Searching(R.string.status_searching, StatusKind.InProgress, R.string.status_searching_named),
     Connected(R.string.status_connected, StatusKind.Ok, R.string.status_connected_named),
     Reconnecting(

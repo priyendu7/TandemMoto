@@ -63,7 +63,9 @@ fun LinkStatus.notificationText(): NotificationText = when (this) {
             partner.name,
             listOf(NotificationAction.Close)
         )
-        Reason.Unreachable, Reason.MaybePairedElsewhere ->
+        Reason.Unreachable ->
+            NotificationText(R.string.notification_unreachable, partner.name, reconnect)
+        Reason.Disconnected, Reason.MaybePairedElsewhere ->
             NotificationText(R.string.notification_not_connected, partner.name, reconnect)
     }
 }

@@ -240,6 +240,13 @@ class RideScreenTest {
     }
 
     @Test
+    fun couldNotReachTapsToTryAgain() {
+        showRide(RideUiState(connection = ConnectionStatus.Unreachable, partnerName = "Redmi"))
+        compose.onNodeWithText(str(R.string.status_unreachable_named, "Redmi")).performClick()
+        assertTrue(connected)
+    }
+
+    @Test
     fun partnerDisconnectedIsNotATapTarget() {
         // This phone is already listening; only the partner's phone can reconnect (#27).
         showRide(
