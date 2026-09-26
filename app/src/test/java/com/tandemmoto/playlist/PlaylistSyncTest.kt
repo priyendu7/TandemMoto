@@ -3,6 +3,8 @@ package com.tandemmoto.playlist
 import com.tandemmoto.library.FakeSongSource
 import com.tandemmoto.library.InMemoryLibraryStore
 import com.tandemmoto.library.Library
+import com.tandemmoto.library.LibraryData
+import com.tandemmoto.library.Song
 import com.tandemmoto.link.ChannelState
 import com.tandemmoto.link.Partner
 import com.tandemmoto.state.Envelope
@@ -38,13 +40,17 @@ class Phone(
     scope: CoroutineScope,
     dispatcher: kotlinx.coroutines.CoroutineDispatcher,
     val rideStore: InMemoryRidePlaylistStore = InMemoryRidePlaylistStore(),
-    val source: FakeSongSource = FakeSongSource()
+    val source: FakeSongSource = FakeSongSource(),
+    val libraryStore: InMemoryLibraryStore = InMemoryLibraryStore()
 ) {
     val ride = RidePlaylist(rideStore, { id }, scope)
-    val library =
-        Library(source, InMemoryLibraryStore(), scope, io = dispatcher, partnerSongs = {
-            ride.partnerSongs
-        })
+    val library = Library(
+        source,
+        libraryStore,
+        scope,
+        io = dispatcher,
+        partnerSongs = { ride.partnerSongs }
+    )
     val channel = MutableStateFlow<ChannelState>(ChannelState.Idle)
     val incoming = MutableSharedFlow<Message>(extraBufferCapacity = 10_000)
     val partner = MutableStateFlow<Partner?>(Partner("partner", "addr", role, 0L))
@@ -245,6 +251,34 @@ class PlaylistSyncTest {
         link(s25, moto)
         assertEquals(listOf("Mine", "New partner's"), s25.titles)
         assertEquals(s25.titles, moto.titles)
+    }
+
+    @Test
+    fun songsAddedBeforeTheRidePlaylistExistedJoinIt() = runTest {
+        // Phone test on #49: the S25's songs from the #48 build weren't in the new playlist.
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val songs = listOf("A", "B", "C").map { Song("id-$it", "u$it", it, "Artist", 200_000, 1) }
+        val phone = Phone(
+            "S25",
+            Partner.Role.Initiator,
+            backgroundScope,
+            dispatcher,
+            libraryStore = InMemoryLibraryStore(LibraryData(songs = songs))
+        )
+        runCurrent()
+        assertEquals(listOf("A", "B", "C"), phone.titles)
+
+        // Only once: a restart doesn't add them again.
+        val again = Phone(
+            "S25",
+            Partner.Role.Initiator,
+            backgroundScope,
+            dispatcher,
+            rideStore = phone.rideStore,
+            libraryStore = phone.libraryStore
+        )
+        runCurrent()
+        assertEquals(listOf("A", "B", "C"), again.titles)
     }
 
     @Test

@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -33,6 +34,7 @@ class PlaylistSync(
 
     fun start() {
         scope.launch { library.added.collect { playlist.addMine(it) } }
+        scope.launch { joinExistingSongs() }
         scope.launch {
             playlist.gone.collect { entries ->
                 val me = playlist.state.value.me
@@ -50,6 +52,22 @@ class PlaylistSync(
             channelState.collect { state ->
                 if (state is ChannelState.Open) onConnected(state.partner)
             }
+        }
+    }
+
+    /**
+     * Songs this phone has that aren't in the ride playlist at all (added before it existed: the
+     * #48 builds kept them in My songs only) join it at the end, in their saved order.
+     */
+    private suspend fun joinExistingSongs() {
+        playlist.state.first { it.loaded }
+        val songs = library.state.first { it.loaded }
+        val known = playlist.snapshot().map { it.id }.toSet()
+        val copies = songs.copyOf.values.toSet()
+        val missing = songs.songs.filter { it.id !in known && it.id !in copies }
+        if (missing.isNotEmpty()) {
+            log("Adding ${missing.size} of this phone's songs to the ride playlist")
+            playlist.addMine(missing)
         }
     }
 
