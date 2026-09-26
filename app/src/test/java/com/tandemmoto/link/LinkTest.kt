@@ -218,7 +218,7 @@ class LinkTest {
     @Test
     fun aGroupWithAnotherPhoneIsRemovedWhenNotPairing() = runTest {
         val link = link(InMemoryPartnerStore(saved(s25, Acceptor)))
-        advanceTimeBy(PeerDiscovery.SCAN_DURATION_MS + 1) // let the startup attempt end
+        advanceTimeBy(Reconnector.WINDOW_MS + 1) // let the startup attempt end
         driver.formGroupWith(redmi) // e.g. a phone that was once paired, reconnecting silently
         runCurrent()
         assertEquals(1, driver.removeGroupCalls)
@@ -230,7 +230,7 @@ class LinkTest {
     @Test
     fun theGuardStillRemovesTheGroupWhenTheOtherAppDoesNotAnswer() = runTest {
         link(InMemoryPartnerStore(saved(s25, Acceptor)), partnerAppRunning = false)
-        advanceTimeBy(PeerDiscovery.SCAN_DURATION_MS + 1)
+        advanceTimeBy(Reconnector.WINDOW_MS + 1)
         driver.formGroupWith(redmi)
         runCurrent()
         assertEquals(0, driver.removeGroupCalls)
@@ -275,8 +275,11 @@ class LinkTest {
     fun notReachedWithinTheWindowMeansNotConnected() = runTest {
         val partner = saved(redmi, Initiator)
         val link = link(InMemoryPartnerStore(partner))
-        advanceTimeBy(PeerDiscovery.SCAN_DURATION_MS + 1)
+        advanceTimeBy(Reconnector.WINDOW_MS - 1_000)
+        assertEquals(LinkStatus.Connecting(partner), link.status.value)
+        advanceTimeBy(1_001)
         assertEquals(LinkStatus.NotConnected(partner), link.status.value)
+        assertEquals(DiscoveryState.Idle, link.discovery.state.value) // stopped searching
     }
 
     @Test
@@ -327,30 +330,103 @@ class LinkTest {
         runCurrent()
         driver.group.value = null
         runCurrent()
-        assertEquals(LinkStatus.NotConnected(partner.learned()), link.status.value)
+        assertEquals(LinkStatus.Reconnecting(partner.learned()), link.status.value)
     }
 
     @Test
-    fun aLaterDropIsAnOrdinaryDisconnect() = runTest {
+    fun aDropReconnectsWithoutATap() = runTest {
+        // #27: airplane mode, Wi-Fi off/on, out of range and back.
         val partner = saved(redmi, Initiator)
         val link = link(InMemoryPartnerStore(partner))
         driver.formGroupWith(redmi)
         runCurrent()
         advanceTimeBy(Link.REJECTION_WINDOW_MS + 1)
         driver.group.value = null
+        driver.peers.value = emptyList()
         runCurrent()
+        assertEquals(LinkStatus.Reconnecting(partner.learned()), link.status.value)
+        assertTrue(link.discovery.state.value is DiscoveryState.Scanning)
+
+        driver.peers.value = listOf(redmi) // back in range
+        runCurrent()
+        assertEquals(listOf(redmi.address), driver.connectCalls)
+        driver.formGroupWith(redmi)
+        runCurrent()
+        assertEquals(LinkStatus.Connected(partner.learned()), link.status.value)
+    }
+
+    @Test
+    fun theAcceptorReconnectsByStayingVisible() = runTest {
+        val partner = saved(s25, Acceptor)
+        val link = link(InMemoryPartnerStore(partner))
+        driver.formGroupWith(s25, isGroupOwner = false)
+        runCurrent()
+        driver.group.value = null
+        driver.peers.value = listOf(s25)
+        advanceTimeBy(30_000)
+        assertEquals(LinkStatus.Reconnecting(partner.learned()), link.status.value)
+        assertTrue(link.discovery.state.value is DiscoveryState.Scanning)
+        assertTrue(driver.connectCalls.isEmpty())
+        driver.formGroupWith(s25, isGroupOwner = false) // the initiator's invitation
+        runCurrent()
+        assertEquals(LinkStatus.Connected(partner.learned()), link.status.value)
+    }
+
+    @Test
+    fun reconnectingGivesUpAfterTheWindowAndATapStartsAFreshOne() = runTest {
+        val partner = saved(redmi, Initiator)
+        val link = link(InMemoryPartnerStore(partner))
+        driver.formGroupWith(redmi)
+        runCurrent()
+        driver.group.value = null
+        runCurrent()
+        advanceTimeBy(Reconnector.WINDOW_MS + 1)
         assertEquals(LinkStatus.NotConnected(partner.learned()), link.status.value)
+
+        link.connectToPartner()
+        runCurrent()
+        assertEquals(LinkStatus.Connecting(partner.learned()), link.status.value)
+        advanceTimeBy(Reconnector.WINDOW_MS - 1_000)
+        assertEquals(LinkStatus.Connecting(partner.learned()), link.status.value)
+    }
+
+    @Test
+    fun aDropAfterARejectionGuessIsNotRetried() = runTest {
+        val partner = saved(redmi, Initiator)
+        val link = link(InMemoryPartnerStore(partner), partnerAppRunning = false)
+        driver.peers.value = listOf(redmi)
+        runCurrent()
+        driver.formGroupWith(redmi)
+        runCurrent()
+        driver.group.value = null
+        runCurrent()
+        val attempts = driver.connectCalls.size
+        advanceTimeBy(60_000)
+        assertEquals(attempts, driver.connectCalls.size)
     }
 
     @Test
     fun tapToConnectStartsAnotherAttempt() = runTest {
         val partner = saved(redmi, Initiator)
         val link = link(InMemoryPartnerStore(partner))
-        advanceTimeBy(PeerDiscovery.SCAN_DURATION_MS + 1)
+        advanceTimeBy(Reconnector.WINDOW_MS + 1)
         assertEquals(LinkStatus.NotConnected(partner), link.status.value)
         link.connectToPartner()
         runCurrent()
         assertEquals(LinkStatus.Connecting(partner), link.status.value)
+    }
+
+    @Test
+    fun thePairScreenPausesReconnectingAndClosingItResumes() = runTest {
+        val partner = saved(redmi, Initiator)
+        val link = link(InMemoryPartnerStore(partner))
+        link.openPairScreen()
+        driver.peers.value = listOf(redmi)
+        advanceTimeBy(5_000)
+        assertTrue(driver.connectCalls.isEmpty()) // the Pair screen's list, not our loop
+        link.closePairScreen()
+        runCurrent()
+        assertEquals(listOf(redmi.address), driver.connectCalls)
     }
 
     // ---- Command channel (#25) ----
@@ -390,7 +466,7 @@ class LinkTest {
     }
 
     @Test
-    fun aPartnerThatGoesSilentIsNotConnectedNotAClosedApp() = runTest {
+    fun aPartnerThatGoesSilentIsReconnectedWithAFreshGroup() = runTest {
         // #25 phone test: Wi-Fi off on the S25; the Redmi's Android kept the group ~13 s longer.
         val partner = saved(redmi, Initiator)
         val link = link(InMemoryPartnerStore(partner))
@@ -399,13 +475,17 @@ class LinkTest {
         partnerApp.answersPings = false // gone: silent, and unreachable
         transport.partnerApp.value = null
         advanceTimeBy(CommandChannel.SILENCE_TIMEOUT_MS + CommandChannel.HEARTBEAT_MS)
-        assertEquals(LinkStatus.NotConnected(partner.learned()), link.status.value)
+        assertEquals(LinkStatus.Reconnecting(partner.learned()), link.status.value)
+        assertEquals(1, driver.removeGroupCalls) // the dead group, not waiting ~13 s for Android
         advanceTimeBy(Link.PARTNER_APP_TIMEOUT_MS * 2)
-        assertEquals(LinkStatus.NotConnected(partner.learned()), link.status.value)
+        assertEquals(LinkStatus.Reconnecting(partner.learned()), link.status.value)
 
-        partnerApp.answersPings = true // back in range: the channel is still retrying
+        partnerApp.answersPings = true // back in range
         transport.partnerApp.value = partnerApp
-        advanceTimeBy(CommandChannel.SLOW_RETRY_MS + 1)
+        driver.peers.value = listOf(redmi)
+        runCurrent()
+        driver.formGroupWith(redmi)
+        runCurrent()
         assertEquals(LinkStatus.Connected(partner.learned()), link.status.value)
     }
 
@@ -493,20 +573,22 @@ class LinkTest {
         // #25 phone test: the Redmi said "Looking for …" with its Wi-Fi off.
         val partner = saved(redmi, Initiator)
         val link = link(InMemoryPartnerStore(partner))
-        advanceTimeBy(PeerDiscovery.SCAN_DURATION_MS + 1)
         driver.enabled.value = false
         runCurrent()
         assertEquals(LinkStatus.NotConnected(partner, Reason.WifiOff), link.status.value)
 
         val searches = driver.discoverCalls
         link.connectToPartner()
-        runCurrent()
+        advanceTimeBy(Reconnector.WINDOW_MS * 2) // Wi-Fi off doesn't use up retries
         assertEquals(LinkStatus.NotConnected(partner, Reason.WifiOff), link.status.value)
         assertEquals(searches, driver.discoverCalls)
 
-        driver.enabled.value = true
+        driver.enabled.value = true // back on: tries again by itself, with a fresh window
         runCurrent()
-        assertEquals(LinkStatus.NotConnected(partner), link.status.value)
+        assertEquals(LinkStatus.Reconnecting(partner), link.status.value)
+        driver.peers.value = listOf(redmi)
+        runCurrent()
+        assertEquals(listOf(redmi.address), driver.connectCalls)
     }
 
     @Test
@@ -553,8 +635,14 @@ class LinkTest {
         assertEquals(listOf(Message.Bye(Bye.Reason.Disconnected)), partnerApp.byesReceived)
         assertEquals(1, driver.removeGroupCalls)
         assertEquals(LinkStatus.NotConnected(partner.learned()), link.status.value)
+        driver.peers.value = listOf(redmi) // even with the partner in sight
         advanceTimeBy(5 * 60_000L)
         assertTrue(driver.connectCalls.isEmpty()) // doesn't reconnect by itself
+        assertEquals(LinkStatus.NotConnected(partner.learned()), link.status.value)
+
+        link.connectToPartner() // one tap on this phone
+        runCurrent()
+        assertEquals(listOf(redmi.address), driver.connectCalls)
     }
 
     @Test
@@ -569,6 +657,52 @@ class LinkTest {
         driver.group.value = null
         runCurrent()
         assertEquals(expected, link.status.value)
+    }
+
+    @Test
+    fun afterThePartnerDisconnectsThisPhoneListensSoOneTapThereReconnects() = runTest {
+        val partner = saved(s25, Acceptor)
+        val link = link(InMemoryPartnerStore(partner))
+        partnerApp.refuseWith = Bye.Reason.Disconnected
+        driver.formGroupWith(s25, isGroupOwner = false)
+        runCurrent()
+        driver.group.value = null // the partner removed it
+        advanceTimeBy(60_000)
+        val disconnected = LinkStatus.NotConnected(partner.learned(), Reason.PartnerDisconnected)
+        assertEquals(disconnected, link.status.value) // still says so while listening
+        assertTrue(link.discovery.state.value is DiscoveryState.Scanning)
+
+        partnerApp.refuseWith = null
+        driver.formGroupWith(s25, isGroupOwner = false) // they tapped Connect
+        runCurrent()
+        assertEquals(LinkStatus.Connected(partner.learned()), link.status.value)
+    }
+
+    @Test
+    fun listeningAfterThePartnersDisconnectEndsWithTheWindow() = runTest {
+        val partner = saved(s25, Acceptor)
+        val link = link(InMemoryPartnerStore(partner))
+        partnerApp.refuseWith = Bye.Reason.Disconnected
+        driver.formGroupWith(s25, isGroupOwner = false)
+        runCurrent()
+        driver.group.value = null
+        advanceTimeBy(Reconnector.WINDOW_MS + 1)
+        assertEquals(LinkStatus.NotConnected(partner.learned()), link.status.value)
+        assertEquals(DiscoveryState.Idle, link.discovery.state.value)
+    }
+
+    @Test
+    fun noRetriesOnceThePartnerSaysWeAreNotPaired() = runTest {
+        val partner = saved(redmi, Initiator)
+        val link = link(InMemoryPartnerStore(partner))
+        partnerApp.refuseWith = Bye.Reason.NotYourPartner
+        driver.formGroupWith(redmi)
+        runCurrent()
+        driver.group.value = null
+        driver.peers.value = listOf(redmi)
+        advanceTimeBy(60_000)
+        assertTrue(driver.connectCalls.isEmpty())
+        assertEquals(Reason.NoLongerPaired, (link.status.value as LinkStatus.NotConnected).reason)
     }
 
     // ---- Forget ----

@@ -53,7 +53,8 @@ class LinkSession(
                     log("Link service started")
                 }
             }
-            is LinkStatus.Connecting -> idleTimer?.cancel()
+            // Trying to (re)connect: the service must stay up for it (#27).
+            is LinkStatus.Connecting, is LinkStatus.Reconnecting -> idleTimer?.cancel()
             is LinkStatus.NotConnected -> if (running && idleTimer?.isActive != true) {
                 idleTimer = scope.launch {
                     delay(idleStopMs)

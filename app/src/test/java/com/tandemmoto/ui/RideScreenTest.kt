@@ -238,13 +238,20 @@ class RideScreenTest {
     }
 
     @Test
-    fun partnerDisconnectedTapsToConnect() {
+    fun partnerDisconnectedIsNotATapTarget() {
+        // This phone is already listening; only the partner's phone can reconnect (#27).
         showRide(
             RideUiState(connection = ConnectionStatus.PartnerDisconnected, partnerName = "Redmi")
         )
         compose.onNodeWithText(str(R.string.status_partner_disconnected_named, "Redmi"))
             .performClick()
-        assertTrue(connected)
+        assertTrue(!connected && !openedPair)
+    }
+
+    @Test
+    fun reconnectingShowsThePartnersName() {
+        showRide(RideUiState(connection = ConnectionStatus.Reconnecting, partnerName = "Redmi"))
+        compose.onNodeWithText(str(R.string.status_reconnecting_named, "Redmi")).assertExists()
     }
 
     @Test

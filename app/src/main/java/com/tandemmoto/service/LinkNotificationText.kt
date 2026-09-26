@@ -41,6 +41,8 @@ fun LinkStatus.notificationText(): NotificationText = when (this) {
         )
     is LinkStatus.Connecting -> NotificationText(R.string.notification_connecting, partner.name)
     is LinkStatus.Connected -> NotificationText(R.string.notification_connected, partner.name)
+    is LinkStatus.Reconnecting ->
+        NotificationText(R.string.notification_reconnecting, partner.name)
     is LinkStatus.NotConnected -> when (reason) {
         Reason.WifiOff -> NotificationText(
             R.string.notification_wifi_off,
@@ -49,8 +51,12 @@ fun LinkStatus.notificationText(): NotificationText = when (this) {
         // Still in a group: the partner's app may come back on its own.
         Reason.PartnerAppClosed ->
             NotificationText(R.string.notification_partner_app_closed, partner.name)
-        Reason.PartnerDisconnected ->
-            NotificationText(R.string.notification_partner_disconnected, partner.name, reconnect)
+        // This phone is listening; only the partner's phone can reconnect (#27), so no Connect.
+        Reason.PartnerDisconnected -> NotificationText(
+            R.string.notification_partner_disconnected,
+            partner.name,
+            listOf(NotificationAction.Close)
+        )
         // Only the app can fix these (pair again, update): tapping the notification opens it.
         Reason.NoLongerPaired, Reason.UpdateNeeded -> NotificationText(
             R.string.notification_not_connected,

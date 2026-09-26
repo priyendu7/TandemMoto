@@ -50,8 +50,22 @@ persistent command/state socket, auto-reconnect, connection status.
   app was closed ("Open TandemMoto on …"); silence or a broken socket means the phone went away
   ("Not connected"). Android can take ~13 s to drop the group after the other phone's Wi-Fi goes
   off (Redmi), so the channel decides that, not the group.
-- Re-forming a dropped group is auto-reconnect (#27); the channel only reopens the socket while
-  the group exists.
+
+## Auto-reconnect (#27)
+
+- `Reconnector` runs one 2-minute window of attempts: both phones search the whole time (a phone
+  only receives an invitation while discovering); the initiator connects whenever the partner is
+  visible and backs off 1, 2, 4, 8 s after an attempt that forms no group within 15 s; the
+  acceptor never connects. Android never reconnects by itself (spike #22).
+- `Link` starts a window at startup ("Looking for …"), after a drop ("Reconnecting to …"), when
+  Wi-Fi comes back, when the Pair screen closes, and on a tap. After the window: "Not connected ·
+  Tap to connect". Wi-Fi off pauses it without using up the window.
+- A partner that goes silent while Android keeps the group (the Redmi kept a dead one ~13 s) gets
+  that group removed, so a fresh one can form. Removing the active group keeps Android's saved one
+  (no prompt on reconnect).
+- Disconnect turns reconnecting off on this phone until Connect is tapped. The partner, told by
+  `Bye(Disconnected)`, keeps listening for a window, so one tap on the phone that disconnected
+  reconnects both. No retries after "no longer paired", "update needed" or a rejection guess.
 
 Design notes come from the spike: [`docs/spikes/wifi-direct.md`](../../../../../../../docs/spikes/wifi-direct.md).
 

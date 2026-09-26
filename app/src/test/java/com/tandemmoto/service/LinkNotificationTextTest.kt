@@ -37,11 +37,14 @@ class LinkNotificationTextTest {
                 name,
                 listOf(Disconnect)
             ),
+            // Listening: only the partner's phone can reconnect, so no Connect (#27).
             notConnected(Reason.PartnerDisconnected) to NotificationText(
                 R.string.notification_partner_disconnected,
                 name,
-                listOf(Connect, Close)
+                listOf(Close)
             ),
+            LinkStatus.Reconnecting(partner) to
+                NotificationText(R.string.notification_reconnecting, name, listOf(Disconnect)),
             notConnected(Reason.NoLongerPaired) to
                 NotificationText(R.string.notification_not_connected, name, listOf(Close)),
             notConnected(Reason.UpdateNeeded) to

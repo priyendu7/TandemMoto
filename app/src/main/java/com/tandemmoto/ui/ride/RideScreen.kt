@@ -168,8 +168,7 @@ private fun ConnectionSection(
             partnerName = partnerName,
             onClickLabel = stringResource(
                 when (connection) {
-                    ConnectionStatus.NotConnected,
-                    ConnectionStatus.PartnerDisconnected -> R.string.ride_connect_action
+                    ConnectionStatus.NotConnected -> R.string.ride_connect_action
                     ConnectionStatus.WifiOff -> R.string.ride_wifi_action
                     else -> R.string.ride_pair_action
                 }
@@ -178,7 +177,7 @@ private fun ConnectionSection(
                 ConnectionStatus.NotPaired,
                 ConnectionStatus.PairedElsewhere,
                 ConnectionStatus.NoLongerPaired -> onOpenPair
-                ConnectionStatus.NotConnected, ConnectionStatus.PartnerDisconnected -> onConnect
+                ConnectionStatus.NotConnected -> onConnect
                 ConnectionStatus.WifiOff -> onOpenWifiSettings
                 else -> null
             }
