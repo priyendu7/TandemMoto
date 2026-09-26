@@ -36,7 +36,7 @@ TandemMoto solves this in software only, using two Android phones that talk to e
 - Android ↔ Android only, one rider + one pillion (1:1 pairing)
 - Phone-to-phone link over Wi-Fi Direct (no internet/router needed, higher bandwidth + lower latency than Bluetooth Classic)
 - Built-in local music player (own player, owns the media session) with a shared, synced playlist
-- Song files cached locally on both phones **before** playback (one-time transfer, not live streaming) — Wi-Fi Direct's bandwidth also leaves room to revisit live streaming sooner if desired
+- Each song is on a phone **before** it plays there (a file transfer, not live streaming): each phone downloads the partner's songs a few ahead of playback (the song window) and keeps only a small window of them, so storage stays low. Wi-Fi Direct's bandwidth also leaves room to revisit live streaming sooner if desired
 - Play/pause/skip/seek from either phone mirrored to the other over the data link
 - Rider: play/pause via bike's Bluetooth HID remote; audio via wired earphones
 - Pillion: play/pause via in-app screen controls; audio via Bluetooth wireless earbuds (A2DP + HFP)

@@ -80,7 +80,7 @@ Pass thresholds come from the [PRD](PRD.md) §4 and the phase exit criteria in t
 | T2 | Pair + remembered partner | 1 | Tap partner, accept on the other phone; restart both apps | Group forms (the partner accepts Android's prompt the first time only); after restart, reconnects to that partner only. Either phone may be group owner: the first pairing fixes the roles |
 | T3 | Airplane-mode drop | 1 | Airplane mode on one phone for 10 s, then off | Link restores with no taps on either phone (**Phase 1 exit criterion**) |
 | T4 | Range walk-out | 1 | Walk apart until the link drops, then walk back | Reconnects automatically; note the distance at drop |
-| T5 | Song transfer | 2 | Send a 25 MB song; repeat with a mid-transfer link drop | Completes; resumes after the drop; record the time taken |
+| T5 | Song transfer | 2 | Add a 25 MB song on one phone; repeat with a mid-transfer link drop; play through the playlist | Completes and verifies; resumes after the drop; songs inside the window are ready before their turn; record the time taken |
 | T6 | Playback mirror | 3 | Play / pause / skip / seek from each phone | Other phone follows within ~0.5 s |
 | T7 | Handlebar and inline controls | 3 | Press every R1 and W1 button during playback | Each button works on both phones; key codes recorded in the device table |
 | T8 | Mic mode + latency | 4 | Pause → talk both ways; measure the round trip (clap test) | Intercom opens on both phones; round trip under ~300 ms |
