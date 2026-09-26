@@ -84,6 +84,7 @@ class SongTransfers(
     private var lastChunkAt = 0L
     private var watchdog: Job? = null
     private var sending: Job? = null
+    private var sendGeneration = 0
     private var lastInventory: Set<String>? = null
     private val failures = mutableMapOf<String, Int>()
     private val unavailable = mutableSetOf<String>()
@@ -285,8 +286,13 @@ class SongTransfers(
 
     /** The partner asked for one of this phone's songs: stream it (one at a time). */
     private fun serve(request: Message.SongRequest) {
-        sending?.cancel()
+        // Not cancel(): cancelling mid-write interrupts the socket, which closes the whole
+        // transfer connection (seen on the phones). The previous song stops after its current
+        // chunk instead.
+        val generation = ++sendGeneration
+        val previous = sending
         sending = scope.launch {
+            previous?.join()
             val song = library.value.songs.firstOrNull { it.id == request.id }
             val input = song?.let {
                 withContext(io) { runCatching { openSong(it.uri) }.getOrNull() }
@@ -301,7 +307,7 @@ class SongTransfers(
                     withContext(io) { stream.skipFully(request.offset) }
                     var offset = request.offset
                     val buffer = ByteArray(SongChunk.DATA_BYTES)
-                    while (isActive) {
+                    while (isActive && generation == sendGeneration) {
                         val read = withContext(io) { stream.readUpTo(buffer) }
                         if (read <= 0) break
                         val chunk = SongChunk(song.id, offset, song.sizeBytes, buffer.copyOf(read))

@@ -116,6 +116,12 @@ The app runs a foreground service of type **connectedDevice** while the phones a
   3. Lock the screen for a few seconds, unlock: still connected.
   4. Tap **Disconnect** in the notification: it disappears, Home shows *Not connected*.
 
+**Media playback** (from #51): the same service also has the **mediaPlayback** type while music plays. Tick **Media playback** and fill in:
+
+- **Task description** (paste):
+  > TandemMoto plays the rider's and pillion's shared playlist of local songs (files they chose on their phones) while they ride. Playback continues with the screen locked and is controlled from the app, the notification, the lock screen and headset or handlebar buttons. The service is the same one that keeps the phones linked; it shows one notification with the song and the link status, and stops when the music stops and the phones aren't linked.
+- **Demo video** (30–60 s): open Playlist and tap a song; show the notification with ⏮ ⏯ ⏭ and the song; lock the screen and show the lock-screen controls while music plays; pause from the notification.
+
 Phase 4 adds the **microphone** type (intercom) with its own declaration and video.
 
 ### Service account for CI

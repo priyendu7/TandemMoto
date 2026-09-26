@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 /** One row of the Playlist screen. */
@@ -40,7 +42,11 @@ sealed interface PlaylistRow {
         val mine: Boolean = true,
         val onThisPhone: Boolean = true,
         /** Where the song is between the phones (#50); null when not paired. */
-        val badge: SongBadge? = null
+        val badge: SongBadge? = null,
+        /** The player's current song (#51). */
+        val current: Boolean = false,
+        /** This phone can't decode its audio format (#51). */
+        val cantPlay: Boolean = false
     ) : PlaylistRow {
         override val key get() = song.id
     }
@@ -96,23 +102,22 @@ internal fun playlistUi(
     partner: Partner?,
     connected: Boolean,
     fileSlotsLeft: Int,
-    transfers: TransferState = TransferState()
+    transfers: TransferState = TransferState(),
+    currentId: String? = null
 ) = PlaylistUiState(
     rows = ride.songs.mapIndexed { index, entry ->
         val mine = entry.owner == ride.me
         val onThisPhone = library.hasFile(entry.id) || entry.id in transfers.stored
+        val badge = partner?.let {
+            badge(entry.id, index, mine, onThisPhone, connected, transfers)
+        }
         PlaylistRow.Entry(
             song = entry.asSong(),
             missing = mine && entry.id in library.missing,
             mine = mine,
             onThisPhone = onThisPhone,
-            badge = if (partner ==
-                null
-            ) {
-                null
-            } else {
-                badge(entry.id, index, mine, onThisPhone, connected, transfers)
-            }
+            badge = badge,
+            current = entry.id == currentId
         )
     } + library.reading.map { PlaylistRow.Reading(it.uri, it.name) },
     loaded = ride.loaded && library.loaded,
@@ -151,25 +156,47 @@ class PlaylistViewModel(
     private val playlist: RidePlaylist,
     partner: StateFlow<Partner?>,
     linkStatus: StateFlow<LinkStatus>,
-    transfers: StateFlow<TransferState>
+    transfers: StateFlow<TransferState>,
+    currentSong: Flow<String?> = flowOf(null),
+    private val playAt: (Int) -> Unit = {},
+    cantPlay: Flow<Set<String>> = flowOf(emptySet())
 ) : ViewModel() {
+    private val linked = linkStatus.map { it is LinkStatus.Connected }
+
     val uiState: StateFlow<PlaylistUiState> =
-        combine(playlist.state, library.state, partner, linkStatus, transfers) {
-                ride,
-                songs,
-                who,
-                status,
-                moving
-            ->
-            playlistUi(
-                ride,
-                songs,
-                who,
-                status is LinkStatus.Connected,
-                library.fileSlotsLeft,
-                moving
-            )
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, PlaylistUiState())
+        combine(playlist.state, library.state, partner, linked, transfers, ::Inputs)
+            .combine(currentSong) { now, current ->
+                playlistUi(
+                    now.ride,
+                    now.songs,
+                    now.partner,
+                    now.linked,
+                    library.fileSlotsLeft,
+                    now.moving,
+                    current
+                )
+            }.combine(cantPlay) { ui, unplayable ->
+                ui.copy(
+                    rows = ui.rows.map { row ->
+                        if (row is PlaylistRow.Entry && row.song.id in unplayable) {
+                            row.copy(cantPlay = true)
+                        } else {
+                            row
+                        }
+                    }
+                )
+            }.stateIn(viewModelScope, SharingStarted.Eagerly, PlaylistUiState())
+
+    private data class Inputs(
+        val ride: RidePlaylistState,
+        val songs: LibraryState,
+        val partner: Partner?,
+        val linked: Boolean,
+        val moving: TransferState
+    )
+
+    /** A tap on a song: play from there (#51). */
+    fun play(index: Int) = playAt(index)
 
     val summaries: Flow<ImportSummary> = library.summaries
 
@@ -197,7 +224,10 @@ class PlaylistViewModel(
                     app.ridePlaylist,
                     app.link.partner,
                     app.link.status,
-                    app.transfers.state
+                    app.transfers.state,
+                    app.playback.state.map { it.currentId },
+                    app.playback::playAt,
+                    app.playback.state.map { it.cantPlay }
                 )
             }
         }

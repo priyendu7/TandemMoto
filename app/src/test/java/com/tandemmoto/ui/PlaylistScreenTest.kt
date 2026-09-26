@@ -274,6 +274,37 @@ class PlaylistScreenTest {
     }
 
     @Test
+    fun tappingASongPlaysFromThereAndTheCurrentOneIsMarked() {
+        var played = -1
+        compose.setContent {
+            TandemMotoTheme {
+                PlaylistScreen(
+                    state = songs(
+                        PlaylistRow.Entry(alpha, false, current = true),
+                        PlaylistRow.Entry(bravo, false)
+                    ),
+                    onBack = {},
+                    onAddSongs = {},
+                    onAddFolder = {},
+                    onCheckFolders = {},
+                    onRemove = {},
+                    onMove = { _, _ -> },
+                    onPlay = { played = it }
+                )
+            }
+        }
+        compose.onNodeWithText(str(R.string.playlist_now_playing), substring = true).assertExists()
+        compose.onNodeWithText("Bravo").performClick()
+        assertEquals(1, played)
+    }
+
+    @Test
+    fun aSongThisPhoneCantDecodeSaysSo() {
+        show(songs(PlaylistRow.Entry(alpha, false, cantPlay = true)))
+        compose.onNodeWithText(str(R.string.playlist_cant_play)).assertIsDisplayed()
+    }
+
+    @Test
     fun durationsReadLikeAClock() {
         assertEquals("3:45", formatDuration(225_000))
         assertEquals("0:05", formatDuration(5_400))

@@ -3,8 +3,10 @@ package com.tandemmoto.ui
 import com.tandemmoto.link.LinkStatus
 import com.tandemmoto.link.LinkStatus.NotConnected.Reason
 import com.tandemmoto.link.Partner
+import com.tandemmoto.player.PlaybackState
 import com.tandemmoto.ui.components.ConnectionStatus
 import com.tandemmoto.ui.ride.CONNECTED_BLIP_MS
+import com.tandemmoto.ui.ride.PlayerControls
 import com.tandemmoto.ui.ride.RideViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,6 +21,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -97,6 +100,31 @@ class RideViewModelTest {
         vm.onDisconnect()
         assertEquals(1, connects)
         assertEquals(1, disconnects)
+    }
+
+    @Test
+    fun theCardAndButtonsFollowThePlayer() = runTest(dispatcher) {
+        val player = MutableStateFlow(PlaybackState())
+        var toggles = 0
+        val vm = RideViewModel(status, {}, {}, player, PlayerControls(playPause = { toggles++ }))
+        runCurrent()
+        player.value = PlaybackState(
+            hasSongs = true,
+            title = "Ride On",
+            artist = "Band",
+            playWhenReady = true,
+            gettingSong = true
+        )
+        runCurrent()
+        with(vm.uiState.value) {
+            assertEquals("Ride On", nowPlaying)
+            assertEquals("Band", artist)
+            assertTrue(isPlaying)
+            assertTrue(gettingSong)
+            assertTrue(controlsEnabled)
+        }
+        vm.onPlayPause()
+        assertEquals(1, toggles)
     }
 
     @Test

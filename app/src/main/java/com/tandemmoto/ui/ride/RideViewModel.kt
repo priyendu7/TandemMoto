@@ -7,14 +7,15 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.tandemmoto.TandemMotoApp
 import com.tandemmoto.link.LinkStatus
+import com.tandemmoto.player.PlaybackState
 import com.tandemmoto.ui.components.ConnectionStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
 
@@ -26,13 +27,21 @@ import kotlinx.coroutines.flow.transformLatest
 class RideViewModel(
     linkStatus: Flow<LinkStatus>,
     private val connect: () -> Unit,
-    private val disconnect: () -> Unit
+    private val disconnect: () -> Unit,
+    playback: Flow<PlaybackState> = flowOf(PlaybackState()),
+    private val controls: PlayerControls = PlayerControls()
 ) : ViewModel() {
-    private val playback = MutableStateFlow(RideUiState())
-
     val uiState: StateFlow<RideUiState> =
-        combine(playback, linkStatus.holdingConnected()) { state, status ->
-            state.copy(connection = status.toUi(), partnerName = status.partnerName())
+        combine(playback, linkStatus.holdingConnected()) { player, status ->
+            RideUiState(
+                connection = status.toUi(),
+                partnerName = status.partnerName(),
+                nowPlaying = player.title,
+                artist = player.artist,
+                isPlaying = player.playWhenReady,
+                gettingSong = player.gettingSong,
+                hasSongs = player.hasSongs
+            )
         }
             .stateIn(viewModelScope, SharingStarted.Eagerly, RideUiState())
 
@@ -42,23 +51,40 @@ class RideViewModel(
     /** Tapping the connected bar, after confirming: same as the notification's Disconnect. */
     fun onDisconnect() = disconnect()
 
-    // TODO(Phase 3): send play/pause/skip through the MediaSession and mirror them to the partner.
-    fun onPlayPause() = Unit
+    // Local in Phase 2 (#51); Phase 3 mirrors them to the partner.
+    fun onPlayPause() = controls.playPause()
 
-    fun onNext() = Unit
+    fun onNext() = controls.next()
 
-    fun onPrevious() = Unit
+    fun onPrevious() = controls.previous()
 
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                     as TandemMotoApp
-                RideViewModel(app.link.status, app.link::connectToPartner, app::disconnect)
+                RideViewModel(
+                    app.link.status,
+                    app.link::connectToPartner,
+                    app::disconnect,
+                    app.playback.state,
+                    PlayerControls(
+                        app.playback::togglePlay,
+                        app.playback::next,
+                        app.playback::previous
+                    )
+                )
             }
         }
     }
 }
+
+/** The player's buttons, passed in so tests don't need a real player. */
+class PlayerControls(
+    val playPause: () -> Unit = {},
+    val next: () -> Unit = {},
+    val previous: () -> Unit = {}
+)
 
 /** How long a blip away from Connected is held back before it's shown (and announced). */
 const val CONNECTED_BLIP_MS = 1_500L
