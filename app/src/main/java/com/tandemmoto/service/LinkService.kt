@@ -12,19 +12,24 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.provider.Settings
+import androidx.annotation.OptIn
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.session.MediaStyleNotificationHelper
 import com.tandemmoto.R
 import com.tandemmoto.TandemMotoApp
 import com.tandemmoto.diagnostics.AppLog
 import com.tandemmoto.link.LinkStatus
+import com.tandemmoto.player.PlaybackState
 import com.tandemmoto.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
@@ -58,30 +63,35 @@ class LinkService : Service() {
                 app.link.connectToPartner()
                 return START_NOT_STICKY
             }
+            ACTION_PLAY_PAUSE -> {
+                app.playback.togglePlay()
+                return START_NOT_STICKY
+            }
+            ACTION_NEXT -> {
+                app.playback.next()
+                return START_NOT_STICKY
+            }
+            ACTION_PREVIOUS -> {
+                app.playback.previous()
+                return START_NOT_STICKY
+            }
         }
-        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-        } else {
-            0
-        }
-        ServiceCompat.startForeground(
-            this,
-            NOTIFICATION_ID,
-            notification(app.link.status.value),
-            type
-        )
+        goForeground(app.link.status.value, app.playback.state.value)
         if (!updating) updating = true else return START_NOT_STICKY
         scope.launch {
-            // Denied notifications (Android 13+) only hide it; the service keeps running.
-            app.link.status.collect { status ->
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            combine(app.link.status, app.playback.state, ::Pair).collect { (status, playback) ->
+                val types = typesFor(playback)
+                if (types != currentTypes) {
+                    goForeground(status, playback) // the playing state changes the service type
+                } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
                     ContextCompat.checkSelfPermission(
                         this@LinkService,
                         Manifest.permission.POST_NOTIFICATIONS
                     ) == PackageManager.PERMISSION_GRANTED
                 ) {
+                    // Denied notifications (Android 13+) only hide it; the service keeps running.
                     NotificationManagerCompat.from(this@LinkService)
-                        .notify(NOTIFICATION_ID, notification(status))
+                        .notify(NOTIFICATION_ID, notification(status, playback))
                 }
             }
         }
@@ -94,8 +104,44 @@ class LinkService : Service() {
         super.onDestroy()
     }
 
-    private fun notification(status: LinkStatus): android.app.Notification {
+    private var currentTypes = -1
+
+    /** connectedDevice while the link wants it, mediaPlayback while music plays (#51). */
+    private fun typesFor(playback: PlaybackState): Int {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return 0
+        var types = 0
+        if (app.linkSession.linkWanted) {
+            types =
+                types or ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+        }
+        if (playback.playWhenReady) {
+            types =
+                types or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+        }
+        return if (types == 0) ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE else types
+    }
+
+    private fun goForeground(status: LinkStatus, playback: PlaybackState) {
+        currentTypes = typesFor(playback)
+        ServiceCompat.startForeground(
+            this,
+            NOTIFICATION_ID,
+            notification(status, playback),
+            currentTypes
+        )
+    }
+
+    /**
+     * One notification (#51): the song with ⏮ ⏯ ⏭ in media style (and on the lock screen) once
+     * there are songs, plus the link's line and its button (Disconnect, Connect…).
+     */
+    @OptIn(UnstableApi::class)
+    private fun notification(
+        status: LinkStatus,
+        playback: PlaybackState
+    ): android.app.Notification {
         val text = status.notificationText()
+        val linkLine = getString(text.text, text.name)
         val open = PendingIntent.getActivity(
             this,
             0,
@@ -104,20 +150,63 @@ class LinkService : Service() {
         )
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_link)
-            .setContentTitle(getString(R.string.app_name))
-            .setContentText(getString(text.text, text.name))
             .setContentIntent(open)
-        text.actions.forEach { action ->
-            builder.addAction(0, getString(action.label), pendingIntentFor(action))
-        }
-        return builder
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .build()
+        if (playback.hasSongs) {
+            val song = when {
+                playback.gettingSong -> getString(R.string.ride_getting_song)
+                else -> playback.artist
+            }
+            builder
+                .setContentTitle(playback.title ?: getString(R.string.app_name))
+                .setContentText(listOfNotNull(song, linkLine).joinToString(" · "))
+                .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .addAction(
+                    R.drawable.ic_skip_previous,
+                    getString(R.string.ride_previous),
+                    playerIntent(ACTION_PREVIOUS, 10)
+                )
+                .addAction(
+                    if (playback.playWhenReady) R.drawable.ic_pause else R.drawable.ic_play,
+                    getString(
+                        if (playback.playWhenReady) R.string.ride_pause else R.string.ride_play
+                    ),
+                    playerIntent(ACTION_PLAY_PAUSE, 11)
+                )
+                .addAction(
+                    R.drawable.ic_skip_next,
+                    getString(R.string.ride_next),
+                    playerIntent(ACTION_NEXT, 12)
+                )
+            text.actions.forEach { action ->
+                builder.addAction(action.icon, getString(action.label), pendingIntentFor(action))
+            }
+            builder.setStyle(
+                MediaStyleNotificationHelper.MediaStyle(app.playback.session)
+                    .setShowActionsInCompactView(0, 1, 2)
+            )
+        } else {
+            builder
+                .setContentTitle(getString(R.string.app_name))
+                .setContentText(linkLine)
+                .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            text.actions.forEach { action ->
+                builder.addAction(action.icon, getString(action.label), pendingIntentFor(action))
+            }
+        }
+        return builder.build()
     }
+
+    private fun playerIntent(action: String, code: Int) = PendingIntent.getService(
+        this,
+        code,
+        Intent(this, LinkService::class.java).setAction(action),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+    )
 
     private fun pendingIntentFor(action: NotificationAction): PendingIntent {
         val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
@@ -157,6 +246,9 @@ class LinkService : Service() {
         const val NOTIFICATION_ID = 40
         const val ACTION_DISCONNECT = "com.tandemmoto.action.DISCONNECT"
         const val ACTION_CONNECT = "com.tandemmoto.action.CONNECT"
+        const val ACTION_PLAY_PAUSE = "com.tandemmoto.action.PLAY_PAUSE"
+        const val ACTION_NEXT = "com.tandemmoto.action.NEXT"
+        const val ACTION_PREVIOUS = "com.tandemmoto.action.PREVIOUS"
 
         fun start(context: Context) {
             try {

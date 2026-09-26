@@ -99,11 +99,15 @@
     <string name="ride_open_settings">Settings</string>
     <string name="ride_now_playing">Now playing</string>
     <string name="ride_no_song">No song selected</string>
+    <string name="ride_getting_song">Getting song…</string>
+    <string name="ride_getting_song_named">Getting song from %1$s…</string>
     <string name="ride_play">Play</string>
     <string name="ride_pause">Pause</string>
     <string name="ride_next">Next song</string>
     <string name="ride_previous">Previous song</string>
-    <string name="ride_controls_disabled_hint">Pair with your partner to control music together.</string>
+    <string name="ride_controls_disabled_hint">Add songs in Playlist to start playing.</string>
+    <string name="playlist_now_playing">Now playing</string>
+    <string name="playlist_play_from_here">Play from here</string>
     <string name="ride_intercom_on">Intercom on: you can talk to each other</string>
     <string name="ride_intercom_off">Intercom turns on when the music is paused</string>
 

@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree
 import androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -51,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -60,6 +62,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -107,7 +110,8 @@ fun PlaylistRoute(
         onAddFolder = { pickFolder.launch(null) },
         onCheckFolders = viewModel::checkFolders,
         onRemove = viewModel::remove,
-        onMove = viewModel::move
+        onMove = viewModel::move,
+        onPlay = viewModel::play
     )
 }
 
@@ -141,7 +145,8 @@ fun PlaylistScreen(
     onCheckFolders: () -> Unit,
     onRemove: (String) -> Unit,
     onMove: (Int, Int) -> Unit,
-    snackbar: SnackbarHostState = remember { SnackbarHostState() }
+    snackbar: SnackbarHostState = remember { SnackbarHostState() },
+    onPlay: (Int) -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -161,7 +166,7 @@ fun PlaylistScreen(
             when {
                 !state.loaded -> Unit
                 state.rows.isEmpty() -> EmptyPlaylist(onAddSongs, onAddFolder)
-                else -> SongList(state, onRemove, onMove)
+                else -> SongList(state, onRemove, onMove, onPlay)
             }
         }
     }
@@ -261,7 +266,8 @@ private fun EmptyPlaylist(onAddSongs: () -> Unit, onAddFolder: () -> Unit) {
 private fun SongList(
     state: PlaylistUiState,
     onRemove: (String) -> Unit,
-    onMove: (Int, Int) -> Unit
+    onMove: (Int, Int) -> Unit,
+    onPlay: (Int) -> Unit
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -350,6 +356,7 @@ private fun SongList(
                         partnerName = state.partnerName,
                         onRemove = { onRemove(row.song.id) },
                         onMove = onMove,
+                        onPlay = { onPlay(index) },
                         modifier = Modifier.graphicsLayer {
                             translationY = if (dragging == row.key) offset else 0f
                         },
@@ -472,6 +479,7 @@ private fun SongRow(
     partnerName: String?,
     onRemove: () -> Unit,
     onMove: (Int, Int) -> Unit,
+    onPlay: () -> Unit,
     modifier: Modifier,
     handle: Modifier
 ) {
@@ -488,8 +496,9 @@ private fun SongRow(
         song.artist ?: stringResource(R.string.playlist_unknown_artist),
         formatDuration(song.durationMs)
     )
+    val playFromHere = stringResource(R.string.playlist_play_from_here)
     ListItem(
-        modifier = modifier.semantics {
+        modifier = modifier.clickable(onClickLabel = playFromHere, onClick = onPlay).semantics {
             // Reordering without dragging, for TalkBack.
             customActions = listOfNotNull(
                 CustomAccessibilityAction(moveTop) {
@@ -538,7 +547,13 @@ private fun SongRow(
                 )
             }
         },
-        headlineContent = { Text(song.title) },
+        headlineContent = {
+            Text(
+                song.title,
+                color = if (entry.current) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                fontWeight = if (entry.current) FontWeight.Bold else null
+            )
+        },
         supportingContent = {
             if (entry.missing) {
                 Text(
@@ -546,7 +561,9 @@ private fun SongRow(
                     color = MaterialTheme.colorScheme.error
                 )
             } else {
-                Text("$details · ${whereItIs(entry, partnerName)}")
+                val playing = stringResource(R.string.playlist_now_playing)
+                val line = "$details · ${whereItIs(entry, partnerName)}"
+                Text(if (entry.current) "$playing · $line" else line)
             }
         },
         trailingContent = {

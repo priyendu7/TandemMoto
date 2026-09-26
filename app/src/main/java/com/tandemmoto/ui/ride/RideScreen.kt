@@ -147,7 +147,7 @@ fun RideScreen(
                     .fillMaxSize()
                     .padding(24.dp)
             ) {
-                NowPlayingCard(state.nowPlaying)
+                NowPlayingCard(state)
                 Spacer(Modifier.weight(1f))
                 PlaybackControls(state, onPlayPause, onNext, onPrevious)
                 IntercomIndicator(state.intercomOn)
@@ -258,7 +258,7 @@ private fun ConnectionSection(
 }
 
 @Composable
-private fun NowPlayingCard(nowPlaying: String?) {
+private fun NowPlayingCard(state: RideUiState) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text(
@@ -267,9 +267,23 @@ private fun NowPlayingCard(nowPlaying: String?) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = nowPlaying ?: stringResource(R.string.ride_no_song),
+                text = state.nowPlaying ?: stringResource(R.string.ride_no_song),
                 style = MaterialTheme.typography.headlineMedium
             )
+            val below = when {
+                state.gettingSong ->
+                    state.partnerName
+                        ?.let { stringResource(R.string.ride_getting_song_named, it) }
+                        ?: stringResource(R.string.ride_getting_song)
+                else -> state.artist
+            }
+            if (below != null && state.nowPlaying != null) {
+                Text(
+                    text = below,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

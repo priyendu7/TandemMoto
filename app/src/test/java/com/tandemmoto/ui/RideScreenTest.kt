@@ -40,6 +40,7 @@ class RideScreenTest {
     private var connected = false
     private var openedWifi = false
     private var disconnected = false
+    private var playPaused = false
 
     private fun nearby(status: PermissionStatus, sdk: Int = 34, approximateOnly: Boolean = false) =
         PermissionsState(sdk, mapOf(AppPermission.NEARBY to status), approximateOnly)
@@ -57,7 +58,7 @@ class RideScreenTest {
                 onConnect = { connected = true },
                 onDisconnect = { disconnected = true },
                 onOpenWifiSettings = { openedWifi = true },
-                onPlayPause = {},
+                onPlayPause = { playPaused = true },
                 onNext = {},
                 onPrevious = {},
                 onOpenPlaylist = {},
@@ -105,7 +106,7 @@ class RideScreenTest {
     }
 
     @Test
-    fun controlsDisabledWhenNotPaired() {
+    fun controlsDisabledWithoutSongs() {
         showRide(RideUiState())
         listOf(R.string.ride_previous, R.string.ride_play, R.string.ride_next).forEach {
             compose.onNodeWithContentDescription(str(it)).assertIsNotEnabled()
@@ -116,7 +117,13 @@ class RideScreenTest {
 
     @Test
     fun connectedAndPausedEnablesControlsAndIntercom() {
-        showRide(RideUiState(connection = ConnectionStatus.Connected, nowPlaying = "Highway Song"))
+        showRide(
+            RideUiState(
+                connection = ConnectionStatus.Connected,
+                nowPlaying = "Highway Song",
+                hasSongs = true
+            )
+        )
         compose.onNodeWithContentDescription(str(R.string.ride_play)).assertIsEnabled()
         compose.onNodeWithText("Highway Song").assertExists()
         compose.onNodeWithText(str(R.string.ride_intercom_on)).assertExists()
@@ -124,7 +131,9 @@ class RideScreenTest {
 
     @Test
     fun playingShowsPauseAndIntercomOff() {
-        showRide(RideUiState(connection = ConnectionStatus.Connected, isPlaying = true))
+        showRide(
+            RideUiState(connection = ConnectionStatus.Connected, isPlaying = true, hasSongs = true)
+        )
         compose.onNodeWithContentDescription(str(R.string.ride_pause)).assertIsEnabled()
         compose.onNodeWithText(str(R.string.ride_intercom_off)).assertExists()
     }
@@ -296,6 +305,32 @@ class RideScreenTest {
         compose.onNodeWithText(str(R.string.ride_stop_title, "Redmi")).assertExists()
         compose.onNodeWithText(str(R.string.ride_stop_action)).performClick()
         assertTrue(disconnected)
+    }
+
+    @Test
+    fun songsPlayWithoutThePartner() {
+        // Phase 2 (#51): each phone plays locally, linked or not.
+        showRide(RideUiState(hasSongs = true, nowPlaying = "Solo Song", artist = "Band"))
+        compose.onNodeWithContentDescription(
+            str(R.string.ride_play)
+        ).assertIsEnabled().performClick()
+        assertTrue(playPaused)
+        compose.onNodeWithText("Band").assertExists()
+    }
+
+    @Test
+    fun aSongNotHereYetSaysItsBeingFetchedFromThePartner() {
+        showRide(
+            RideUiState(
+                hasSongs = true,
+                nowPlaying = "Their Song",
+                artist = "Band",
+                gettingSong = true,
+                partnerName = "Redmi"
+            )
+        )
+        compose.onNodeWithText(str(R.string.ride_getting_song_named, "Redmi")).assertExists()
+        compose.onNodeWithText("Band").assertDoesNotExist()
     }
 
     @Test

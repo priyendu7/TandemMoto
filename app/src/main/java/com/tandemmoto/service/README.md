@@ -4,7 +4,13 @@ Foreground service keeping the Wi-Fi Direct link (and later mic mode and playbac
 screen off. Without one, the S25 closed the socket within a second of the screen locking (spike
 #22).
 
-## Link service (#40)
+## Link service (#40), and music (#51)
+
+- Since #51 the same service also runs while music plays (type `mediaPlayback`), with **one**
+  notification: media style with the song, ⏮ ⏯ ⏭ and the link's line and button, or just the link
+  when there are no songs. `LinkSession` runs it while the link wants it **or** music plays, so
+  Disconnect doesn't stop the music.
+
 
 - `LinkService`: type `connectedDevice` (allowed by `CHANGE_WIFI_STATE`), no work of its own. Its
   notification ("Connection" channel, low importance, silent) follows the link status and has a

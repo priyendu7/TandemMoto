@@ -102,16 +102,17 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     // Command channel messages (state/Message.kt): JSON, see state/README.md for why not protobuf.
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    // Local player (#51): ExoPlayer and a MediaSession for the lock screen, notification and
+    // headset buttons. The foreground service and its notification stay our own (service/).
+    implementation("androidx.media3:media3-exoplayer:1.11.1")
+    implementation("androidx.media3:media3-session:1.11.1")
     implementation("androidx.navigation:navigation-compose:2.10.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
-    // TODO(Phase 0-2): add and pin —
-    //   androidx.media3 (exoplayer + session), androidx.room,
-    //   Wi-Fi P2P uses the platform android.net.wifi.p2p APIs directly (no extra dep),
-    //   Opus + WebRTC AudioProcessing via native/AAR deps (see docs/DEVELOPMENT_PLAN.md §2).
+    // TODO(Phase 4): Opus + WebRTC AudioProcessing via native/AAR deps (DEVELOPMENT_PLAN.md §2).
 
     testImplementation("junit:junit:4.13.2")
     // Virtual time for coroutine logic such as the 30 s discovery window (link/PeerDiscovery).

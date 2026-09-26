@@ -115,6 +115,41 @@ class LinkSessionTest {
     }
 
     @Test
+    fun playingMusicKeepsItRunningWithoutTheLink() = runTest {
+        // #51: one service for the link and the music.
+        val playing = MutableStateFlow(false)
+        val session =
+            LinkSession(status, backgroundScope, { starts++ }, { stops++ }, playing = playing)
+        session.begin()
+        runCurrent()
+        playing.value = true
+        runCurrent()
+        assertEquals(1, starts)
+        assertTrue(session.running)
+        assertFalse(session.linkWanted)
+        playing.value = false
+        runCurrent()
+        assertEquals(1, stops)
+    }
+
+    @Test
+    fun disconnectLeavesTheMusicPlaying() = runTest {
+        val playing = MutableStateFlow(true)
+        val session =
+            LinkSession(status, backgroundScope, { starts++ }, { stops++ }, playing = playing)
+        session.begin()
+        runCurrent()
+        set(LinkStatus.Connected(partner))
+        session.stopNow()
+        runCurrent()
+        assertEquals(0, stops) // still playing
+        assertTrue(session.running)
+        playing.value = false
+        runCurrent()
+        assertEquals(1, stops)
+    }
+
+    @Test
     fun nothingToStopWhenItNeverStarted() = runTest {
         val session = session()
         set(LinkStatus.NotPaired)

@@ -1,26 +1,27 @@
 package com.tandemmoto.service
 
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import com.tandemmoto.R
 import com.tandemmoto.link.LinkStatus
 import com.tandemmoto.link.LinkStatus.NotConnected.Reason
 
 /** A button on the link notification. */
-enum class NotificationAction(@StringRes val label: Int) {
+enum class NotificationAction(@StringRes val label: Int, @DrawableRes val icon: Int) {
     /** Drop the link and stop the service. */
-    Disconnect(R.string.notification_disconnect),
+    Disconnect(R.string.notification_disconnect, R.drawable.ic_close),
 
     /** Still searching: stop trying (same as Disconnect underneath). */
-    Stop(R.string.notification_stop),
+    Stop(R.string.notification_stop, R.drawable.ic_close),
 
     /** Try to reach the partner again. */
-    Connect(R.string.notification_connect),
+    Connect(R.string.notification_connect, R.drawable.ic_notification_link),
 
     /** Open the Wi-Fi panel. */
-    TurnOnWifi(R.string.notification_turn_on_wifi),
+    TurnOnWifi(R.string.notification_turn_on_wifi, R.drawable.ic_notification_link),
 
     /** Not connected anyway: just stop the service (same as Disconnect underneath). */
-    Close(R.string.notification_close)
+    Close(R.string.notification_close, R.drawable.ic_close)
 }
 
 /**

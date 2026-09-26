@@ -26,6 +26,8 @@
          Console foreground-service declaration: see docs/RELEASING.md. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <!-- The same service while music plays (#51); needs its own Play declaration. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <!-- Optional (Android 13+): shows the service's notification; it runs without it. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -56,7 +58,7 @@
         <service
             android:name=".service.LinkService"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
+            android:foregroundServiceType="connectedDevice|mediaPlayback" />
 
         <!-- Shares the diagnostic log export only when the user asks (Settings → Export). -->
         <provider

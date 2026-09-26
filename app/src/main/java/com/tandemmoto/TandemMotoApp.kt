@@ -13,11 +13,13 @@ import com.tandemmoto.library.JsonFileLibraryStore
 import com.tandemmoto.library.Library
 import com.tandemmoto.link.AndroidDiscoveryPreconditions
 import com.tandemmoto.link.AndroidWifiP2pDriver
+import com.tandemmoto.link.ChannelState
 import com.tandemmoto.link.DataStorePartnerStore
 import com.tandemmoto.link.InstallId
 import com.tandemmoto.link.Link
 import com.tandemmoto.link.LowLatencyWifiLock
 import com.tandemmoto.link.SocketFrameTransport
+import com.tandemmoto.player.Playback
 import com.tandemmoto.playlist.JsonFileRidePlaylistStore
 import com.tandemmoto.playlist.PlaylistSync
 import com.tandemmoto.playlist.RidePlaylist
@@ -32,6 +34,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 
 private val Context.partnerDataStore by preferencesDataStore(name = "partner")
 private val Context.identityDataStore by preferencesDataStore(name = "identity")
@@ -56,11 +61,12 @@ class TandemMotoApp : Application() {
     lateinit var windowSettings: WindowSettingsStore
         private set
 
-    /**
-     * The current song's place in the ride playlist, which the song window follows. The player
-     * (#51) moves it; until then it's the first song.
-     */
+    /** The current song's place in the ride playlist; the player moves it, the window follows. */
     val currentSongIndex = MutableStateFlow(0)
+
+    /** The local player (#51). */
+    lateinit var playback: Playback
+        private set
 
     /** Runs the foreground service while the phones are linked. */
     lateinit var linkSession: LinkSession
@@ -115,6 +121,7 @@ class TandemMotoApp : Application() {
             log = { AppLog.i("Playlist", it) }
         ).start()
         windowSettings = WindowSettingsStore(this)
+        val partnerSongs = SongStore(File(filesDir, "partner_songs"))
         transfers = SongTransfers(
             playlist = ridePlaylist.state,
             library = library.state,
@@ -127,19 +134,35 @@ class TandemMotoApp : Application() {
             connection = TransferConnection(SocketFrameTransport(), appScope) {
                 AppLog.i("Transfer", it)
             },
-            store = SongStore(File(filesDir, "partner_songs")),
+            store = partnerSongs,
             freeBytes = { StatFs(filesDir.path).availableBytes },
             openSong = { uri -> contentResolver.openInputStream(uri.toUri()) },
             scope = appScope,
             log = { AppLog.i("Transfer", it) }
         )
         transfers.start()
+        playback = Playback(
+            context = this,
+            scope = appScope,
+            songs = ridePlaylist.state.map {
+                it.songs
+            }.stateIn(appScope, SharingStarted.Eagerly, emptyList()),
+            library = library.state,
+            downloaded = { id -> partnerSongs.file(id).takeIf { it.isFile } },
+            linked = { link.channel.state.value is ChannelState.Open },
+            storageFull = { transfers.state.value.storageFull },
+            currentIndex = currentSongIndex,
+            log = { AppLog.i("Player", it) }
+        )
+        playback.start()
         linkSession = LinkSession(
             status = link.status,
             scope = appScope,
             start = { LinkService.start(this) },
             stop = { LinkService.stop(this) },
-            log = { AppLog.i("Service", it) }
+            log = { AppLog.i("Service", it) },
+            playing = playback.state.map { it.playWhenReady }
+                .stateIn(appScope, SharingStarted.Eagerly, false)
         )
         linkSession.begin()
     }
