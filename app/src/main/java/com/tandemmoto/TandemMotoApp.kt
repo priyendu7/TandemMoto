@@ -63,6 +63,12 @@ class TandemMotoApp : Application() {
         )
         linkSession.begin()
     }
+
+    /** The user's Disconnect, from Home or the notification: drop the link and the service. */
+    fun disconnect() {
+        link.disconnect()
+        linkSession.stopNow()
+    }
 }
 
 /** The shared [Link], for view models: `(application as TandemMotoApp).link`. */

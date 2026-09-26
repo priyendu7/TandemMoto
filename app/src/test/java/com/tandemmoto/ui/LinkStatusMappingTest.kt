@@ -18,6 +18,7 @@ class LinkStatusMappingTest {
         val expected = mapOf(
             LinkStatus.NotPaired to ConnectionStatus.NotPaired,
             LinkStatus.Connecting(partner) to ConnectionStatus.Searching,
+            LinkStatus.Reconnecting(partner) to ConnectionStatus.Reconnecting,
             LinkStatus.Connected(partner) to ConnectionStatus.Connected,
             LinkStatus.NotConnected(partner) to ConnectionStatus.NotConnected,
             LinkStatus.NotConnected(partner, Reason.MaybePairedElsewhere) to

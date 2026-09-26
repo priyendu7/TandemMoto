@@ -3,6 +3,7 @@ package com.tandemmoto.ui.ride
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.tandemmoto.TandemMotoApp
 import com.tandemmoto.link
 import com.tandemmoto.link.LinkStatus
 import com.tandemmoto.ui.components.ConnectionStatus
@@ -29,6 +30,9 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
     /** "Not connected · Tap to connect". */
     fun onConnect() = link.connectToPartner()
 
+    /** Tapping the connected bar, after confirming: same as the notification's Disconnect. */
+    fun onDisconnect() = (getApplication<Application>() as TandemMotoApp).disconnect()
+
     // TODO(Phase 3): send play/pause/skip through the MediaSession and mirror them to the partner.
     fun onPlayPause() = Unit
 
@@ -40,6 +44,7 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
 internal fun LinkStatus.partnerName(): String? = when (this) {
     LinkStatus.NotPaired -> null
     is LinkStatus.Connecting -> partner.name
+    is LinkStatus.Reconnecting -> partner.name
     is LinkStatus.Connected -> partner.name
     is LinkStatus.NotConnected -> partner.name
 }
@@ -47,6 +52,7 @@ internal fun LinkStatus.partnerName(): String? = when (this) {
 internal fun LinkStatus.toUi(): ConnectionStatus = when (this) {
     LinkStatus.NotPaired -> ConnectionStatus.NotPaired
     is LinkStatus.Connecting -> ConnectionStatus.Searching
+    is LinkStatus.Reconnecting -> ConnectionStatus.Reconnecting
     is LinkStatus.Connected -> ConnectionStatus.Connected
     is LinkStatus.NotConnected -> when (reason) {
         LinkStatus.NotConnected.Reason.Unreachable -> ConnectionStatus.NotConnected

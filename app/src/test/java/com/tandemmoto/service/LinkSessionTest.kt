@@ -85,6 +85,17 @@ class LinkSessionTest {
     }
 
     @Test
+    fun reconnectingKeepsItRunning() = runTest {
+        session()
+        set(LinkStatus.Connected(partner))
+        set(LinkStatus.NotConnected(partner))
+        advanceTimeBy(LinkSession.IDLE_STOP_MS - 1_000)
+        set(LinkStatus.Reconnecting(partner))
+        advanceTimeBy(LinkSession.IDLE_STOP_MS)
+        assertEquals(0, stops)
+    }
+
+    @Test
     fun disconnectStopsAtOnce() = runTest {
         val session = session()
         set(LinkStatus.Connected(partner))

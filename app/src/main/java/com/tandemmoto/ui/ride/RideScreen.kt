@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -17,10 +18,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -73,6 +78,7 @@ fun RideRoute(
         onRequestPermission = permissions.request,
         onOpenPair = onOpenPair,
         onConnect = viewModel::onConnect,
+        onDisconnect = viewModel::onDisconnect,
         onOpenWifiSettings = context::openWifiSettings,
         onPlayPause = viewModel::onPlayPause,
         onNext = viewModel::onNext,
@@ -90,6 +96,7 @@ fun RideScreen(
     onRequestPermission: (AppPermission) -> Unit,
     onOpenPair: () -> Unit,
     onConnect: () -> Unit,
+    onDisconnect: () -> Unit,
     onOpenWifiSettings: () -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
@@ -130,6 +137,7 @@ fun RideScreen(
                 onRequestPermission,
                 onOpenPair,
                 onConnect,
+                onDisconnect,
                 onOpenWifiSettings
             )
             Column(
@@ -160,17 +168,42 @@ private fun ConnectionSection(
     onRequestPermission: (AppPermission) -> Unit,
     onOpenPair: () -> Unit,
     onConnect: () -> Unit,
+    onDisconnect: () -> Unit,
     onOpenWifiSettings: () -> Unit
 ) {
+    // Disconnect asks first: a stray tap while riding shouldn't drop the link.
+    var confirmDisconnect by rememberSaveable { mutableStateOf(false) }
+    if (confirmDisconnect) {
+        val name = partnerName ?: stringResource(R.string.ride_your_partner)
+        AlertDialog(
+            onDismissRequest = { confirmDisconnect = false },
+            title = { Text(stringResource(R.string.ride_disconnect_title, name)) },
+            text = { Text(stringResource(R.string.ride_disconnect_body, name)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDisconnect = false
+                    onDisconnect()
+                }) { Text(stringResource(R.string.notification_disconnect)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDisconnect = false }) {
+                    Text(stringResource(R.string.pair_cancel))
+                }
+            }
+        )
+    }
     if (permissions.isGranted(AppPermission.NEARBY)) {
         ConnectionStatusBar(
             status = connection,
             partnerName = partnerName,
             onClickLabel = stringResource(
                 when (connection) {
-                    ConnectionStatus.NotConnected,
-                    ConnectionStatus.PartnerDisconnected -> R.string.ride_connect_action
+                    ConnectionStatus.NotConnected -> R.string.ride_connect_action
                     ConnectionStatus.WifiOff -> R.string.ride_wifi_action
+                    ConnectionStatus.Connected,
+                    ConnectionStatus.Searching,
+                    ConnectionStatus.Reconnecting,
+                    ConnectionStatus.PartnerAppClosed -> R.string.ride_disconnect_action
                     else -> R.string.ride_pair_action
                 }
             ),
@@ -178,8 +211,14 @@ private fun ConnectionSection(
                 ConnectionStatus.NotPaired,
                 ConnectionStatus.PairedElsewhere,
                 ConnectionStatus.NoLongerPaired -> onOpenPair
-                ConnectionStatus.NotConnected, ConnectionStatus.PartnerDisconnected -> onConnect
+                ConnectionStatus.NotConnected -> onConnect
                 ConnectionStatus.WifiOff -> onOpenWifiSettings
+                ConnectionStatus.Connected,
+                ConnectionStatus.Searching,
+                ConnectionStatus.Reconnecting,
+                ConnectionStatus.PartnerAppClosed -> {
+                    { confirmDisconnect = true }
+                }
                 else -> null
             }
         )
@@ -290,6 +329,7 @@ private fun RidePreview(state: RideUiState, permissions: PermissionsState = near
         onRequestPermission = {},
         onOpenPair = {},
         onConnect = {},
+        onDisconnect = {},
         onOpenWifiSettings = {},
         onPlayPause = {},
         onNext = {},

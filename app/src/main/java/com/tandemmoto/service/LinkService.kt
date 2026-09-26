@@ -50,8 +50,7 @@ class LinkService : Service() {
         when (intent?.action) {
             ACTION_DISCONNECT -> {
                 AppLog.i(TAG, "Disconnect tapped")
-                app.link.disconnect()
-                app.linkSession.stopNow()
+                app.disconnect()
                 return START_NOT_STICKY
             }
             ACTION_CONNECT -> {

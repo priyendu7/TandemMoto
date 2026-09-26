@@ -133,7 +133,7 @@ class PeerDiscovery(
         _state.value = DiscoveryState.Scanning(sorted(driver.peers.value))
         log(
             if (continuous) {
-                "Searching until the screen closes"
+                "Searching continuously"
             } else {
                 "Searching for ${scanDurationMs / 1_000} s"
             }

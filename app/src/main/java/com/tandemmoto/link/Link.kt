@@ -34,13 +34,16 @@ sealed interface LinkStatus {
 
     data class Connecting(val partner: Partner) : LinkStatus
 
+    /** The link dropped; both phones are trying to get it back (#27). */
+    data class Reconnecting(val partner: Partner) : LinkStatus
+
     /** The partner's app answered on the command channel (#25), not just "in a group". */
     data class Connected(val partner: Partner) : LinkStatus
 
     data class NotConnected(val partner: Partner, val reason: Reason = Reason.Unreachable) :
         LinkStatus {
         enum class Reason {
-            /** No group with the partner (not found, or the link dropped). */
+            /** No group with the partner, and not trying: the window ended, or Disconnect. */
             Unreachable,
 
             /**
@@ -61,7 +64,10 @@ sealed interface LinkStatus {
             /** This phone's Wi-Fi is off. */
             WifiOff,
 
-            /** The partner tapped Disconnect. */
+            /**
+             * The partner tapped Disconnect. This phone keeps listening for a window so one tap on
+             * the partner's phone reconnects both.
+             */
             PartnerDisconnected
         }
     }
@@ -94,10 +100,12 @@ class Link(
     private val appVersion: String,
     nanoTime: () -> Long = System::nanoTime,
     keepAwake: (Boolean) -> Unit = {},
-    private val connectWindowMs: Long = PeerDiscovery.SCAN_DURATION_MS,
+    reconnectWindowMs: Long = Reconnector.WINDOW_MS,
     private val inviteTimeoutMs: Long = INVITE_TIMEOUT_MS
 ) {
     val discovery = PeerDiscovery(driver, preconditions, scope, log = log)
+
+    private val reconnector = Reconnector(driver, discovery, log, reconnectWindowMs)
 
     val channel = CommandChannel(transport, scope, nanoTime, log, keepAwake)
 
@@ -112,8 +120,17 @@ class Link(
 
     private var pairScreenOpen = false
     private var inviteJob: Job? = null
-    private var connectJob: Job? = null
+    private var reconnectJob: Job? = null
     private var groupWithPartner = false
+
+    /**
+     * This phone wants a link with the partner: on after pairing, at start and on Connect; off
+     * after Disconnect, or when the partner's app refused us for good (not paired, update).
+     */
+    private var wantsLink = false
+
+    /** The group is being removed by us so a fresh one can form (a vanished partner). */
+    private var removingToReconnect = false
     private var myInstallId = ""
 
     /** Set right after a group with the partner forms; a quick silent drop suggests rejection. */
@@ -128,7 +145,7 @@ class Link(
     private var appTimer: Job? = null
     private var guardJob: Job? = null
 
-    /** Loads the saved partner, watches the group and channel, and makes one connection attempt. */
+    /** Loads the saved partner, watches the group, channel and Wi-Fi, and starts connecting. */
     fun start() {
         scope.launch {
             myInstallId = installId()
@@ -140,7 +157,10 @@ class Link(
             scope.launch { channel.state.collect { onChannelState(it) } }
             scope.launch { driver.enabled.collect { onWifi(it) } }
             scope.launch { driver.group.collect { onGroup(it) } }
-            connectToPartner()
+            if (_partner.value != null) {
+                wantsLink = true
+                reconnect(Attempt.First)
+            }
         }
     }
 
@@ -149,6 +169,7 @@ class Link(
     /** The Pair screen listens for as long as it's open, so an invitation can always arrive. */
     fun openPairScreen() {
         pairScreenOpen = true
+        reconnectJob?.cancel() // the Pair screen does its own searching
         if (_pairing.value !is PairingState.Inviting) discovery.start(continuous = true)
     }
 
@@ -156,6 +177,7 @@ class Link(
         pairScreenOpen = false
         if (_pairing.value is PairingState.Inviting) cancelInvite() else discovery.stop()
         if (_pairing.value !is PairingState.Inviting) _pairing.value = PairingState.Idle
+        reconnect(Attempt.First)
     }
 
     fun invite(device: NearbyDevice) {
@@ -194,7 +216,7 @@ class Link(
         discovery.pause() // not stop(): see PeerDiscovery.pause
         log("Inviting ${device.logId}")
         inviteJob = scope.launch {
-            val result = connectWithRetry(device.address)
+            val result = driver.connectWithRetry(device.address, log)
             when (result) {
                 P2pResult.Ok -> Unit
                 P2pResult.Busy -> return@launch failPairing(PairingState.Failed.Reason.Busy)
@@ -207,18 +229,6 @@ class Link(
         }
     }
 
-    /** connect(), retried a few times: Android can refuse it briefly (BUSY/ERROR). */
-    private suspend fun connectWithRetry(address: String): P2pResult {
-        var result = P2pResult.Error
-        repeat(CONNECT_ATTEMPTS) { attempt ->
-            result = driver.connect(address)
-            if (result == P2pResult.Ok || result == P2pResult.Unsupported) return result
-            log("Connect refused: $result (attempt ${attempt + 1})")
-            if (attempt < CONNECT_ATTEMPTS - 1) delay(CONNECT_RETRY_MS)
-        }
-        return result
-    }
-
     private fun failPairing(reason: PairingState.Failed.Reason) {
         _pairing.value = PairingState.Failed(reason)
         log("Pairing failed: $reason")
@@ -227,47 +237,47 @@ class Link(
 
     // ---- Connecting to the saved partner ----
 
-    /**
-     * One attempt of [connectWindowMs] at forming the group; the channel takes it from there.
-     * Automatic retrying after a drop is #27.
-     */
+    /** Why a window of attempts starts; decides what Home shows meanwhile. */
+    private enum class Attempt {
+        /** Start, a tap, the Pair screen closing: "Looking for …". */
+        First,
+
+        /** After a drop: "Reconnecting to …". */
+        Drop,
+
+        /** The partner tapped Disconnect: keep showing that, but listen so they can reconnect. */
+        Listen
+    }
+
+    /** Tap to connect (Home, notification): want the link again, with a fresh window. */
     fun connectToPartner() {
+        wantsLink = true
+        reconnectJob?.cancel()
+        reconnect(Attempt.First)
+    }
+
+    /** Starts a window of attempts ([Reconnector]) unless one is running or can't help. */
+    private fun reconnect(attempt: Attempt) {
         val partner = _partner.value ?: return
-        if (groupWithPartner || connectJob?.isActive == true) return
-        if (_pairing.value is PairingState.Inviting) return
+        if (!wantsLink || groupWithPartner || reconnectJob?.isActive == true) return
+        if (pairScreenOpen || _pairing.value is PairingState.Inviting) return
         if (driver.enabled.value == false) {
             _status.value = LinkStatus.NotConnected(partner, LinkStatus.NotConnected.Reason.WifiOff)
             return
         }
-        connectJob = scope.launch {
+        reconnectJob = scope.launch {
             // The group watcher may already have found an existing group with the partner.
             if (groupWithPartner) return@launch
-            _status.value = LinkStatus.Connecting(partner)
-            log("Connecting to ${partner.logId} as ${partner.role}")
-            if (driver.group.value == null) driver.cancelConnect()
-            discovery.start()
-            val connected = withTimeoutOrNull(connectWindowMs) {
-                // Acceptors just stay visible; Android accepts the saved group without a prompt.
-                val initiating = if (partner.role == Partner.Role.Initiator) {
-                    launch {
-                        val found = driver.peers.first { peers -> peers.any(partner::matches) }
-                            .first(partner::matches)
-                        if (driver.group.value == null) {
-                            log("Partner visible, connecting")
-                            discovery.pause() // see PeerDiscovery.pause
-                            connectWithRetry(found.address)
-                        }
-                    }
-                } else {
-                    null
-                }
-                driver.group.first { group -> group?.peer?.let(partner::matches) == true }
-                initiating?.cancel()
+            when (attempt) {
+                Attempt.First -> _status.value = LinkStatus.Connecting(partner)
+                Attempt.Drop -> _status.value = LinkStatus.Reconnecting(partner)
+                Attempt.Listen -> Unit
             }
-            discovery.stop()
-            if (connected == null && !groupWithPartner) {
+            log("Connecting to ${partner.logId} as ${partner.role} ($attempt)")
+            val reached = reconnector.run(partner)
+            if (!reached && !groupWithPartner) {
                 _status.value = LinkStatus.NotConnected(partner, unreachable())
-                log("Partner not reached")
+                log("Partner not reached; stopped trying")
             }
         }
     }
@@ -278,8 +288,9 @@ class Link(
      */
     fun disconnect() {
         val partner = _partner.value ?: return
+        wantsLink = false
+        reconnectJob?.cancel()
         scope.launch {
-            connectJob?.cancel()
             discovery.stop()
             channel.send(Bye(Bye.Reason.Disconnected))
             channel.close()
@@ -293,9 +304,11 @@ class Link(
 
     fun forgetPartner() {
         val partner = _partner.value ?: return
+        wantsLink = false
+        reconnectJob?.cancel()
         scope.launch {
             inviteJob?.cancel()
-            connectJob?.cancel()
+            discovery.stop()
             channel.send(Bye(Bye.Reason.NotYourPartner)) // so its app knows, if it's listening
             channel.close()
             removingOurselves = true
@@ -337,6 +350,8 @@ class Link(
         _pairing.value = PairingState.Paired(partner)
         groupWithPartner = false // a new partner: start over
         channelGroup = null
+        wantsLink = true
+        reconnectJob?.cancel()
         log("Paired with ${partner.logId} as $role")
         onGroupWithPartner(partner, group)
     }
@@ -414,11 +429,14 @@ class Link(
             ChannelState.Idle -> appTimer?.cancel()
             ChannelState.Opening -> if (channel.lastLoss == ChannelLoss.Vanished) {
                 // The phone went quiet or the socket broke: it's gone (Wi-Fi off, out of range),
-                // not a closed app. The channel keeps retrying while Android keeps the group,
-                // which on the Redmi took ~13 s to notice (#25 phone test).
+                // not a closed app. Android can keep the dead group for a while (~13 s on the
+                // Redmi), so remove it and reconnect with a fresh one. Removing the active group
+                // keeps Android's saved one: reconnecting after Disconnect didn't prompt (#40).
                 appTimer?.cancel()
-                _status.value = LinkStatus.NotConnected(partner, unreachable())
-                log("Partner went away")
+                _status.value = LinkStatus.Reconnecting(partner)
+                log("Partner went away; removing the dead group to reconnect")
+                removingToReconnect = true
+                scope.launch { driver.removeGroup() }
             } else {
                 if (_status.value is LinkStatus.Connected) {
                     _status.value = LinkStatus.Connecting(partner)
@@ -438,6 +456,8 @@ class Link(
                     Bye.Reason.Disconnected -> LinkStatus.NotConnected.Reason.PartnerDisconnected
                     else -> LinkStatus.NotConnected.Reason.NoLongerPaired
                 }
+                // Retrying can't fix these; the partner's Disconnect is answered by listening.
+                if (reason != LinkStatus.NotConnected.Reason.PartnerDisconnected) wantsLink = false
                 _status.value = LinkStatus.NotConnected(partner, reason)
             }
         }
@@ -482,6 +502,8 @@ class Link(
     private fun onGroupRemoved() {
         val wasOurs = removingOurselves
         removingOurselves = false
+        val toReconnect = removingToReconnect
+        removingToReconnect = false
         channel.close()
         channelGroup = null
         appTimer?.cancel()
@@ -495,7 +517,11 @@ class Link(
                 current == LinkStatus.NotConnected.Reason.UpdateNeeded ||
                 current == LinkStatus.NotConnected.Reason.PartnerDisconnected -> current
             driver.enabled.value == false -> LinkStatus.NotConnected.Reason.WifiOff
-            justFormed && !wasOurs && !answeredInGroup && partner.role == Partner.Role.Initiator ->
+            justFormed &&
+                !wasOurs &&
+                !toReconnect &&
+                !answeredInGroup &&
+                partner.role == Partner.Role.Initiator ->
                 LinkStatus.NotConnected.Reason.MaybePairedElsewhere
             else -> unreachable()
         }
@@ -507,6 +533,13 @@ class Link(
                 "Group removed"
             }
         )
+        when (reason) {
+            LinkStatus.NotConnected.Reason.PartnerDisconnected -> reconnect(Attempt.Listen)
+            // A rejection guess: retrying would just be rejected again.
+            LinkStatus.NotConnected.Reason.MaybePairedElsewhere -> Unit
+            LinkStatus.NotConnected.Reason.Unreachable -> reconnect(Attempt.Drop)
+            else -> Unit // Wi-Fi off waits for Wi-Fi; not paired / update: nothing to retry
+        }
     }
 
     /** Not connected for no reason the partner gave: this phone's Wi-Fi, or just not reached. */
@@ -517,16 +550,17 @@ class Link(
     }
 
     /**
-     * Wi-Fi off stops any attempt and says so; back on, it's an ordinary "Not connected" (tap to
-     * connect; reconnecting by itself is #27). A group, if any, is removed by Android.
+     * Wi-Fi off pauses any attempt instead of burning retries, and says so; back on, reconnecting
+     * starts again with a fresh window (if this phone still wants the link). A group, if any, is
+     * removed by Android.
      */
     private fun onWifi(enabled: Boolean?) {
         val partner = _partner.value ?: return
         when (enabled) {
             false -> {
                 // Only our own attempt's search; the Pair screen shows Wi-Fi off itself.
-                if (connectJob?.isActive == true) {
-                    connectJob?.cancel()
+                if (reconnectJob?.isActive == true) {
+                    reconnectJob?.cancel()
                     discovery.stop()
                 }
                 _status.value =
@@ -538,8 +572,9 @@ class Link(
                 if (status is LinkStatus.NotConnected &&
                     status.reason == LinkStatus.NotConnected.Reason.WifiOff
                 ) {
-                    _status.value = LinkStatus.NotConnected(partner)
                     log("Wi-Fi back on")
+                    _status.value = LinkStatus.NotConnected(partner)
+                    reconnect(Attempt.Drop)
                 }
             }
             null -> Unit
