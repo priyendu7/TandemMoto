@@ -17,6 +17,7 @@ import com.tandemmoto.library.Song
 import com.tandemmoto.ui.playlist.PlaylistRow
 import com.tandemmoto.ui.playlist.PlaylistScreen
 import com.tandemmoto.ui.playlist.PlaylistUiState
+import com.tandemmoto.ui.playlist.Sharing
 import com.tandemmoto.ui.playlist.formatDuration
 import com.tandemmoto.ui.theme.TandemMotoTheme
 import org.junit.Assert.assertEquals
@@ -90,6 +91,51 @@ class PlaylistScreenTest {
         show(songs(PlaylistRow.Entry(alpha, false), PlaylistRow.Entry(bravo, false)))
         compose.onNodeWithText("1").assertIsDisplayed()
         compose.onNodeWithText("2").assertIsDisplayed()
+    }
+
+    @Test
+    fun rowsSayWhoseSongItIsOnceThereIsAPartner() {
+        show(
+            PlaylistUiState(
+                rows = listOf(
+                    PlaylistRow.Entry(alpha, false, mine = true),
+                    PlaylistRow.Entry(bravo, false, mine = false, onThisPhone = true),
+                    PlaylistRow.Entry(charlie, false, mine = false, onThisPhone = false)
+                ),
+                loaded = true,
+                sharing = Sharing.Shared,
+                partnerName = "Redmi"
+            )
+        )
+        val from = str(R.string.playlist_from_named, "Redmi")
+        compose.onNodeWithText(
+            "Artist · 3:45 · ${str(R.string.playlist_added_by_you)}"
+        ).assertIsDisplayed()
+        compose.onNodeWithText(
+            "${str(
+                R.string.playlist_unknown_artist
+            )} · 1:01 · $from · ${str(R.string.playlist_on_this_phone)}"
+        ).assertIsDisplayed()
+        compose.onNodeWithText("Band · 1:02:03 · $from").assertIsDisplayed()
+        compose.onNodeWithText(
+            str(R.string.playlist_sharing_shared_named, "Redmi")
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun theHeaderSaysWhenChangesWillSync() {
+        show(
+            songs(
+                PlaylistRow.Entry(alpha, false)
+            ).copy(sharing = Sharing.WaitingToSync, partnerName = "Redmi")
+        )
+        compose.onNodeWithText(str(R.string.playlist_sharing_waiting)).assertIsDisplayed()
+    }
+
+    @Test
+    fun withoutAPartnerItSaysToPair() {
+        show(songs(PlaylistRow.Entry(alpha, false)))
+        compose.onNodeWithText(str(R.string.playlist_sharing_not_paired)).assertIsDisplayed()
     }
 
     @Test

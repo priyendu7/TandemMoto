@@ -93,7 +93,7 @@ class FakePartnerApp(
                         pingsReceived++
                         if (answersPings) end.sendMessage(Message.Pong(message.sentAtNanos))
                     }
-                    is Message.Pong -> Unit
+                    is Message.Pong, is Message.PlaylistEntries -> Unit
                     is Message.Bye -> {
                         byesReceived += message
                         end.close()

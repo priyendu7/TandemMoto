@@ -1,5 +1,6 @@
 package com.tandemmoto.state
 
+import com.tandemmoto.playlist.RideEntry
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -37,6 +38,14 @@ sealed interface Message {
 
     @Serializable
     data class Pong(val sentAtNanos: Long) : Message
+
+    /**
+     * Ride playlist songs (#49): on every connection each phone sends its whole list in batches
+     * (a frame is at most 64 KB), [complete] on the last; after an edit, just the changed songs.
+     */
+    @Serializable
+    data class PlaylistEntries(val entries: List<RideEntry>, val complete: Boolean = false) :
+        Message
 
     /** The sender is closing the connection, and why. */
     @Serializable
@@ -88,6 +97,8 @@ object MessageCodec {
             is Message.Ping -> json.encodeToJsonElement(Message.Ping.serializer(), message)
             is Message.Pong -> json.encodeToJsonElement(Message.Pong.serializer(), message)
             is Message.Bye -> json.encodeToJsonElement(Message.Bye.serializer(), message)
+            is Message.PlaylistEntries ->
+                json.encodeToJsonElement(Message.PlaylistEntries.serializer(), message)
         }
         val envelope = buildJsonObject {
             put("v", version)
@@ -111,6 +122,7 @@ object MessageCodec {
                 PING -> payload.decodeAs(Message.Ping.serializer())
                 PONG -> payload.decodeAs(Message.Pong.serializer())
                 BYE -> payload.decodeAs(Message.Bye.serializer())
+                PLAYLIST -> payload.decodeAs(Message.PlaylistEntries.serializer())
                 else -> return Envelope.Unknown(version, type)
             }
             return Envelope.Known(version, seq, message)
@@ -135,10 +147,12 @@ object MessageCodec {
         is Message.Ping -> PING
         is Message.Pong -> PONG
         is Message.Bye -> BYE
+        is Message.PlaylistEntries -> PLAYLIST
     }
 
     private const val HELLO = "hello"
     private const val PING = "ping"
     private const val PONG = "pong"
     private const val BYE = "bye"
+    private const val PLAYLIST = "playlist"
 }

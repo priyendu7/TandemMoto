@@ -347,6 +347,7 @@ private fun SongList(
                         entry = row,
                         index = index,
                         songCount = songCount,
+                        partnerName = state.partnerName,
                         onRemove = { onRemove(row.song.id) },
                         onMove = onMove,
                         modifier = Modifier.graphicsLayer {
@@ -404,12 +405,39 @@ private fun PlaylistTotals(state: PlaylistUiState) {
     } else {
         stringResource(R.string.playlist_length_minutes, totalMinutes)
     }
-    Text(
-        text = "$count · $length",
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-    )
+    val sharing = when (state.sharing) {
+        Sharing.NotPaired -> stringResource(R.string.playlist_sharing_not_paired)
+        Sharing.Shared -> state.partnerName?.let {
+            stringResource(R.string.playlist_sharing_shared_named, it)
+        }
+            ?: stringResource(R.string.playlist_sharing_shared)
+        Sharing.WaitingToSync -> stringResource(R.string.playlist_sharing_waiting)
+    }
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Text(
+            text = "$count · $length",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = sharing,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** "Added by you", "From Priyendu's S25 · On this phone"… (just "On this phone" when unpaired). */
+@Composable
+private fun whereItIs(entry: PlaylistRow.Entry, partnerName: String?): String {
+    val onThisPhone = stringResource(R.string.playlist_on_this_phone)
+    return when {
+        partnerName == null -> onThisPhone
+        entry.mine -> stringResource(R.string.playlist_added_by_you)
+        entry.onThisPhone -> stringResource(R.string.playlist_from_named, partnerName) + " · " +
+            onThisPhone
+        else -> stringResource(R.string.playlist_from_named, partnerName)
+    }
 }
 
 @Composable
@@ -426,6 +454,7 @@ private fun SongRow(
     entry: PlaylistRow.Entry,
     index: Int,
     songCount: Int,
+    partnerName: String?,
     onRemove: () -> Unit,
     onMove: (Int, Int) -> Unit,
     modifier: Modifier,
@@ -502,7 +531,7 @@ private fun SongRow(
                     color = MaterialTheme.colorScheme.error
                 )
             } else {
-                Text("$details · ${stringResource(R.string.playlist_on_this_phone)}")
+                Text("$details · ${whereItIs(entry, partnerName)}")
             }
         },
         trailingContent = {
