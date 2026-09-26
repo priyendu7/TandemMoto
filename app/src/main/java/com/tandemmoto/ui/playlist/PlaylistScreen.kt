@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree
 import androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,11 +47,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -68,6 +71,8 @@ import com.tandemmoto.library.Song
 import com.tandemmoto.ui.components.BackTopBar
 import com.tandemmoto.ui.theme.TandemMotoTheme
 import kotlin.math.abs
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @Composable
@@ -247,7 +252,9 @@ private fun EmptyPlaylist(onAddSongs: () -> Unit, onAddFolder: () -> Unit) {
 
 /**
  * The songs, reorderable by dragging a row's handle: the row follows the finger and swaps with a
- * neighbour once it's dragged past half of that neighbour; the move is saved on release.
+ * neighbour once it's dragged past half of that neighbour; the move is saved on release. Held near
+ * the top or bottom edge, the list scrolls by itself, faster closer to the edge, so a song can go
+ * from 100th to 1st in one drag (phone test on #48).
  */
 @Composable
 private fun SongList(
@@ -257,12 +264,59 @@ private fun SongList(
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val edgeZone = with(LocalDensity.current) { AUTO_SCROLL_EDGE.toPx() }
+    val maxStep = with(LocalDensity.current) { AUTO_SCROLL_MAX_STEP.toPx() }
     var order by remember { mutableStateOf(state.rows) }
     var dragging by remember { mutableStateOf<String?>(null) }
     var dragStart by remember { mutableIntStateOf(-1) }
     var offset by remember { mutableFloatStateOf(0f) }
+    var autoScroll by remember { mutableStateOf<Job?>(null) }
     if (dragging == null) order = state.rows
     val songCount = state.songCount
+
+    /** Swaps the dragged row with its neighbour once it's past half of it. */
+    fun swapIfPastNeighbour() {
+        val current = order.indexOfFirst { it.key == dragging }
+        val items = listState.layoutInfo.visibleItemsInfo
+        val me = items.firstOrNull { it.index == current } ?: return
+        val target = if (offset > 0) {
+            items.firstOrNull { it.index == current + 1 }
+        } else {
+            items.firstOrNull { it.index == current - 1 }
+        }
+        if (target == null || target.index >= songCount || abs(offset) <= target.size / 2) return
+        // A list keeps its scroll anchored to the first visible row; swapping that row would
+        // scroll with it and throw the drag off (phone test on #48). Pin it.
+        val first = listState.firstVisibleItemIndex
+        if (current == first || target.index == first) {
+            val firstOffset = listState.firstVisibleItemScrollOffset
+            scope.launch { listState.scrollToItem(first, firstOffset) }
+        }
+        order = order.toMutableList().apply { add(target.index, removeAt(current)) }
+        offset += if (offset > 0) -me.size.toFloat() else me.size.toFloat()
+    }
+
+    /** Pixels to scroll this frame: negative near the top edge, positive near the bottom. */
+    fun edgeStep(): Float {
+        val info = listState.layoutInfo
+        val me = info.visibleItemsInfo.firstOrNull { it.key == dragging } ?: return 0f
+        val top = me.offset + offset
+        val bottom = top + me.size
+        val nearTop = info.viewportStartOffset + edgeZone - top
+        val nearBottom = bottom - (info.viewportEndOffset - edgeZone)
+        return when {
+            nearTop > 0 -> -maxStep * (nearTop / edgeZone).coerceAtMost(1f)
+            nearBottom > 0 -> maxStep * (nearBottom / edgeZone).coerceAtMost(1f)
+            else -> 0f
+        }
+    }
+
+    fun endDrag() {
+        autoScroll?.cancel()
+        autoScroll = null
+        dragging = null
+        offset = 0f
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         PlaylistTotals(state)
@@ -286,61 +340,30 @@ private fun SongList(
                                     dragging = row.key
                                     dragStart = order.indexOfFirst { it.key == row.key }
                                     offset = 0f
+                                    autoScroll = scope.launch {
+                                        while (isActive) {
+                                            withFrameNanos { }
+                                            val step = edgeStep()
+                                            if (step != 0f) {
+                                                // The row stays under the finger as the list moves.
+                                                offset += listState.scrollBy(step)
+                                                swapIfPastNeighbour()
+                                            }
+                                        }
+                                    }
                                 },
                                 onDragEnd = {
                                     val end = order.indexOfFirst { it.key == dragging }
-                                    if (dragStart >= 0 &&
-                                        end >= 0 &&
-                                        end != dragStart
-                                    ) {
+                                    if (dragStart >= 0 && end >= 0 && end != dragStart) {
                                         onMove(dragStart, end)
                                     }
-                                    dragging = null
-                                    offset = 0f
+                                    endDrag()
                                 },
-                                onDragCancel = {
-                                    dragging = null
-                                    offset = 0f
-                                },
+                                onDragCancel = { endDrag() },
                                 onDrag = { change, amount ->
                                     change.consume()
                                     offset += amount.y
-                                    val current = order.indexOfFirst { it.key == dragging }
-                                    val items = listState.layoutInfo.visibleItemsInfo
-                                    val me =
-                                        items.firstOrNull { it.index == current }
-                                            ?: return@detectDragGestures
-                                    val target = when {
-                                        offset > 0 -> items.firstOrNull { it.index == current + 1 }
-                                        else -> items.firstOrNull { it.index == current - 1 }
-                                    }
-                                    if (target != null &&
-                                        target.index < songCount &&
-                                        abs(offset) > target.size / 2
-                                    ) {
-                                        // A list keeps its scroll anchored to the first visible row;
-                                        // swapping that row would scroll with it and throw the drag
-                                        // off (phone test on #48: couldn't drag to the top). Pin it.
-                                        val first = listState.firstVisibleItemIndex
-                                        if (current == first || target.index == first) {
-                                            val firstOffset = listState.firstVisibleItemScrollOffset
-                                            scope.launch {
-                                                listState.scrollToItem(first, firstOffset)
-                                            }
-                                        }
-                                        order =
-                                            order.toMutableList().apply {
-                                                add(target.index, removeAt(current))
-                                            }
-                                        offset +=
-                                            if (offset >
-                                                0
-                                            ) {
-                                                -me.size.toFloat()
-                                            } else {
-                                                me.size.toFloat()
-                                            }
-                                    }
+                                    swapIfPastNeighbour()
                                 }
                             )
                         }
@@ -392,8 +415,11 @@ private fun SongRow(
 ) {
     val song = entry.song
     var menu by remember { mutableStateOf(false) }
+    val moveTop = stringResource(R.string.playlist_move_top)
     val moveUp = stringResource(R.string.playlist_move_up)
     val moveDown = stringResource(R.string.playlist_move_down)
+    val moveBottom = stringResource(R.string.playlist_move_bottom)
+    val last = songCount - 1
     val remove = stringResource(R.string.playlist_remove)
     val details = stringResource(
         R.string.playlist_song_details,
@@ -404,6 +430,11 @@ private fun SongRow(
         modifier = modifier.semantics {
             // Reordering without dragging, for TalkBack.
             customActions = listOfNotNull(
+                CustomAccessibilityAction(moveTop) {
+                    onMove(index, 0)
+                    true
+                }
+                    .takeIf { index > 1 },
                 CustomAccessibilityAction(moveUp) {
                     onMove(index, index - 1)
                     true
@@ -413,7 +444,12 @@ private fun SongRow(
                     onMove(index, index + 1)
                     true
                 }
-                    .takeIf { index < songCount - 1 },
+                    .takeIf { index < last },
+                CustomAccessibilityAction(moveBottom) {
+                    onMove(index, last)
+                    true
+                }
+                    .takeIf { index < last - 1 },
                 CustomAccessibilityAction(remove) {
                     onRemove()
                     true
@@ -470,16 +506,16 @@ private fun SongRow(
                     )
                 }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    if (index > 0) {
-                        DropdownMenuItem(text = { Text(moveUp) }, onClick = {
+                    // Top and bottom only where they differ from up and down.
+                    listOfNotNull(
+                        (moveTop to 0).takeIf { index > 1 },
+                        (moveUp to index - 1).takeIf { index > 0 },
+                        (moveDown to index + 1).takeIf { index < last },
+                        (moveBottom to last).takeIf { index < last - 1 }
+                    ).forEach { (label, to) ->
+                        DropdownMenuItem(text = { Text(label) }, onClick = {
                             menu = false
-                            onMove(index, index - 1)
-                        })
-                    }
-                    if (index < songCount - 1) {
-                        DropdownMenuItem(text = { Text(moveDown) }, onClick = {
-                            menu = false
-                            onMove(index, index + 1)
+                            onMove(index, to)
                         })
                     }
                     DropdownMenuItem(text = { Text(remove) }, onClick = {
@@ -506,6 +542,10 @@ internal fun formatDuration(ms: Long): String {
 }
 
 private const val FEW_FILE_SLOTS = 50
+
+/** Holding a dragged song this close to an edge scrolls the list, up to this far per frame. */
+private val AUTO_SCROLL_EDGE = 72.dp
+private val AUTO_SCROLL_MAX_STEP = 20.dp
 
 @Preview(showBackground = true)
 @Composable

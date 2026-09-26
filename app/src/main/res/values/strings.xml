@@ -128,7 +128,9 @@
     <string name="playlist_add_folder">Add a folder</string>
     <string name="playlist_check_folders">Check folders for new songs</string>
     <string name="playlist_more">More options for %1$s</string>
+    <string name="playlist_move_top">Move to top</string>
     <string name="playlist_move_up">Move up</string>
+    <string name="playlist_move_bottom">Move to bottom</string>
     <string name="playlist_move_down">Move down</string>
     <string name="playlist_remove">Remove</string>
     <string name="playlist_drag">Drag to reorder</string>

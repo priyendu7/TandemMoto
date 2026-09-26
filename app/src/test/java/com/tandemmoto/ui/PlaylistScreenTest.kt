@@ -140,6 +140,27 @@ class PlaylistScreenTest {
     }
 
     @Test
+    fun moveToTopAndBottomAppearWhereTheyDifferFromUpAndDown() {
+        show(
+            songs(
+                PlaylistRow.Entry(alpha, false),
+                PlaylistRow.Entry(bravo, false),
+                PlaylistRow.Entry(charlie, false),
+                PlaylistRow.Entry(alpha.copy(id = "d", title = "Delta"), false)
+            )
+        )
+        compose.onNodeWithContentDescription(str(R.string.playlist_more, "Charlie")).performClick()
+        compose.onNodeWithText(str(R.string.playlist_move_top)).performClick()
+        compose.onNodeWithContentDescription(str(R.string.playlist_more, "Bravo")).performClick()
+        compose.onNodeWithText(str(R.string.playlist_move_bottom)).performClick()
+        assertEquals(listOf(2 to 0, 1 to 3), moves)
+
+        // Second from the top: "Move up" already goes to the top, so no "Move to top".
+        compose.onNodeWithContentDescription(str(R.string.playlist_more, "Bravo")).performClick()
+        compose.onNodeWithText(str(R.string.playlist_move_top)).assertDoesNotExist()
+    }
+
+    @Test
     fun durationsReadLikeAClock() {
         assertEquals("3:45", formatDuration(225_000))
         assertEquals("0:05", formatDuration(5_400))
