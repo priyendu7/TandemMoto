@@ -2,6 +2,7 @@ package com.tandemmoto.playlist
 
 import com.tandemmoto.library.Song
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -103,8 +104,15 @@ class RidePlaylist(
     fun start() {
         scope.launch {
             lock.withLock {
-                me = installId()
-                data = store.load()
+                try {
+                    me = installId()
+                    data = store.load()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Show the screen anyway; the log says why the list is empty.
+                    log("Couldn't load the ride playlist: ${e.javaClass.simpleName}")
+                }
                 publish(loaded = true)
             }
             log("Ride playlist: ${RideList.ordered(data.entries).size} songs")

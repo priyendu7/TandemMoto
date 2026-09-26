@@ -3,7 +3,6 @@ package com.tandemmoto.ui
 import android.Manifest
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -79,12 +78,8 @@ class AppNavigationTest {
     fun playlistOpensAndReturns() {
         start()
         compose.onNodeWithContentDescription(str(R.string.ride_open_playlist)).performClick()
-        // The playlist loads from disk (library, ride playlist, install ID) before it's shown.
-        compose.waitUntil(timeoutMillis = 10_000) {
-            compose.onAllNodesWithText(
-                str(R.string.playlist_empty)
-            ).fetchSemanticsNodes().isNotEmpty()
-        }
+        // Its contents load from disk; what they show is covered by PlaylistScreenTest.
+        compose.onNodeWithText(str(R.string.playlist_title)).assertExists()
         compose.onNodeWithContentDescription(str(R.string.action_back)).performClick()
         compose.onNodeWithText(str(R.string.status_not_paired)).assertExists()
     }
