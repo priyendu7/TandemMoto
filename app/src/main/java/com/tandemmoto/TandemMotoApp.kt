@@ -6,6 +6,9 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.tandemmoto.diagnostics.AppLog
 import com.tandemmoto.diagnostics.LogLevel
 import com.tandemmoto.diagnostics.RollingFileLog
+import com.tandemmoto.library.AndroidSongSource
+import com.tandemmoto.library.JsonFileLibraryStore
+import com.tandemmoto.library.Library
 import com.tandemmoto.link.AndroidDiscoveryPreconditions
 import com.tandemmoto.link.AndroidWifiP2pDriver
 import com.tandemmoto.link.DataStorePartnerStore
@@ -26,6 +29,10 @@ private val Context.identityDataStore by preferencesDataStore(name = "identity")
 class TandemMotoApp : Application() {
     /** The app's single Wi-Fi Direct link, shared by Home, Pair, Settings (and later the service). */
     lateinit var link: Link
+        private set
+
+    /** This phone's songs (#48). */
+    lateinit var library: Library
         private set
 
     /** Runs the foreground service while the phones are linked. */
@@ -54,6 +61,13 @@ class TandemMotoApp : Application() {
             keepAwake = LowLatencyWifiLock(this)::hold
         )
         link.start()
+        library = Library(
+            source = AndroidSongSource(this),
+            store = JsonFileLibraryStore(File(filesDir, "library/my_songs.json")),
+            scope = appScope,
+            log = { AppLog.i("Library", it) }
+        )
+        library.start()
         linkSession = LinkSession(
             status = link.status,
             scope = appScope,

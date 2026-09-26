@@ -121,7 +121,45 @@
 
     <!-- Playlist -->
     <string name="playlist_title">Playlist</string>
-    <string name="playlist_empty">Songs you add will sync to your partner\'s phone. Coming soon.</string>
+    <string name="playlist_empty">No songs yet</string>
+    <string name="playlist_empty_hint">Add songs from your phone, or a whole folder of music. They stay where they are: nothing is copied.</string>
+    <string name="playlist_add">Add</string>
+    <string name="playlist_add_songs">Add songs</string>
+    <string name="playlist_add_folder">Add a folder</string>
+    <string name="playlist_check_folders">Check folders for new songs</string>
+    <string name="playlist_more">More options for %1$s</string>
+    <string name="playlist_move_up">Move up</string>
+    <string name="playlist_move_down">Move down</string>
+    <string name="playlist_remove">Remove</string>
+    <string name="playlist_drag">Drag to reorder</string>
+    <string name="playlist_unknown_artist">Unknown artist</string>
+    <string name="playlist_reading">Reading…</string>
+    <string name="playlist_on_this_phone">On this phone</string>
+    <string name="playlist_file_missing">File missing</string>
+    <string name="playlist_song_details">%1$s · %2$s</string>
+    <string name="playlist_already_there_one">Already in the playlist</string>
+    <string name="playlist_no_songs_in_folder">No songs found in that folder</string>
+    <string name="playlist_folder_refused">Couldn\'t open that folder</string>
+    <plurals name="playlist_add_songs_left">
+        <item quantity="one">About %d more single file; add a folder for more</item>
+        <item quantity="other">About %d more single files; add a folder for more</item>
+    </plurals>
+    <plurals name="playlist_added">
+        <item quantity="one">Added %d song</item>
+        <item quantity="other">Added %d songs</item>
+    </plurals>
+    <plurals name="playlist_already_there">
+        <item quantity="one">%d already in the playlist</item>
+        <item quantity="other">%d already in the playlist</item>
+    </plurals>
+    <plurals name="playlist_unreadable">
+        <item quantity="one">%d couldn\'t be read</item>
+        <item quantity="other">%d couldn\'t be read</item>
+    </plurals>
+    <plurals name="playlist_over_limit">
+        <item quantity="one">%d not added: too many single files, add a folder instead</item>
+        <item quantity="other">%d not added: too many single files, add a folder instead</item>
+    </plurals>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
