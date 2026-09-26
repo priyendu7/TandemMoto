@@ -78,6 +78,17 @@ class LibraryTest {
     }
 
     @Test
+    fun pickingTheSameFileAgainSaysItsAlreadyThere() = runTest {
+        // Phone test on #48: it said "Added 0 songs".
+        source.file("a", "Alpha")
+        val library = library()
+        summaryOf(library) { library.addFiles(listOf("a")) }
+        val summary = summaryOf(library) { library.addFiles(listOf("a")) }
+        assertEquals(ImportSummary(added = 0, alreadyThere = 1, unreadable = 0), summary)
+        assertEquals(setOf("a"), source.held) // still held for the song that's there
+    }
+
+    @Test
     fun unreadableFilesAreReportedAndReleased() = runTest {
         source.files["bad"] = null
         source.file("a", "Alpha")

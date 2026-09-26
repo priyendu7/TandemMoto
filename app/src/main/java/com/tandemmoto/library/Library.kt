@@ -90,23 +90,19 @@ class Library(
     fun addFiles(uris: List<String>) {
         if (uris.isEmpty()) return
         scope.launch {
+            val picked = uris.distinct()
             val fresh = changes.withLock {
-                uris.distinct().filter { uri ->
-                    data.songs.none {
-                        it.uri ==
-                            uri
-                    }
-                }
+                picked.filter { uri -> data.songs.none { it.uri == uri } }
             }
-            val slots = fileSlotsLeft
-            val accepted = fresh.take(slots)
+            val accepted = fresh.take(fileSlotsLeft)
             val kept = accepted.filter(source::keepAccess)
             import(
                 kept,
                 folder = null,
                 overLimit = fresh.size - accepted.size,
-                refused =
-                accepted.size - kept.size
+                refused = accepted.size - kept.size,
+                // Picking the very same file again: it's already there (phone test on #48).
+                alreadyThere = picked.size - fresh.size
             )
         }
     }
@@ -205,13 +201,14 @@ class Library(
         uris: List<String>,
         folder: String?,
         overLimit: Int = 0,
-        refused: Int = 0
+        refused: Int = 0,
+        alreadyThere: Int = 0
     ) {
         val pending =
             withContext(reading) { uris.map { PendingSong(it, source.displayName(it) ?: "") } }
         _state.update { it.copy(reading = it.reading + pending) }
         var added = 0
-        var alreadyThere = 0
+        var duplicates = alreadyThere
         var unreadable = refused
         coroutineScope {
             val reads = uris.map { uri ->
@@ -230,7 +227,7 @@ class Library(
                             if (folder == null) source.releaseAccess(uri)
                         }
                         Duplicates.findIn(data.songs, song) != null -> {
-                            alreadyThere++
+                            duplicates++
                             if (folder == null) source.releaseAccess(uri)
                         }
                         else -> {
@@ -252,17 +249,10 @@ class Library(
             }
         }
         log(
-            "Added $added songs ($alreadyThere already there, $unreadable unreadable, $overLimit over the limit)"
+            "Added $added songs ($duplicates already there, $unreadable unreadable, $overLimit over the limit)"
         )
         _summaries.emit(
-            ImportSummary(
-                added,
-                alreadyThere,
-                unreadable,
-                overLimit,
-                fromFolder =
-                folder != null
-            )
+            ImportSummary(added, duplicates, unreadable, overLimit, fromFolder = folder != null)
         )
     }
 

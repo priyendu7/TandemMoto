@@ -9,10 +9,12 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -42,6 +44,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,6 +68,7 @@ import com.tandemmoto.library.Song
 import com.tandemmoto.ui.components.BackTopBar
 import com.tandemmoto.ui.theme.TandemMotoTheme
 import kotlin.math.abs
+import kotlinx.coroutines.launch
 
 @Composable
 fun PlaylistRoute(
@@ -252,6 +256,7 @@ private fun SongList(
     onMove: (Int, Int) -> Unit
 ) {
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     var order by remember { mutableStateOf(state.rows) }
     var dragging by remember { mutableStateOf<String?>(null) }
     var dragStart by remember { mutableIntStateOf(-1) }
@@ -259,72 +264,111 @@ private fun SongList(
     if (dragging == null) order = state.rows
     val songCount = state.songCount
 
-    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-        itemsIndexed(order, key = { _, row -> row.key }) { index, row ->
-            when (row) {
-                is PlaylistRow.Reading -> ReadingRow(row)
-                is PlaylistRow.Entry -> SongRow(
-                    entry = row,
-                    index = index,
-                    songCount = songCount,
-                    onRemove = { onRemove(row.song.id) },
-                    onMove = onMove,
-                    modifier = Modifier.graphicsLayer {
-                        translationY = if (dragging == row.key) offset else 0f
-                    },
-                    handle = Modifier.pointerInput(row.key) {
-                        detectDragGestures(
-                            onDragStart = {
-                                dragging = row.key
-                                dragStart = order.indexOfFirst { it.key == row.key }
-                                offset = 0f
-                            },
-                            onDragEnd = {
-                                val end = order.indexOfFirst { it.key == dragging }
-                                if (dragStart >= 0 &&
-                                    end >= 0 &&
-                                    end != dragStart
-                                ) {
-                                    onMove(dragStart, end)
-                                }
-                                dragging = null
-                                offset = 0f
-                            },
-                            onDragCancel = {
-                                dragging = null
-                                offset = 0f
-                            },
-                            onDrag = { change, amount ->
-                                change.consume()
-                                offset += amount.y
-                                val current = order.indexOfFirst { it.key == dragging }
-                                val items = listState.layoutInfo.visibleItemsInfo
-                                val me =
-                                    items.firstOrNull { it.index == current }
-                                        ?: return@detectDragGestures
-                                val target = when {
-                                    offset > 0 -> items.firstOrNull { it.index == current + 1 }
-                                    else -> items.firstOrNull { it.index == current - 1 }
-                                }
-                                if (target != null &&
-                                    target.index < songCount &&
-                                    abs(offset) > target.size / 2
-                                ) {
-                                    order =
-                                        order.toMutableList().apply {
-                                            add(target.index, removeAt(current))
+    Column(modifier = Modifier.fillMaxSize()) {
+        PlaylistTotals(state)
+        HorizontalDivider()
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+            itemsIndexed(order, key = { _, row -> row.key }) { index, row ->
+                when (row) {
+                    is PlaylistRow.Reading -> ReadingRow(row)
+                    is PlaylistRow.Entry -> SongRow(
+                        entry = row,
+                        index = index,
+                        songCount = songCount,
+                        onRemove = { onRemove(row.song.id) },
+                        onMove = onMove,
+                        modifier = Modifier.graphicsLayer {
+                            translationY = if (dragging == row.key) offset else 0f
+                        },
+                        handle = Modifier.pointerInput(row.key) {
+                            detectDragGestures(
+                                onDragStart = {
+                                    dragging = row.key
+                                    dragStart = order.indexOfFirst { it.key == row.key }
+                                    offset = 0f
+                                },
+                                onDragEnd = {
+                                    val end = order.indexOfFirst { it.key == dragging }
+                                    if (dragStart >= 0 &&
+                                        end >= 0 &&
+                                        end != dragStart
+                                    ) {
+                                        onMove(dragStart, end)
+                                    }
+                                    dragging = null
+                                    offset = 0f
+                                },
+                                onDragCancel = {
+                                    dragging = null
+                                    offset = 0f
+                                },
+                                onDrag = { change, amount ->
+                                    change.consume()
+                                    offset += amount.y
+                                    val current = order.indexOfFirst { it.key == dragging }
+                                    val items = listState.layoutInfo.visibleItemsInfo
+                                    val me =
+                                        items.firstOrNull { it.index == current }
+                                            ?: return@detectDragGestures
+                                    val target = when {
+                                        offset > 0 -> items.firstOrNull { it.index == current + 1 }
+                                        else -> items.firstOrNull { it.index == current - 1 }
+                                    }
+                                    if (target != null &&
+                                        target.index < songCount &&
+                                        abs(offset) > target.size / 2
+                                    ) {
+                                        // A list keeps its scroll anchored to the first visible row;
+                                        // swapping that row would scroll with it and throw the drag
+                                        // off (phone test on #48: couldn't drag to the top). Pin it.
+                                        val first = listState.firstVisibleItemIndex
+                                        if (current == first || target.index == first) {
+                                            val firstOffset = listState.firstVisibleItemScrollOffset
+                                            scope.launch {
+                                                listState.scrollToItem(first, firstOffset)
+                                            }
                                         }
-                                    offset +=
-                                        if (offset > 0) -me.size.toFloat() else me.size.toFloat()
+                                        order =
+                                            order.toMutableList().apply {
+                                                add(target.index, removeAt(current))
+                                            }
+                                        offset +=
+                                            if (offset >
+                                                0
+                                            ) {
+                                                -me.size.toFloat()
+                                            } else {
+                                                me.size.toFloat()
+                                            }
+                                    }
                                 }
-                            }
-                        )
-                    }
-                )
+                            )
+                        }
+                    )
+                }
+                HorizontalDivider()
             }
-            HorizontalDivider()
         }
     }
+}
+
+/** "23 songs · 1 h 24 min" above the list. */
+@Composable
+private fun PlaylistTotals(state: PlaylistUiState) {
+    val songs = state.rows.filterIsInstance<PlaylistRow.Entry>()
+    val count = pluralStringResource(R.plurals.playlist_song_count, songs.size, songs.size)
+    val totalMinutes = songs.sumOf { it.song.durationMs } / 60_000
+    val length = if (totalMinutes >= 60) {
+        stringResource(R.string.playlist_length_hours, totalMinutes / 60, totalMinutes % 60)
+    } else {
+        stringResource(R.string.playlist_length_minutes, totalMinutes)
+    }
+    Text(
+        text = "$count · $length",
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+    )
 }
 
 @Composable
@@ -377,11 +421,24 @@ private fun SongRow(
             )
         },
         leadingContent = {
-            Icon(
-                Icons.Filled.Menu,
-                contentDescription = stringResource(R.string.playlist_drag),
-                modifier = handle
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    Icons.Filled.Menu,
+                    contentDescription = stringResource(R.string.playlist_drag),
+                    modifier = handle
+                )
+                // Its place in the playlist (phone test on #48).
+                Text(
+                    text = "${index + 1}",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.widthIn(min = 24.dp)
+                )
+            }
         },
         headlineContent = { Text(song.title) },
         supportingContent = {

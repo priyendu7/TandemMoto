@@ -77,6 +77,20 @@ class PlaylistScreenTest {
     }
 
     @Test
+    fun theTotalCountAndLengthAreShown() {
+        show(songs(PlaylistRow.Entry(alpha, false), PlaylistRow.Entry(charlie, false)))
+        // 3:45 + 1:02:03 = 65 min
+        compose.onNodeWithText("2 songs · 1 h 5 min").assertIsDisplayed()
+    }
+
+    @Test
+    fun eachSongShowsItsPlaceInThePlaylist() {
+        show(songs(PlaylistRow.Entry(alpha, false), PlaylistRow.Entry(bravo, false)))
+        compose.onNodeWithText("1").assertIsDisplayed()
+        compose.onNodeWithText("2").assertIsDisplayed()
+    }
+
+    @Test
     fun aSongBeingReadShowsReading() {
         show(songs(PlaylistRow.Reading("u9", "new-song.mp3")))
         compose.onNodeWithText("new-song.mp3").assertIsDisplayed()

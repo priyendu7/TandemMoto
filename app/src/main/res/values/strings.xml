@@ -134,6 +134,8 @@
     <string name="playlist_drag">Drag to reorder</string>
     <string name="playlist_unknown_artist">Unknown artist</string>
     <string name="playlist_reading">Reading…</string>
+    <string name="playlist_length_minutes">%1$d min</string>
+    <string name="playlist_length_hours">%1$d h %2$d min</string>
     <string name="playlist_on_this_phone">On this phone</string>
     <string name="playlist_file_missing">File missing</string>
     <string name="playlist_song_details">%1$s · %2$s</string>
@@ -143,6 +145,10 @@
     <plurals name="playlist_add_songs_left">
         <item quantity="one">About %d more single file; add a folder for more</item>
         <item quantity="other">About %d more single files; add a folder for more</item>
+    </plurals>
+    <plurals name="playlist_song_count">
+        <item quantity="one">%d song</item>
+        <item quantity="other">%d songs</item>
     </plurals>
     <plurals name="playlist_added">
         <item quantity="one">Added %d song</item>
