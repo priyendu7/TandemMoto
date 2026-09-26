@@ -18,6 +18,7 @@ import com.tandemmoto.ui.playlist.PlaylistRow
 import com.tandemmoto.ui.playlist.PlaylistScreen
 import com.tandemmoto.ui.playlist.PlaylistUiState
 import com.tandemmoto.ui.playlist.Sharing
+import com.tandemmoto.ui.playlist.SongBadge
 import com.tandemmoto.ui.playlist.formatDuration
 import com.tandemmoto.ui.theme.TandemMotoTheme
 import org.junit.Assert.assertEquals
@@ -98,9 +99,9 @@ class PlaylistScreenTest {
         show(
             PlaylistUiState(
                 rows = listOf(
-                    PlaylistRow.Entry(alpha, false, mine = true),
-                    PlaylistRow.Entry(bravo, false, mine = false, onThisPhone = true),
-                    PlaylistRow.Entry(charlie, false, mine = false, onThisPhone = false)
+                    PlaylistRow.Entry(alpha, false, mine = true, badge = SongBadge.OnBothPhones),
+                    PlaylistRow.Entry(bravo, false, false, true, SongBadge.OnThisPhone),
+                    PlaylistRow.Entry(charlie, false, false, false, SongBadge.OnPartnerOnly)
                 ),
                 loaded = true,
                 sharing = Sharing.Shared,
@@ -108,18 +109,54 @@ class PlaylistScreenTest {
             )
         )
         val from = str(R.string.playlist_from_named, "Redmi")
-        compose.onNodeWithText(
-            "Artist · 3:45 · ${str(R.string.playlist_added_by_you)}"
-        ).assertIsDisplayed()
-        compose.onNodeWithText(
-            "${str(
-                R.string.playlist_unknown_artist
-            )} · 1:01 · $from · ${str(R.string.playlist_on_this_phone)}"
-        ).assertIsDisplayed()
+        val yours = str(R.string.playlist_added_by_you)
+        val both = str(R.string.playlist_on_both_phones)
+        val unknown = str(R.string.playlist_unknown_artist)
+        val here = str(R.string.playlist_on_this_phone)
+        compose.onNodeWithText("Artist · 3:45 · $yours · $both").assertIsDisplayed()
+        compose.onNodeWithText("$unknown · 1:01 · $from · $here").assertIsDisplayed()
         compose.onNodeWithText("Band · 1:02:03 · $from").assertIsDisplayed()
         compose.onNodeWithText(
             str(R.string.playlist_sharing_shared_named, "Redmi")
         ).assertIsDisplayed()
+    }
+
+    @Test
+    fun eachTransferStatusHasItsLine() {
+        val badges = listOf(
+            SongBadge.NotOnPartner to str(R.string.playlist_not_on_partner, "Redmi"),
+            SongBadge.Sending(45) to str(R.string.playlist_sending, 45),
+            SongBadge.Receiving(12) to str(R.string.playlist_receiving, 12),
+            SongBadge.Queued to str(R.string.playlist_queued),
+            SongBadge.WaitingForConnection to str(R.string.playlist_waiting_for_connection),
+            SongBadge.StorageFull to str(R.string.playlist_storage_full)
+        )
+        // One row at a time: a lazy list only builds the rows that fit the test screen.
+        val row = mutableStateOf<PlaylistRow>(PlaylistRow.Entry(alpha, false))
+        compose.setContent {
+            TandemMotoTheme {
+                PlaylistScreen(
+                    state = PlaylistUiState(
+                        rows = listOf(row.value),
+                        loaded = true,
+                        sharing = Sharing.Shared,
+                        partnerName = "Redmi"
+                    ),
+                    onBack = {},
+                    onAddSongs = {},
+                    onAddFolder = {},
+                    onCheckFolders = {},
+                    onRemove = {},
+                    onMove = { _, _ -> }
+                )
+            }
+        }
+        badges.forEach { (badge, text) ->
+            val mine = badge is SongBadge.NotOnPartner || badge is SongBadge.Sending
+            row.value = PlaylistRow.Entry(alpha, false, mine, false, badge)
+            compose.onNodeWithText(text, substring = true).assertExists()
+        }
+        assertEquals("Sending 45%", str(R.string.playlist_sending, 45))
     }
 
     @Test

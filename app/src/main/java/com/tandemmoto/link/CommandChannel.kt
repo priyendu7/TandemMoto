@@ -232,7 +232,11 @@ class CommandChannel(
                     } else {
                         End.Refused(message.reason)
                     }
-                    is Message.PlaylistEntries ->
+                    // Everything else is for the app (playlist, songs…), once the partner is known.
+                    is Message.PlaylistEntries,
+                    is Message.SongRequest,
+                    is Message.SongUnavailable,
+                    is Message.SongsOnPhone ->
                         if (_state.value is ChannelState.Open) _incoming.emit(message)
                     // New message types get a branch here that emits to _incoming once Open.
                 }

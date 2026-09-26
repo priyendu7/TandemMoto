@@ -47,6 +47,18 @@ sealed interface Message {
     data class PlaylistEntries(val entries: List<RideEntry>, val complete: Boolean = false) :
         Message
 
+    /** Song transfer (#50): send song [id] from byte [offset] on the transfer connection. */
+    @Serializable
+    data class SongRequest(val id: String, val offset: Long = 0) : Message
+
+    /** The sender can't send song [id] (not its song, or the file is gone). */
+    @Serializable
+    data class SongUnavailable(val id: String) : Message
+
+    /** Every song this phone can play (its own, its copies, its downloads), for "On both phones". */
+    @Serializable
+    data class SongsOnPhone(val ids: List<String>) : Message
+
     /** The sender is closing the connection, and why. */
     @Serializable
     data class Bye(val reason: Reason) : Message {
@@ -99,6 +111,16 @@ object MessageCodec {
             is Message.Bye -> json.encodeToJsonElement(Message.Bye.serializer(), message)
             is Message.PlaylistEntries ->
                 json.encodeToJsonElement(Message.PlaylistEntries.serializer(), message)
+            is Message.SongRequest -> json.encodeToJsonElement(
+                Message.SongRequest.serializer(),
+                message
+            )
+            is Message.SongUnavailable ->
+                json.encodeToJsonElement(Message.SongUnavailable.serializer(), message)
+            is Message.SongsOnPhone -> json.encodeToJsonElement(
+                Message.SongsOnPhone.serializer(),
+                message
+            )
         }
         val envelope = buildJsonObject {
             put("v", version)
@@ -123,6 +145,9 @@ object MessageCodec {
                 PONG -> payload.decodeAs(Message.Pong.serializer())
                 BYE -> payload.decodeAs(Message.Bye.serializer())
                 PLAYLIST -> payload.decodeAs(Message.PlaylistEntries.serializer())
+                SONG_REQUEST -> payload.decodeAs(Message.SongRequest.serializer())
+                SONG_UNAVAILABLE -> payload.decodeAs(Message.SongUnavailable.serializer())
+                SONGS_ON_PHONE -> payload.decodeAs(Message.SongsOnPhone.serializer())
                 else -> return Envelope.Unknown(version, type)
             }
             return Envelope.Known(version, seq, message)
@@ -148,6 +173,9 @@ object MessageCodec {
         is Message.Pong -> PONG
         is Message.Bye -> BYE
         is Message.PlaylistEntries -> PLAYLIST
+        is Message.SongRequest -> SONG_REQUEST
+        is Message.SongUnavailable -> SONG_UNAVAILABLE
+        is Message.SongsOnPhone -> SONGS_ON_PHONE
     }
 
     private const val HELLO = "hello"
@@ -155,4 +183,7 @@ object MessageCodec {
     private const val PONG = "pong"
     private const val BYE = "bye"
     private const val PLAYLIST = "playlist"
+    private const val SONG_REQUEST = "song_request"
+    private const val SONG_UNAVAILABLE = "song_unavailable"
+    private const val SONGS_ON_PHONE = "songs_on_phone"
 }

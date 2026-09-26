@@ -22,6 +22,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.tandemmoto.BuildConfig
 import com.tandemmoto.R
 import com.tandemmoto.permissions.PermissionStatus
+import com.tandemmoto.transfer.WindowSettings
 import com.tandemmoto.ui.components.BackTopBar
 import com.tandemmoto.ui.theme.TandemMotoTheme
 
@@ -39,7 +40,11 @@ fun SettingsScreen(
     onForgetPartner: () -> Unit = {},
     /** Android 13+ notifications permission; null where it doesn't apply (row hidden). */
     notifications: PermissionStatus? = null,
-    onNotificationsClick: () -> Unit = {}
+    onNotificationsClick: () -> Unit = {},
+    /** Shown when paired (#50); null hides the section. */
+    partnerSongs: PartnerSongsUi? = null,
+    onWindowChange: (WindowSettings) -> Unit = {},
+    onRemovePartnerSongs: () -> Unit = {}
 ) {
     val uriHandler = LocalUriHandler.current
     var confirmForget by rememberSaveable { mutableStateOf(false) }
@@ -86,6 +91,9 @@ fun SettingsScreen(
                     modifier = Modifier.clickable { confirmForget = true }
                 )
                 HorizontalDivider()
+            }
+            if (partnerSongs != null) {
+                PartnerSongsSection(partnerSongs, onWindowChange, onRemovePartnerSongs)
             }
             if (notifications != null) {
                 ListItem(

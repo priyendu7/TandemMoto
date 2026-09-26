@@ -427,17 +427,32 @@ private fun PlaylistTotals(state: PlaylistUiState) {
     }
 }
 
-/** "Added by you", "From Priyendu's S25 · On this phone"… (just "On this phone" when unpaired). */
+/**
+ * "Added by you · On both phones ✓", "From Priyendu's S25 · Receiving 45%"… (just "On this phone"
+ * when unpaired).
+ */
 @Composable
 private fun whereItIs(entry: PlaylistRow.Entry, partnerName: String?): String {
     val onThisPhone = stringResource(R.string.playlist_on_this_phone)
-    return when {
-        partnerName == null -> onThisPhone
-        entry.mine -> stringResource(R.string.playlist_added_by_you)
-        entry.onThisPhone -> stringResource(R.string.playlist_from_named, partnerName) + " · " +
-            onThisPhone
-        else -> stringResource(R.string.playlist_from_named, partnerName)
+    val badge = entry.badge
+    if (partnerName == null || badge == null) return onThisPhone
+    val who = if (entry.mine) {
+        stringResource(R.string.playlist_added_by_you)
+    } else {
+        stringResource(R.string.playlist_from_named, partnerName)
     }
+    val where = when (badge) {
+        SongBadge.OnBothPhones -> stringResource(R.string.playlist_on_both_phones)
+        SongBadge.NotOnPartner -> stringResource(R.string.playlist_not_on_partner, partnerName)
+        is SongBadge.Sending -> stringResource(R.string.playlist_sending, badge.percent)
+        SongBadge.OnThisPhone -> onThisPhone
+        is SongBadge.Receiving -> stringResource(R.string.playlist_receiving, badge.percent)
+        SongBadge.Queued -> stringResource(R.string.playlist_queued)
+        SongBadge.WaitingForConnection -> stringResource(R.string.playlist_waiting_for_connection)
+        SongBadge.OnPartnerOnly -> null
+        SongBadge.StorageFull -> stringResource(R.string.playlist_storage_full)
+    }
+    return if (where == null) who else "$who · $where"
 }
 
 @Composable

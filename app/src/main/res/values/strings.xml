@@ -29,6 +29,24 @@
     <string name="notification_turn_on_wifi">Turn on Wi-Fi</string>
     <string name="notification_close">Close</string>
     <string name="notification_stop">Stop</string>
+    <string name="settings_partner_songs">Songs from partner</string>
+    <plurals name="settings_partner_songs_keeps">
+        <item quantity="one">Keeps up to %d of your partner\'s songs</item>
+        <item quantity="other">Keeps up to %d of your partner\'s songs</item>
+    </plurals>
+    <string name="settings_partner_songs_using">%1$d on this phone now (%2$d MB)</string>
+    <plurals name="settings_partner_songs_limited">
+        <item quantity="one">limited to %d ahead by free space</item>
+        <item quantity="other">limited to %d ahead by free space</item>
+    </plurals>
+    <string name="settings_partner_songs_behind">Songs kept before the current one</string>
+    <string name="settings_partner_songs_ahead">Songs downloaded ahead</string>
+    <string name="settings_partner_songs_remove">Remove songs from partner</string>
+    <string name="settings_partner_songs_remove_summary">Frees the space now; they come back as needed while you\'re linked</string>
+    <string name="settings_partner_songs_remove_title">Remove your partner\'s songs from this phone?</string>
+    <string name="settings_partner_songs_remove_body">They stay in the playlist and on your partner\'s phone. The ones near the current song download again while you\'re linked.</string>
+    <string name="settings_decrease">Fewer: %1$s</string>
+    <string name="settings_increase">More: %1$s</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_on">On: shows the connection while the screen is off</string>
     <string name="settings_notifications_off">Off · Tap to turn on and see the connection while the screen is off</string>
@@ -145,6 +163,13 @@
     <string name="playlist_on_this_phone">On this phone</string>
     <string name="playlist_file_missing">File missing</string>
     <string name="playlist_added_by_you">Added by you</string>
+    <string name="playlist_on_both_phones">On both phones ✓</string>
+    <string name="playlist_not_on_partner">Not on %1$s yet</string>
+    <string name="playlist_sending">Sending %1$d%%</string>
+    <string name="playlist_receiving">Receiving %1$d%%</string>
+    <string name="playlist_queued">Next to download</string>
+    <string name="playlist_waiting_for_connection">Waiting for connection</string>
+    <string name="playlist_storage_full">Phone storage full</string>
     <string name="playlist_from_named">From %1$s</string>
     <string name="playlist_sharing_not_paired">Pair with your partner to share this playlist</string>
     <string name="playlist_sharing_shared">Shared with your partner</string>
