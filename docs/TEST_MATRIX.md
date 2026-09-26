@@ -15,6 +15,7 @@ Wi‑Fi Direct, Bluetooth media controls, audio routing and battery optimisation
 
 | ID | Model | Android | Skin | Battery optimisation | Owner | Notes |
 |---|---|---|---|---|---|---|
+| 2026-09-26 | TandemMoto #48 build (`pr54-7d42e39`, PR #54) | My songs: add, folder, reorder, missing file | P1 | — | ✅ | Add songs and Add a folder (20+ songs) with titles and durations; picking a song again says "Already in the playlist"; song count, length and numbers shown; reorder by drag (auto-scrolls near the edges), menu Move up/down/to top/to bottom, view stays put; survives a restart; a deleted original shows "File missing". The 128-permission limit on P4 (Android 9) wasn't exercised: no songs on P4 |
 | 2026-09-26 | TandemMoto #26 build (`pr47-2493c01`, PR #47) | Status bar states + TalkBack | P1 ↔ P4 | — | ✅ | Give-up after 2 min shows "Couldn't reach … · Tap to try again" and a tap reconnects; Disconnect shows "Not connected · Tap to connect". TalkBack (P1): each change read once, the bar reads the status then "double-tap to …" |
 | 2026-09-26 | TandemMoto #27 build (`pr45-9ccf8a4`, PR #45) | T3 Airplane mode / Wi‑Fi off-on, auto-reconnect | P1 ↔ P4 | — | ✅ | No taps on either phone. Connected again 5.5–7.5 s after Wi‑Fi returned (target 5–20 s), also with both screens locked. P4's silent-partner detection removed the dead group at once |
 | 2026-09-26 | TandemMoto #27 build (`pr45-9ccf8a4`, PR #45) | T4 Out of range and back | P1 ↔ P4 | — | ✅ | Reconnecting… while away (33 s incl. walking back), then Connected with no taps |
@@ -131,4 +132,5 @@ Record anything a tester had to change or work around, with the device ID.
 - **Android auto-accepts invitations from a phone it paired with before** (P1 and P4): the accept prompt only appears the first time two phones pair. TandemMoto's *Forget partner* can't clear Android's remembered group (hidden system API), and neither phone lists it in its Wi‑Fi Direct screen; only *Reset network settings* would.
 - **A Wi‑Fi Direct group outlives the app** (P1 and P4): after closing TandemMoto, Android keeps the phones connected, so "Connected" alone doesn't prove the partner app is running. The heartbeat (#25) fixes this.
 - **P4 keeps a dead group for ~13 s** after P1's Wi‑Fi goes off (P1 drops it at once). The command channel's silence timeout (6 s) notices first, so the app decides the link is down, not the group.
+- **Android's file picker browses by folder**; search (🔍) or the side menu's Audio section helps, and *Add a folder* adds many songs at once. An app keeps at most 512 picked-file permissions (128 on Android 10 and older, e.g. P4), which is why folders exist.
 - **P1 discovery without Nearby devices permission** fails with a generic `ERROR` instead of a permission error.
