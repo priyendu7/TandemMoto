@@ -10,6 +10,9 @@ enum class NotificationAction(@StringRes val label: Int) {
     /** Drop the link and stop the service. */
     Disconnect(R.string.notification_disconnect),
 
+    /** Still searching: stop trying (same as Disconnect underneath). */
+    Stop(R.string.notification_stop),
+
     /** Try to reach the partner again. */
     Connect(R.string.notification_connect),
 
@@ -39,10 +42,17 @@ fun LinkStatus.notificationText(): NotificationText = when (this) {
             R.string.notification_not_paired,
             actions = listOf(NotificationAction.Close)
         )
-    is LinkStatus.Connecting -> NotificationText(R.string.notification_connecting, partner.name)
+    is LinkStatus.Connecting -> NotificationText(
+        R.string.notification_connecting,
+        partner.name,
+        listOf(NotificationAction.Stop)
+    )
     is LinkStatus.Connected -> NotificationText(R.string.notification_connected, partner.name)
-    is LinkStatus.Reconnecting ->
-        NotificationText(R.string.notification_reconnecting, partner.name)
+    is LinkStatus.Reconnecting -> NotificationText(
+        R.string.notification_reconnecting,
+        partner.name,
+        listOf(NotificationAction.Stop)
+    )
     is LinkStatus.NotConnected -> when (reason) {
         Reason.WifiOff -> NotificationText(
             R.string.notification_wifi_off,

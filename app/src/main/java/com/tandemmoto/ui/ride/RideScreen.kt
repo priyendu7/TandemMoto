@@ -173,17 +173,42 @@ private fun ConnectionSection(
 ) {
     // Disconnect asks first: a stray tap while riding shouldn't drop the link.
     var confirmDisconnect by rememberSaveable { mutableStateOf(false) }
+    // While still searching it's "Stop", not "Disconnect": nothing is connected yet.
+    val searching = connection == ConnectionStatus.Searching ||
+        connection == ConnectionStatus.Reconnecting
     if (confirmDisconnect) {
         val name = partnerName ?: stringResource(R.string.ride_your_partner)
         AlertDialog(
             onDismissRequest = { confirmDisconnect = false },
-            title = { Text(stringResource(R.string.ride_disconnect_title, name)) },
-            text = { Text(stringResource(R.string.ride_disconnect_body, name)) },
+            title = {
+                Text(
+                    stringResource(
+                        if (searching) R.string.ride_stop_title else R.string.ride_disconnect_title,
+                        name
+                    )
+                )
+            },
+            text = {
+                Text(
+                    if (searching) {
+                        stringResource(R.string.ride_stop_body)
+                    } else {
+                        stringResource(R.string.ride_disconnect_body, name)
+                    }
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDisconnect = false
                     onDisconnect()
-                }) { Text(stringResource(R.string.notification_disconnect)) }
+                }) {
+                    val action = if (searching) {
+                        R.string.ride_stop_action
+                    } else {
+                        R.string.notification_disconnect
+                    }
+                    Text(stringResource(action))
+                }
             },
             dismissButton = {
                 TextButton(onClick = { confirmDisconnect = false }) {
@@ -201,9 +226,9 @@ private fun ConnectionSection(
                     ConnectionStatus.NotConnected -> R.string.ride_connect_action
                     ConnectionStatus.Unreachable -> R.string.ride_try_again_action
                     ConnectionStatus.WifiOff -> R.string.ride_wifi_action
-                    ConnectionStatus.Connected,
                     ConnectionStatus.Searching,
-                    ConnectionStatus.Reconnecting,
+                    ConnectionStatus.Reconnecting -> R.string.ride_stop_action
+                    ConnectionStatus.Connected,
                     ConnectionStatus.PartnerAppClosed -> R.string.ride_disconnect_action
                     else -> R.string.ride_pair_action
                 }
