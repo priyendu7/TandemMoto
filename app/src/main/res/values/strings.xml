@@ -107,6 +107,8 @@
     <string name="ride_pause">Pause</string>
     <string name="ride_next">Next song</string>
     <string name="ride_previous">Previous song</string>
+    <string name="ride_seek">Song position</string>
+    <string name="ride_seek_position">%1$s of %2$s</string>
     <string name="ride_controls_disabled_hint">Add songs in Playlist to start playing.</string>
     <string name="playlist_now_playing">Now playing</string>
     <string name="playlist_play_from_here">Play from here</string>

@@ -17,6 +17,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -24,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -31,6 +33,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -48,6 +54,7 @@ import com.tandemmoto.ui.components.PermissionPrompt
 import com.tandemmoto.ui.components.openWifiSettings
 import com.tandemmoto.ui.components.rememberPermissionRequester
 import com.tandemmoto.ui.theme.TandemMotoTheme
+import java.util.Locale
 
 /** The Home screen: the app opens here, and every feature is reached from it. */
 @Composable
@@ -84,7 +91,8 @@ fun RideRoute(
         onNext = viewModel::onNext,
         onPrevious = viewModel::onPrevious,
         onOpenPlaylist = onOpenPlaylist,
-        onOpenSettings = onOpenSettings
+        onOpenSettings = onOpenSettings,
+        onSeek = viewModel::onSeek
     )
 }
 
@@ -102,7 +110,8 @@ fun RideScreen(
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     onOpenPlaylist: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onSeek: (Long) -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -147,7 +156,7 @@ fun RideScreen(
                     .fillMaxSize()
                     .padding(24.dp)
             ) {
-                NowPlayingCard(state)
+                NowPlayingCard(state, onSeek)
                 Spacer(Modifier.weight(1f))
                 PlaybackControls(state, onPlayPause, onNext, onPrevious)
                 IntercomIndicator(state.intercomOn)
@@ -258,7 +267,7 @@ private fun ConnectionSection(
 }
 
 @Composable
-private fun NowPlayingCard(state: RideUiState) {
+private fun NowPlayingCard(state: RideUiState, onSeek: (Long) -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text(
@@ -284,7 +293,67 @@ private fun NowPlayingCard(state: RideUiState) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            if (state.nowPlaying != null) SeekBar(state, onSeek)
         }
+    }
+}
+
+/**
+ * Where the song is. Dragging only moves the thumb; letting go seeks, which the partner's phone
+ * follows (#60), so a drag doesn't send a seek for every step.
+ */
+@Composable
+private fun SeekBar(state: RideUiState, onSeek: (Long) -> Unit) {
+    var dragging by remember { mutableStateOf<Float?>(null) }
+    val duration = state.durationMs.coerceAtLeast(0)
+    val shown = dragging?.toLong() ?: state.positionMs.coerceIn(0, duration)
+    val description = stringResource(R.string.ride_seek)
+    val position = stringResource(
+        R.string.ride_seek_position,
+        formatTime(shown),
+        formatTime(duration)
+    )
+    Column(modifier = Modifier.padding(top = 12.dp)) {
+        Slider(
+            value = shown.toFloat(),
+            onValueChange = { dragging = it },
+            onValueChangeFinished = {
+                dragging?.let { onSeek(it.toLong()) }
+                dragging = null
+            },
+            valueRange = 0f..duration.toFloat().coerceAtLeast(1f),
+            enabled = state.controlsEnabled && duration > 0,
+            modifier = Modifier.semantics {
+                contentDescription = description
+                stateDescription = position
+            }
+        )
+        Row(modifier = Modifier.fillMaxWidth().clearAndSetSemantics {}) {
+            Text(
+                text = formatTime(shown),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = formatTime(duration),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/** "4:05", or "1:02:03" past an hour. */
+internal fun formatTime(ms: Long): String {
+    val total = ms.coerceAtLeast(0) / 1_000
+    val hours = total / 3_600
+    val minutes = total % 3_600 / 60
+    val seconds = total % 60
+    return if (hours > 0) {
+        "%d:%02d:%02d".format(Locale.ROOT, hours, minutes, seconds)
+    } else {
+        "%d:%02d".format(Locale.ROOT, minutes, seconds)
     }
 }
 
@@ -403,7 +472,13 @@ private fun RideNotPairedPreview() {
 private fun RideConnectedPreview() {
     TandemMotoTheme(darkTheme = true, dynamicColor = false) {
         RidePreview(
-            RideUiState(connection = ConnectionStatus.Connected, nowPlaying = "Highway Song")
+            RideUiState(
+                connection = ConnectionStatus.Connected,
+                nowPlaying = "Highway Song",
+                hasSongs = true,
+                positionMs = 83_000,
+                durationMs = 245_000
+            )
         )
     }
 }

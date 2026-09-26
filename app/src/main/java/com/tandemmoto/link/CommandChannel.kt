@@ -79,6 +79,14 @@ class CommandChannel(
     /** Messages other than the handshake and heartbeat (playback, mic mode… from Phase 3). */
     val incoming: SharedFlow<Message> = _incoming.asSharedFlow()
 
+    private val _clockOffsetNanos = MutableStateFlow<Long?>(null)
+
+    /**
+     * The partner's clock minus this phone's (`System.nanoTime`), from the heartbeat; null until
+     * known on each connection. Playback mirroring (#60) uses it to tell when the partner acted.
+     */
+    val clockOffsetNanos: StateFlow<Long?> = _clockOffsetNanos.asStateFlow()
+
     /** Set before [state] goes back to [ChannelState.Opening] after a connection ends. */
     @Volatile
     var lastLoss = ChannelLoss.None
@@ -195,6 +203,8 @@ class CommandChannel(
         val ended = CompletableDeferred<End>()
         var lastHeard = nanoTime()
         val stats = RttStats()
+        val offset = ClockOffset()
+        _clockOffsetNanos.value = null
 
         suspend fun write(message: Message) = connection.send(MessageCodec.encode(message, ++seq))
 
@@ -225,8 +235,13 @@ class CommandChannel(
                         keepAwake(true)
                         log("Channel open (partner app ${message.appVersion})")
                     }
-                    is Message.Ping -> write(Message.Pong(message.sentAtNanos))
-                    is Message.Pong -> stats.add(nanoTime() - message.sentAtNanos)
+                    is Message.Ping -> write(Message.Pong(message.sentAtNanos, nanoTime()))
+                    is Message.Pong -> {
+                        val now = nanoTime()
+                        stats.add(now - message.sentAtNanos)
+                        offset.add(message.sentAtNanos, message.repliedAtNanos, now)
+                        _clockOffsetNanos.value = offset.offsetNanos
+                    }
                     is Bye -> return if (message.reason == Bye.Reason.Closing) {
                         End.Lost("the partner closed it", ChannelLoss.ClosedByPartner)
                     } else {
@@ -236,7 +251,8 @@ class CommandChannel(
                     is Message.PlaylistEntries,
                     is Message.SongRequest,
                     is Message.SongUnavailable,
-                    is Message.SongsOnPhone ->
+                    is Message.SongsOnPhone,
+                    is Message.PlaybackState ->
                         if (_state.value is ChannelState.Open) _incoming.emit(message)
                     // New message types get a branch here that emits to _incoming once Open.
                 }
@@ -269,7 +285,10 @@ class CommandChannel(
                     sinceReport += heartbeatMs
                     if (sinceReport >= STATS_EVERY_MS) {
                         sinceReport = 0
-                        stats.summary()?.let(log)
+                        stats.summary()?.let { rtt ->
+                            val ms = offset.offsetNanos?.let { it / NANOS_PER_MS }
+                            log(if (ms == null) rtt else "$rtt, partner clock offset $ms ms")
+                        }
                         stats.reset()
                     }
                 }

@@ -20,6 +20,7 @@ import com.tandemmoto.link.Link
 import com.tandemmoto.link.LowLatencyWifiLock
 import com.tandemmoto.link.SocketFrameTransport
 import com.tandemmoto.player.Playback
+import com.tandemmoto.player.PlaybackMirror
 import com.tandemmoto.playlist.JsonFileRidePlaylistStore
 import com.tandemmoto.playlist.PlaylistSync
 import com.tandemmoto.playlist.RidePlaylist
@@ -155,6 +156,16 @@ class TandemMotoApp : Application() {
             log = { AppLog.i("Player", it) }
         )
         playback.start()
+        PlaybackMirror(
+            player = playback,
+            installId = installId::get,
+            channelState = link.channel.state,
+            incoming = link.channel.incoming,
+            send = link.channel::send,
+            clockOffsetNanos = link.channel.clockOffsetNanos,
+            scope = appScope,
+            log = { AppLog.i("Mirror", it) }
+        ).also { playback.listener = it }.start()
         linkSession = LinkSession(
             status = link.status,
             scope = appScope,
