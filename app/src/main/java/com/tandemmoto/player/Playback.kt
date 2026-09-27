@@ -125,11 +125,10 @@ class Playback(
             SongDataSource(DefaultDataSource.Factory(context).createDataSource(), this)
         }
         // Decoder fallback: if the phone's first audio decoder can't start, try its next one.
-        // Float output keeps high-resolution audio (24-bit FLAC) at full depth instead of
-        // squeezing it into 16 bits (#62: the Redmi Y2 stalled on two such files).
+        // Not float output: on the S25 it crackled and ran fast (#62 phone test).
         val renderers = DefaultRenderersFactory(context)
             .setEnableDecoderFallback(true)
-            .setEnableAudioFloatOutput(true)
+            .setMediaCodecSelector(DecoderChoice.selector())
         player = ExoPlayer.Builder(context, renderers)
             .setMediaSourceFactory(DefaultMediaSourceFactory(files))
             .setAudioAttributes(

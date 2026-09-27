@@ -68,8 +68,10 @@ players in step (#60). The handlebar remote is a spike after Phase 3.
   moved for 3 s (not held, not waiting for its file, not paused by another app's sound) is marked
   "Can't play on this phone" and skipped on both phones. The Redmi Y2 sat like that on two FLAC
   files its Files app plays, while Android reported them as playable.
-- **Decoder fallback and float output.** If a phone's first audio decoder can't start, Media3
-  tries the next; float output keeps 24-bit audio at full depth.
+- **Decoders (`DecoderChoice`).** FLAC plays on Android's software decoder first: the Redmi's
+  Qualcomm FLAC decoder stuck at 0 s on 24-bit, 48 kHz files. Media3's decoder fallback tries the
+  next decoder if one can't start. Float output was tried and dropped: on the S25 it crackled and
+  ran fast (its audio clock jumped ~0.23 s every half second).
 - **Diagnostics (`PlayerDiagnostics`).** Logs each song's decoder, format in and out, state
   changes, underruns, audio errors, and how long sound takes to start after a start or jump.
   The mirror logs the drift on every 5 s check ("In step with the partner: 42 ms").
