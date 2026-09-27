@@ -10,6 +10,7 @@ import com.tandemmoto.link.LinkStatus
 import com.tandemmoto.player.MissingOn
 import com.tandemmoto.player.PlaybackState
 import com.tandemmoto.ui.components.ConnectionStatus
+import com.tandemmoto.voice.IntercomState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -30,10 +31,12 @@ class RideViewModel(
     private val connect: () -> Unit,
     private val disconnect: () -> Unit,
     playback: Flow<PlaybackState> = flowOf(PlaybackState()),
-    private val controls: PlayerControls = PlayerControls()
+    private val controls: PlayerControls = PlayerControls(),
+    intercom: Flow<IntercomState> = flowOf(IntercomState()),
+    private val intercomControls: IntercomControls = IntercomControls()
 ) : ViewModel() {
     val uiState: StateFlow<RideUiState> =
-        combine(playback, linkStatus.holdingConnected()) { player, status ->
+        combine(playback, linkStatus.holdingConnected(), intercom) { player, status, talk ->
             RideUiState(
                 connection = status.toUi(),
                 partnerName = status.partnerName(),
@@ -45,7 +48,10 @@ class RideViewModel(
                 artwork = player.artwork,
                 hasSongs = player.hasSongs,
                 positionMs = player.positionMs,
-                durationMs = player.durationMs
+                durationMs = player.durationMs,
+                intercom = talk.line,
+                muted = talk.muted,
+                partnerMuted = talk.partnerMuted
             )
         }
             .stateIn(viewModelScope, SharingStarted.Eagerly, RideUiState())
@@ -66,6 +72,12 @@ class RideViewModel(
     /** The seek bar, let go at [positionMs]. */
     fun onSeek(positionMs: Long) = controls.seekTo(positionMs)
 
+    fun onStartIntercom() = intercomControls.start()
+
+    fun onStopIntercom() = intercomControls.stop()
+
+    fun onMute(muted: Boolean) = intercomControls.mute(muted)
+
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
@@ -81,6 +93,12 @@ class RideViewModel(
                         app.playback::next,
                         app.playback::previous,
                         app.playback::seekTo
+                    ),
+                    app.intercom.state,
+                    IntercomControls(
+                        start = app.mirror::startIntercom,
+                        stop = app.mirror::stopIntercom,
+                        mute = app.intercom::setMuted
                     )
                 )
             }
@@ -94,6 +112,13 @@ class PlayerControls(
     val next: () -> Unit = {},
     val previous: () -> Unit = {},
     val seekTo: (Long) -> Unit = {}
+)
+
+/** The intercom's buttons (#72), passed in so tests don't need the app. */
+class IntercomControls(
+    val start: () -> Unit = {},
+    val stop: () -> Unit = {},
+    val mute: (Boolean) -> Unit = {}
 )
 
 /** How long a blip away from Connected is held back before it's shown (and announced). */

@@ -115,6 +115,17 @@
     <string name="playlist_play_from_here">Play from here</string>
     <string name="ride_intercom_on">Intercom on: you can talk to each other</string>
     <string name="ride_intercom_off">Intercom turns on when the music is paused</string>
+    <string name="ride_intercom_not_linked">The intercom works when you\'re connected</string>
+    <string name="ride_intercom_ready">Intercom off: start it, or it turns on when you pause the music</string>
+    <string name="ride_intercom_connecting">Connecting earbuds…</string>
+    <string name="ride_intercom_on_you_muted">Intercom on · you\'re muted</string>
+    <string name="ride_intercom_on_partner_muted">Intercom on · %1$s is muted</string>
+    <string name="ride_intercom_on_both_muted">Intercom on · you\'re both muted</string>
+    <string name="ride_intercom_on_phone">Intercom on the phone\'s mic (earbuds didn\'t connect)</string>
+    <string name="ride_intercom_start">Start intercom</string>
+    <string name="ride_intercom_stop">Stop intercom</string>
+    <string name="ride_mute">Mute me</string>
+    <string name="ride_unmute">Unmute me</string>
 
     <!-- Connection status -->
     <string name="status_not_paired">Not paired</string>

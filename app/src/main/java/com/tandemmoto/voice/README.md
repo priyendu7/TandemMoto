@@ -33,3 +33,23 @@ mic (16 kHz, 20 ms frames) → VoicePacket → UDP 48154 (DSCP EF) → partner �
   median/p95; mouth-to-ear about … ms (frame + mic + network + buffer + speaker)`.
 - `TalkTest` (Settings → Diagnostics, while linked): sends this phone's mic, in call mode, for
   at most 2 minutes.
+
+## Mic mode and self-mute (#72)
+
+- **Mic mode = linked, the intercom wanted, and the music not playing** (`IntercomRules`). "Wanted"
+  is part of the shared playback state (`PlaybackMirror.intercomWanted`, newest control wins): it
+  turns on the first time music plays in a ride, or with **Start intercom** on Home, and off with
+  **Stop intercom** or Disconnect. So it isn't on straight after connecting, and it works with no
+  music at all. A held song ("Getting song…") counts as playing.
+- `Intercom` opens the audio route (`AudioRoute`), then sends the mic unless muted; every way out
+  (music plays, Stop, the link drops, Disconnect) stops sending and closes the route, so no mic
+  is left open. Music resuming while the earbuds are still switching closes it too.
+- `AndroidAudioRoute`: call mode; Android 12+ picks the communication device (earbuds, else a
+  wired headset, else the phone); before 12 it starts the earbuds' hands-free link (SCO) and waits
+  up to 4 s, falling back to the phone's mic and speaker. Closing restores the mode, so music goes
+  back to the earbuds' music mode.
+- **Self-mute** (`MuteStore`, merged from #33): this phone's alone, only the button changes it,
+  remembered across restarts. Muted releases the mic but keeps the route, so the partner is still
+  heard. `Message.Muted` goes to the partner on every change and every connection ("… is muted").
+- Logs: mic mode on/off, the route used, the earbuds' switch time, and the time from the pause to
+  talking.

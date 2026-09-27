@@ -11,6 +11,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -85,7 +86,10 @@ class PlaybackMirrorTest {
         mirror.onControl("Next")
         runCurrent()
         assertEquals(
-            listOf(Message.PlaybackState("b", true, 1_000, 5, Stamp(1, "me"), "Next")),
+            // Music played: the intercom is wanted from now on (#72).
+            listOf(
+                Message.PlaybackState("b", true, 1_000, 5, Stamp(1, "me"), "Next", intercom = true)
+            ),
             sent
         )
         mirror.onControl("Pause")
@@ -338,5 +342,57 @@ class PlaybackMirrorTest {
         incoming.emit(theirs("a", true, 60_000, clock = 2).copy(control = PlaybackMirror.SYNC))
         runCurrent()
         assertTrue(player.applied.isEmpty())
+    }
+
+    @Test
+    fun theIntercomIsWantedOnceMusicPlays() = runTest {
+        val mirror = mirror()
+        assertFalse(mirror.intercomWanted.value)
+        mirror.onControl("Pause") // nothing ever played
+        assertFalse(mirror.intercomWanted.value)
+        player.now = PlayerPosition("a", playing = true, positionMs = 0)
+        mirror.onControl("Play")
+        runCurrent()
+        assertTrue(mirror.intercomWanted.value)
+        assertTrue(sent.last().intercom)
+        player.now = PlayerPosition("a", playing = false, positionMs = 5_000)
+        mirror.onControl("Pause")
+        assertTrue("stays wanted: it's on while paused", mirror.intercomWanted.value)
+    }
+
+    @Test
+    fun startAndStopIntercomWithoutMusic() = runTest {
+        val mirror = mirror()
+        mirror.startIntercom()
+        runCurrent()
+        assertTrue(mirror.intercomWanted.value)
+        assertEquals(PlaybackMirror.START_INTERCOM, sent.last().control)
+        mirror.stopIntercom()
+        runCurrent()
+        assertFalse(mirror.intercomWanted.value)
+        assertFalse(sent.last().intercom)
+    }
+
+    @Test
+    fun thePartnersStartReachesThisPhoneEvenWithNoSongs() = runTest {
+        val mirror = mirror()
+        incoming.emit(
+            theirs(null, playing = false, positionMs = 0, clock = 2).copy(intercom = true)
+        )
+        runCurrent()
+        assertTrue(mirror.intercomWanted.value)
+        incoming.emit(
+            theirs(null, playing = false, positionMs = 0, clock = 3).copy(intercom = false)
+        )
+        runCurrent()
+        assertFalse(mirror.intercomWanted.value)
+    }
+
+    @Test
+    fun disconnectTurnsItOff() = runTest {
+        val mirror = mirror()
+        mirror.startIntercom()
+        mirror.onDisconnect()
+        assertFalse(mirror.intercomWanted.value)
     }
 }
