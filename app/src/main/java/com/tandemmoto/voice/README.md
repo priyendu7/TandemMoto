@@ -44,6 +44,12 @@ mic (16 kHz, 20 ms frames) → VoicePacket → UDP 48154 (DSCP EF) → partner �
 - `Intercom` opens the audio route (`AudioRoute`), then sends the mic unless muted; every way out
   (music plays, Stop, the link drops, Disconnect) stops sending and closes the route, so no mic
   is left open. Music resuming while the earbuds are still switching closes it too.
+- **Bluetooth earbuds stay in music mode by default** (`RouteKind.EarbudsMusicMode`): no call
+  mode; the partner's voice plays as media on the earbuds and you talk into the phone's mic. On
+  the Redmi Y2 with the boAt Nirvana, call mode dropped the earbuds' music connection around
+  every switch (1.4–2.2 s, sometimes not back by the next pause) and, sharing one radio with
+  Wi-Fi, slowed the voice to 0.4–1.4 s (phone test on #72). **Settings → Advanced → Use earbud
+  mic for the intercom** turns call mode back on for earbuds that handle it.
 - `AndroidAudioRoute`: call mode; Android 12+ picks the communication device (earbuds, else a
   wired headset, else the phone); before 12 it starts the earbuds' hands-free link (SCO) and waits
   up to 4 s, falling back to the phone's mic and speaker. Closing restores the mode, so music goes

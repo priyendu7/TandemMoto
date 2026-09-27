@@ -25,7 +25,9 @@ data class RideUiState(
     /** The intercom (#72): what its line says, and who is muted. */
     val intercom: IntercomLine = IntercomLine.NotLinked,
     val muted: Boolean = false,
-    val partnerMuted: Boolean = false
+    val partnerMuted: Boolean = false,
+    /** The earbuds stay in music mode: you talk into the phone (#72). */
+    val talkIntoPhone: Boolean = false
 ) {
     /**
      * Each phone plays the ride playlist, linked or not; while linked, every control is mirrored

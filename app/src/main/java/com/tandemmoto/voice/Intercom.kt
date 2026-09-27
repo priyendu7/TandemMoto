@@ -184,6 +184,26 @@ class Intercom(
     }
 }
 
+/**
+ * Settings → Advanced → Use earbud mic for the intercom (#72). Off by default: the earbuds stay
+ * in music mode and you talk into the phone.
+ */
+class EarbudMicSetting(context: android.content.Context) {
+    private val prefs = context.applicationContext
+        .getSharedPreferences("intercom", android.content.Context.MODE_PRIVATE)
+    private val _on = MutableStateFlow(prefs.getBoolean(KEY, false))
+    val on: StateFlow<Boolean> = _on.asStateFlow()
+
+    fun set(on: Boolean) {
+        prefs.edit { putBoolean(KEY, on) }
+        _on.value = on
+    }
+
+    private companion object {
+        const val KEY = "earbud_mic"
+    }
+}
+
 /** This phone's mute (#72): only the user changes it, and it's remembered across restarts. */
 interface MuteStore {
     val muted: StateFlow<Boolean>

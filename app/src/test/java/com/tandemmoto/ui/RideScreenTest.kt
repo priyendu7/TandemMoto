@@ -228,6 +228,7 @@ class RideScreenTest {
                 )
             }
         }
+        compose.onNodeWithText(str(R.string.settings_advanced)).performScrollTo().performClick()
         compose.onNodeWithText(str(R.string.settings_mic_test_in_seconds, 10))
             .performScrollTo()
             .performClick()
@@ -257,6 +258,7 @@ class RideScreenTest {
                 )
             }
         }
+        compose.onNodeWithText(str(R.string.settings_advanced)).performScrollTo().performClick()
         compose.onNodeWithText(str(R.string.settings_talk_test)).performScrollTo().performClick()
         assertEquals(true, toggled)
         state.value = TalkTestState(on = true, secondsLeft = 95)
@@ -266,8 +268,24 @@ class RideScreenTest {
     }
 
     @Test
+    fun advancedHoldsTheEarbudMicSwitchOffByDefault() {
+        var earbudMic: Boolean? = null
+        compose.setContent {
+            TandemMotoTheme {
+                SettingsScreen(onBack = {}, onExportLogs = {}, onEarbudMic = { earbudMic = it })
+            }
+        }
+        compose.onNodeWithText(str(R.string.settings_earbud_mic)).assertDoesNotExist()
+        compose.onNodeWithText(str(R.string.settings_advanced)).performScrollTo().performClick()
+        compose.onNodeWithText(str(R.string.settings_earbud_mic_off)).assertExists()
+        compose.onNodeWithText(str(R.string.settings_earbud_mic)).performScrollTo().performClick()
+        assertEquals(true, earbudMic)
+    }
+
+    @Test
     fun withoutALinkThereIsNoTalkTest() {
         compose.setContent { TandemMotoTheme { SettingsScreen(onBack = {}, onExportLogs = {}) } }
+        compose.onNodeWithText(str(R.string.settings_advanced)).performScrollTo().performClick()
         compose.onNodeWithText(str(R.string.settings_talk_test)).assertDoesNotExist()
     }
 
@@ -559,7 +577,9 @@ class RideScreenTest {
         compose.onNodeWithText(str(R.string.ride_intercom_on_partner_muted, "Redmi")).assertExists()
         state.value = state.value.copy(muted = true)
         compose.onNodeWithText(str(R.string.ride_intercom_on_both_muted)).assertExists()
-        state.value = state.value.copy(intercom = IntercomLine.OnPhone, muted = false)
+        state.value = state.value.copy(muted = false, partnerMuted = false, talkIntoPhone = true)
+        compose.onNodeWithText(str(R.string.ride_intercom_on_talk_into_phone)).assertExists()
+        state.value = state.value.copy(intercom = IntercomLine.OnPhone, talkIntoPhone = false)
         compose.onNodeWithText(str(R.string.ride_intercom_on_phone)).assertExists()
     }
 

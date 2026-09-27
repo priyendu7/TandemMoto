@@ -11,6 +11,7 @@ import com.tandemmoto.player.MissingOn
 import com.tandemmoto.player.PlaybackState
 import com.tandemmoto.ui.components.ConnectionStatus
 import com.tandemmoto.voice.IntercomState
+import com.tandemmoto.voice.RouteKind
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -51,7 +52,8 @@ class RideViewModel(
                 durationMs = player.durationMs,
                 intercom = talk.line,
                 muted = talk.muted,
-                partnerMuted = talk.partnerMuted
+                partnerMuted = talk.partnerMuted,
+                talkIntoPhone = talk.route == RouteKind.EarbudsMusicMode
             )
         }
             .stateIn(viewModelScope, SharingStarted.Eagerly, RideUiState())

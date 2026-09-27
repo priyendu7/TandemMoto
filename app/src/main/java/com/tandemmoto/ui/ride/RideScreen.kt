@@ -468,6 +468,7 @@ private fun IntercomSection(
                 stringResource(R.string.ride_intercom_on_both_muted)
             state.muted -> stringResource(R.string.ride_intercom_on_you_muted)
             state.partnerMuted -> stringResource(R.string.ride_intercom_on_partner_muted, partner)
+            state.talkIntoPhone -> stringResource(R.string.ride_intercom_on_talk_into_phone)
             else -> stringResource(R.string.ride_intercom_on)
         }
     }

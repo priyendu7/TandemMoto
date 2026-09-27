@@ -11,13 +11,28 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** Where the intercom's voice goes in and out (#72). */
-enum class RouteKind { WiredHeadset, BluetoothEarbuds, Phone }
+enum class RouteKind {
+    WiredHeadset,
+
+    /** The earbuds in call mode: their own mic (Settings → Advanced → Use earbud mic). */
+    BluetoothEarbuds,
+
+    /**
+     * The earbuds stay in music mode and play the partner's voice; you talk into the phone's
+     * mic (the default: on the Redmi Y2 with the boAt Nirvana, call mode dropped the earbuds'
+     * music connection on every switch and slowed the Wi-Fi link to 0.4–1.4 s, #72 phone test).
+     */
+    EarbudsMusicMode,
+
+    Phone
+}
 
 /** [fellBack]: earbuds were there but didn't switch to call mode, so it's the phone's own. */
 data class RouteResult(val kind: RouteKind, val fellBack: Boolean = false, val switchMs: Long = 0)
@@ -38,14 +53,26 @@ interface AudioRoute {
  * - Before 12 (the pillion's Redmi on 9): start the Bluetooth hands-free link (SCO) and wait
  *   for it to connect, up to [SCO_TIMEOUT_MS]; a wired headset is used by itself in call mode.
  * Earbuds that don't switch in time fall back to the phone's mic and speaker.
+ *
+ * Unless [useEarbudMic] is on, Bluetooth earbuds aren't switched at all
+ * ([RouteKind.EarbudsMusicMode]): the phone stays in normal mode, so the earbuds keep playing (the
+ * partner's voice then plays as media) and the phone's own mic hears you.
  */
-class AndroidAudioRoute(private val context: Context, private val log: (String) -> Unit = {}) :
-    AudioRoute {
+class AndroidAudioRoute(
+    private val context: Context,
+    private val log: (String) -> Unit = {},
+    private val useEarbudMic: () -> Boolean = { false },
+    /** AudioManager calls from the main thread; tests run it where they are. */
+    private val main: CoroutineDispatcher = Dispatchers.Main
+) : AudioRoute {
     private val audio = context.getSystemService(AudioManager::class.java)
     private var previousMode: Int? = null
     private var scoStarted = false
 
-    override suspend fun open(): RouteResult = withContext(Dispatchers.Main) {
+    override suspend fun open(): RouteResult = withContext(main) {
+        val earbuds = audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            .any { it.type in BLUETOOTH_ANY }
+        if (earbuds && !useEarbudMic()) return@withContext RouteResult(RouteKind.EarbudsMusicMode)
         if (previousMode == null) previousMode = audio.mode
         audio.mode = AudioManager.MODE_IN_COMMUNICATION
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) openModern() else openLegacy()
@@ -119,9 +146,11 @@ class AndroidAudioRoute(private val context: Context, private val log: (String) 
     }
 
     override fun close() {
+        // Music mode changed nothing, so there's nothing to put back.
+        val before = previousMode ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) audio.clearCommunicationDevice()
         stopSco()
-        previousMode?.let { audio.mode = it }
+        audio.mode = before
         previousMode = null
     }
 
