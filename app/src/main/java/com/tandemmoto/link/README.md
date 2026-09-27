@@ -45,6 +45,10 @@ persistent command/state socket, auto-reconnect, connection status.
   also keeps the radio awake (sparse traffic gave a p95 of up to 1.4 s in the spike), together
   with a low-latency Wi-Fi lock (`LowLatencyWifiLock`) while the channel is open. Round trips
   are logged every 10 s (`RTT median … p95 …`).
+- **Priority on the Wi-Fi link (#62).** Command sockets are marked DSCP EF and the song
+  transfer's CS1 (`SocketTraffic`), so Wi-Fi sends them from different queues (WMM) and a
+  transfer can't hold up the controls; the transfer's buffers are also capped at 256 KB. With
+  everything in one queue, a download made the heartbeat's round trip 0.6–1.3 s (#61 phone test).
 - A connection is lost when the socket closes or breaks, or after 6 s without any message (not
   3 s: MIUI freezes the app for 3–4 s with the screen off). A clean close means the partner's
   app was closed ("Open TandemMoto on …"); silence or a broken socket means the phone went away

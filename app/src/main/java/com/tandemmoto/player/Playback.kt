@@ -13,6 +13,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
@@ -104,6 +105,9 @@ class Playback(
 
     private var ticker: Job? = null
 
+    private val diagnostics = PlayerDiagnostics({ currentId }, log, now)
+    private val stall = StallCheck()
+
     /** Holding at the start of [Held.songId] until both phones have it (#61). */
     private data class Held(val songId: String, val missingOn: MissingOn)
 
@@ -120,7 +124,10 @@ class Playback(
         val files = DataSource.Factory {
             SongDataSource(DefaultDataSource.Factory(context).createDataSource(), this)
         }
-        player = ExoPlayer.Builder(context)
+        // Decoder fallback: if the phone's first audio decoder can't start, try its next one.
+        // Not float output: on the S25 it crackled and ran fast (#62 phone test).
+        val renderers = DefaultRenderersFactory(context).setEnableDecoderFallback(true)
+        player = ExoPlayer.Builder(context, renderers)
             .setMediaSourceFactory(DefaultMediaSourceFactory(files))
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -138,6 +145,7 @@ class Playback(
         session = MediaSession.Builder(context, Controls(player))
             .setId("tandemmoto-${System.identityHashCode(this)}")
             .build()
+        player.addAnalyticsListener(diagnostics)
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 onCurrentChanged()
@@ -174,6 +182,12 @@ class Playback(
 
     fun start() {
         scope.launch { songs.collect(::syncQueue) }
+        scope.launch {
+            while (true) {
+                delay(STALL_CHECK_MS)
+                checkStall()
+            }
+        }
     }
 
     fun togglePlay() {
@@ -324,6 +338,7 @@ class Playback(
             when (val decision = decideStart(id)) {
                 StartDecision.Play -> {
                     stopWaiting()
+                    diagnostics.startRequested()
                     player.play()
                     return true
                 }
@@ -392,6 +407,7 @@ class Playback(
     private fun scheduleStart(id: String, inMs: Long) {
         startJob?.cancel()
         if (inMs <= 0) {
+            diagnostics.startRequested()
             player.play()
             publish()
             return
@@ -399,7 +415,10 @@ class Playback(
         player.pause()
         startJob = scope.launch {
             delay(inMs)
-            if (player.currentMediaItem?.mediaId == id) player.play()
+            if (player.currentMediaItem?.mediaId == id) {
+                diagnostics.startRequested()
+                player.play()
+            }
             publish()
         }
     }
@@ -432,6 +451,35 @@ class Playback(
             player.pause()
         }
         publish()
+    }
+
+    /**
+     * A song that should be playing but doesn't move for 3 s (#62): the phone can't really play
+     * it, even though Android didn't say so. Marked "Can't play on this phone" and skipped on
+     * both phones, like a song Android reports it can't decode.
+     */
+    private fun checkStall() {
+        val id = player.currentMediaItem?.mediaId
+        val shouldMove = id != null &&
+            player.playWhenReady &&
+            held == null &&
+            startJob?.isActive != true &&
+            waitingFor != id &&
+            player.playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_NONE &&
+            (
+                player.playbackState == Player.STATE_READY ||
+                    player.playbackState == Player.STATE_BUFFERING
+                )
+        if (!stall.update(now(), player.currentPosition, shouldMove) || id == null) return
+        val state = if (player.playbackState == Player.STATE_READY) "ready" else "buffering"
+        val format = PlayerDiagnostics.describe(player.audioFormat)
+        log(
+            "song-${id.take(8)} doesn't move ($state at ${player.currentPosition / 1_000} s, " +
+                "$format): can't play it on this phone"
+        )
+        _state.update { it.copy(cantPlay = it.cantPlay + id) }
+        skipForward()
+        control("SkipStalled")
     }
 
     /** Home's seek bar moves every [TICK_MS] while playing. */
@@ -591,6 +639,7 @@ class Playback(
 
     private companion object {
         const val TICK_MS = 500L
+        const val STALL_CHECK_MS = 1_000L
 
         /** Closer than this to the partner's position: no seek (it would be heard). */
         const val APPLY_TOLERANCE_MS = 150L

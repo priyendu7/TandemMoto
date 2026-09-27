@@ -241,7 +241,11 @@ class PlaybackMirror(
         if (!state.playing || state.waiting) return
         val expected = state.positionMs + sinceMs.coerceAtLeast(0)
         val drift = here.positionMs - expected
-        if (abs(drift) <= DRIFT_MS) return
+        if (abs(drift) <= DRIFT_MS) {
+            // Every check, not just the jumps: the phone test measures how close they stay (#62).
+            log("In step with the partner: $drift ms on song-${songId.take(8)}")
+            return
+        }
         log("Drifted $drift ms from the partner on song-${songId.take(8)}: back in step")
         player.apply(songId, expected, playing = true, partnerPlaying = true)
     }

@@ -61,3 +61,18 @@ players in step (#60). The handlebar remote is a spike after Phase 3.
 - **Staying in step.** Every 5 s while playing, the phone that made the latest control sends a
   `Sync` with its position. Only the other phone corrects, and only past 0.5 s (a smaller jump
   would be heard for nothing).
+
+## Phase 3 exit fixes (#62)
+
+- **Stall check (`StallCheck`).** A song the player says is playing but whose position hasn't
+  moved for 3 s (not held, not waiting for its file, not paused by another app's sound) is marked
+  "Can't play on this phone" and skipped on both phones. The Redmi Y2 sat like that on two FLAC
+  files its Files app plays, while Android reported them as playable.
+- **Decoders.** Media3's decoder fallback tries the next decoder if one can't start. Two things
+  were tried for the Redmi's 24-bit, 48 kHz FLAC files and dropped: float output (on the S25 it
+  crackled and ran fast) and preferring a software FLAC decoder (the Redmi has none Media3 can
+  use, so it still picked OMX.qti.audio.decoder.flac). Those files are skipped by the stall check;
+  a bundled FLAC decoder is a Phase 7 item.
+- **Diagnostics (`PlayerDiagnostics`).** Logs each song's decoder, format in and out, state
+  changes, underruns, audio errors, and how long sound takes to start after a start or jump.
+  The mirror logs the drift on every 5 s check ("In step with the partner: 42 ms").

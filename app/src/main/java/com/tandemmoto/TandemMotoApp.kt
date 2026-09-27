@@ -19,6 +19,7 @@ import com.tandemmoto.link.InstallId
 import com.tandemmoto.link.Link
 import com.tandemmoto.link.LowLatencyWifiLock
 import com.tandemmoto.link.SocketFrameTransport
+import com.tandemmoto.link.SocketTraffic
 import com.tandemmoto.player.PartnerSongs
 import com.tandemmoto.player.Playback
 import com.tandemmoto.player.PlaybackMirror
@@ -136,7 +137,10 @@ class TandemMotoApp : Application() {
             incoming = link.channel.incoming,
             send = link.channel::send,
             endpoint = link.endpoint,
-            connection = TransferConnection(SocketFrameTransport(), appScope) {
+            connection = TransferConnection(
+                SocketFrameTransport(traffic = SocketTraffic.Bulk),
+                appScope
+            ) {
                 AppLog.i("Transfer", it)
             },
             store = partnerSongs,
