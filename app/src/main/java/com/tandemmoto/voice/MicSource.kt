@@ -14,6 +14,9 @@ import java.io.Closeable
 interface MicCapture : Closeable {
     /** Fills [buffer]; the number of samples read, or a negative error code. */
     fun read(buffer: ShortArray): Int
+
+    /** Roughly how long a sample waits in the mic's buffer before [read] returns it. */
+    val latencyMs: Int get() = 0
 }
 
 /** Opens the mic; a fake in tests. */
@@ -67,6 +70,9 @@ class AudioRecordSource(private val context: Context) : MicSource {
         }
         return object : MicCapture {
             override fun read(buffer: ShortArray) = record.read(buffer, 0, buffer.size)
+
+            // Android doesn't report it; the minimum buffer is a fair guess.
+            override val latencyMs = minBuffer / 2 * 1_000 / MicSource.SAMPLE_RATE
 
             override fun close() {
                 runCatching { record.stop() }

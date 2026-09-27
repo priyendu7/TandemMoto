@@ -25,6 +25,9 @@ interface FrameConnection {
     suspend fun receive(): ByteArray?
 
     fun close()
+
+    /** The other phone's IP address, for the voice channel (#71); null when not a socket. */
+    val remoteHost: String? get() = null
 }
 
 /** Opens [FrameConnection]s between the two phones. */
@@ -123,6 +126,10 @@ private class SocketFrameConnection(
     override fun close() {
         runCatching { channel.close() }
     }
+
+    override val remoteHost: String? =
+        (runCatching { channel.remoteAddress }.getOrNull() as? InetSocketAddress)
+            ?.address?.hostAddress
 }
 
 /** Reads straight from the channel, which has separate read and write locks. */

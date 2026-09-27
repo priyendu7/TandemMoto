@@ -237,6 +237,9 @@
     <string name="settings_mic_test_could_not_open">Couldn\'t open the mic (allow it on Home)</string>
     <string name="settings_mic_test_in_seconds">In %1$d s</string>
     <string name="settings_mic_test_in_minutes">In %1$d min</string>
+    <string name="settings_talk_test">Talk test</string>
+    <string name="settings_talk_test_summary">Sends your mic to your partner\'s phone. To talk both ways, switch it on for both phones. Stops by itself after 2 minutes.</string>
+    <string name="settings_talk_test_on">Sending your voice: stops in %1$d s</string>
     <string name="settings_export_logs">Export diagnostic logs</string>
     <string name="settings_export_logs_summary">Share a log file to help fix a problem. Nothing is sent automatically.</string>
 

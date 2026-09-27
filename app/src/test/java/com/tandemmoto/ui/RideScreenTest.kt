@@ -27,6 +27,7 @@ import com.tandemmoto.ui.settings.SettingsScreen
 import com.tandemmoto.ui.theme.TandemMotoTheme
 import com.tandemmoto.voice.MicTestResult
 import com.tandemmoto.voice.MicTestState
+import com.tandemmoto.voice.TalkTestState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -233,6 +234,34 @@ class RideScreenTest {
         compose.onNodeWithText(str(R.string.settings_mic_test_heard, -32)).assertExists()
         state.value = MicTestState(result = MicTestResult.Silent)
         compose.onNodeWithText(str(R.string.settings_mic_test_silent)).assertExists()
+    }
+
+    @Test
+    fun settingsTalkTestTogglesAndCountsDown() {
+        var toggled: Boolean? = null
+        val state = mutableStateOf(TalkTestState())
+        compose.setContent {
+            TandemMotoTheme {
+                SettingsScreen(
+                    onBack = {},
+                    onExportLogs = {},
+                    talkTest = state.value,
+                    onTalkTest = { toggled = it }
+                )
+            }
+        }
+        compose.onNodeWithText(str(R.string.settings_talk_test)).performScrollTo().performClick()
+        assertEquals(true, toggled)
+        state.value = TalkTestState(on = true, secondsLeft = 95)
+        compose.onNodeWithText(str(R.string.settings_talk_test_on, 95)).assertExists()
+        compose.onNodeWithText(str(R.string.settings_talk_test)).performClick()
+        assertEquals(false, toggled)
+    }
+
+    @Test
+    fun withoutALinkThereIsNoTalkTest() {
+        compose.setContent { TandemMotoTheme { SettingsScreen(onBack = {}, onExportLogs = {}) } }
+        compose.onNodeWithText(str(R.string.settings_talk_test)).assertDoesNotExist()
     }
 
     @Test

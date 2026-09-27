@@ -7,12 +7,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -23,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.tandemmoto.BuildConfig
@@ -33,6 +36,7 @@ import com.tandemmoto.ui.components.BackTopBar
 import com.tandemmoto.ui.theme.TandemMotoTheme
 import com.tandemmoto.voice.MicTestResult
 import com.tandemmoto.voice.MicTestState
+import com.tandemmoto.voice.TalkTestState
 import kotlin.math.roundToInt
 
 private const val SOURCE_URL = "https://github.com/priyendu7/TandemMoto"
@@ -57,7 +61,10 @@ fun SettingsScreen(
     /** Diagnostics → Mic test (#70); null hides the row. */
     micTest: MicTestState? = null,
     onMicTest: (delaySeconds: Int) -> Unit = {},
-    onCancelMicTest: () -> Unit = {}
+    onCancelMicTest: () -> Unit = {},
+    /** Diagnostics → Talk test (#71); null hides the row (e.g. not linked). */
+    talkTest: TalkTestState? = null,
+    onTalkTest: (Boolean) -> Unit = {}
 ) {
     val uriHandler = LocalUriHandler.current
     var confirmForget by rememberSaveable { mutableStateOf(false) }
@@ -149,6 +156,28 @@ fun SettingsScreen(
             if (micTest != null) {
                 HorizontalDivider()
                 MicTestRow(micTest, onMicTest, onCancelMicTest)
+            }
+            if (talkTest != null) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_talk_test)) },
+                    supportingContent = {
+                        Text(
+                            if (talkTest.on) {
+                                stringResource(R.string.settings_talk_test_on, talkTest.secondsLeft)
+                            } else {
+                                stringResource(R.string.settings_talk_test_summary)
+                            }
+                        )
+                    },
+                    trailingContent = {
+                        Switch(checked = talkTest.on, onCheckedChange = null)
+                    },
+                    modifier = Modifier.toggleable(
+                        value = talkTest.on,
+                        role = Role.Switch,
+                        onValueChange = onTalkTest
+                    )
+                )
             }
         }
     }

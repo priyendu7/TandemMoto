@@ -2,6 +2,7 @@ package com.tandemmoto
 
 import android.app.Application
 import android.content.Context
+import android.os.Process
 import android.os.StatFs
 import androidx.core.net.toUri
 import androidx.datastore.preferences.preferencesDataStore
@@ -33,8 +34,12 @@ import com.tandemmoto.transfer.SongStore
 import com.tandemmoto.transfer.SongTransfers
 import com.tandemmoto.transfer.TransferConnection
 import com.tandemmoto.transfer.WindowSettingsStore
+import com.tandemmoto.voice.AudioModeControl
 import com.tandemmoto.voice.AudioRecordSource
+import com.tandemmoto.voice.AudioTrackSource
 import com.tandemmoto.voice.MicTest
+import com.tandemmoto.voice.TalkTest
+import com.tandemmoto.voice.VoiceChannel
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -89,6 +94,14 @@ class TandemMotoApp : Application() {
 
     /** Whether the intercom could open the mic right now (#70), kept by the link service. */
     val micAccess = MutableStateFlow(MicAccess.NoPermission)
+
+    /** Each person's voice to the other phone (#71). */
+    lateinit var voice: VoiceChannel
+        private set
+
+    /** Settings → Diagnostics → Talk test (#71). */
+    lateinit var talkTest: TalkTest
+        private set
 
     /** Settings → Diagnostics → Mic test (#70). */
     lateinit var micTest: MicTest
@@ -221,6 +234,28 @@ class TandemMotoApp : Application() {
                 "app ${if (visible.value) "on screen" else "in background"}, " +
                     "mic access ${micAccess.value}, link ${link.status.value.javaClass.simpleName}"
             }
+        )
+        startVoice()
+    }
+
+    private fun startVoice() {
+        voice = VoiceChannel(
+            mic = AudioRecordSource(this),
+            speaker = AudioTrackSource(),
+            partnerHost = link.channel.partnerHost,
+            clockOffsetNanos = link.channel.clockOffsetNanos,
+            scope = appScope,
+            log = { AppLog.i("Voice", it) },
+            audioPriority = {
+                Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
+            }
+        )
+        voice.start()
+        talkTest = TalkTest(
+            setSending = voice::setSending,
+            callMode = AudioModeControl(this)::set,
+            scope = appScope,
+            log = { AppLog.i("Voice", it) }
         )
     }
 
