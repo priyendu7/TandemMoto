@@ -31,3 +31,19 @@ Phase 4 adds the `microphone` type (and its own Play declaration) for the interc
 headset-disconnect handling.
 
 Development plan: Phase 1 (#40), Phase 4–5.
+
+## The microphone type (#70)
+
+Android 11+ only lets a foreground service use the mic in the background with the **microphone**
+type, and Android 14+ only lets it *take* that type while the app is on screen. A pause from the
+earbuds or the lock screen happens in the background, so `LinkService` takes the type whenever it
+goes foreground with the app on screen and the mic permission granted, and keeps it until it
+stops (`ServiceTypes`). Taking the type doesn't light Android's mic indicator; recording does.
+
+- Started from the background (a reconnect with the app closed): no mic type, logged, and
+  `MicAccess.OpenAppFirst`; the next time the app comes on screen (`TandemMotoApp.visibleTicks`)
+  the service adds it.
+- If Android refuses the type anyway, the service carries on without it: the link and the music
+  never depend on the mic.
+- Android 10 and older (the Redmi on 9) have no service types; a running foreground service is
+  enough.

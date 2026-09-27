@@ -1,6 +1,7 @@
 package com.tandemmoto.permissions
 
 import android.Manifest
+import com.tandemmoto.permissions.AppPermission.MICROPHONE
 import com.tandemmoto.permissions.AppPermission.NEARBY
 import com.tandemmoto.permissions.AppPermission.NOTIFICATIONS
 import org.junit.Assert.assertEquals
@@ -24,7 +25,7 @@ class PermissionsStateTest {
     @Test
     fun android13AndNewerAskForNearbyDevices() {
         listOf(33, 36).forEach { sdk ->
-            assertEquals(listOf(NEARBY, NOTIFICATIONS), AppPermission.applicable(sdk))
+            assertEquals(listOf(NEARBY, NOTIFICATIONS, MICROPHONE), AppPermission.applicable(sdk))
             assertEquals(
                 listOf(Manifest.permission.NEARBY_WIFI_DEVICES),
                 NEARBY.permissionsFor(sdk)
@@ -35,7 +36,7 @@ class PermissionsStateTest {
     @Test
     fun android12AndOlderAskForLocation() {
         listOf(26, 31, 32).forEach { sdk ->
-            assertEquals(listOf(NEARBY), AppPermission.applicable(sdk))
+            assertEquals(listOf(NEARBY, MICROPHONE), AppPermission.applicable(sdk))
             assertEquals(location, NEARBY.permissionsFor(sdk))
         }
     }

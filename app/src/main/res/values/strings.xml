@@ -52,6 +52,7 @@
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_on">On: shows the connection while the screen is off</string>
     <string name="settings_notifications_off">Off · Tap to turn on and see the connection while the screen is off</string>
+    <string name="permission_microphone_prompt">Allow the microphone to talk when the music is paused</string>
     <string name="permission_notifications_prompt">Allow notifications to see the connection while the screen is off</string>
 
     <!-- Pair -->
@@ -227,6 +228,15 @@
     <string name="settings_forget_title">Forget %1$s?</string>
     <string name="settings_forget_body">You\'ll need to pair again before your next ride.</string>
     <string name="settings_forget_confirm">Forget</string>
+    <string name="settings_mic_test">Mic test</string>
+    <string name="settings_mic_test_summary">Records 5 seconds after a wait, so you can lock the screen or leave the app first. Nothing is kept.</string>
+    <string name="settings_mic_test_starts_in">Starts in %1$d s: lock the screen or leave the app now</string>
+    <string name="settings_mic_test_recording">Recording 5 seconds…</string>
+    <string name="settings_mic_test_heard">Heard sound (loudest %1$d dBFS)</string>
+    <string name="settings_mic_test_silent">Silent: Android blocked the mic</string>
+    <string name="settings_mic_test_could_not_open">Couldn\'t open the mic (allow it on Home)</string>
+    <string name="settings_mic_test_in_seconds">In %1$d s</string>
+    <string name="settings_mic_test_in_minutes">In %1$d min</string>
     <string name="settings_export_logs">Export diagnostic logs</string>
     <string name="settings_export_logs_summary">Share a log file to help fix a problem. Nothing is sent automatically.</string>
 

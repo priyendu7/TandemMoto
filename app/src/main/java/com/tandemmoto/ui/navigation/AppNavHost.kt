@@ -58,6 +58,7 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             val app = context.applicationContext as TandemMotoApp
             val window by app.windowSettings.settings.collectAsStateWithLifecycle()
             val transfers by app.transfers.state.collectAsStateWithLifecycle()
+            val micTest by app.micTest.state.collectAsStateWithLifecycle()
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onExportLogs = { LogExporter.share(context) },
@@ -73,6 +74,9 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 },
                 onWindowChange = app.windowSettings::update,
                 onRemovePartnerSongs = app.transfers::removeAll,
+                micTest = micTest,
+                onMicTest = app.micTest::start,
+                onCancelMicTest = app.micTest::cancel,
                 notifications = permissions.state.statuses[AppPermission.NOTIFICATIONS],
                 onNotificationsClick = {
                     if (permissions.state.isGranted(AppPermission.NOTIFICATIONS)) {

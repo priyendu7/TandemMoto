@@ -28,10 +28,13 @@ import com.tandemmoto.playlist.PlaylistSync
 import com.tandemmoto.playlist.RidePlaylist
 import com.tandemmoto.service.LinkService
 import com.tandemmoto.service.LinkSession
+import com.tandemmoto.service.MicAccess
 import com.tandemmoto.transfer.SongStore
 import com.tandemmoto.transfer.SongTransfers
 import com.tandemmoto.transfer.TransferConnection
 import com.tandemmoto.transfer.WindowSettingsStore
+import com.tandemmoto.voice.AudioRecordSource
+import com.tandemmoto.voice.MicTest
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -76,6 +79,19 @@ class TandemMotoApp : Application() {
 
     /** Runs the foreground service while the phones are linked. */
     lateinit var linkSession: LinkSession
+        private set
+
+    /** An activity is on screen: the link service may take the microphone type then (#70). */
+    val visible = MutableStateFlow(false)
+
+    /** Counts each time the app comes back on screen (a permission may have been granted). */
+    val visibleTicks = MutableStateFlow(0)
+
+    /** Whether the intercom could open the mic right now (#70), kept by the link service. */
+    val micAccess = MutableStateFlow(MicAccess.NoPermission)
+
+    /** Settings → Diagnostics → Mic test (#70). */
+    lateinit var micTest: MicTest
         private set
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -197,6 +213,21 @@ class TandemMotoApp : Application() {
                 .stateIn(appScope, SharingStarted.Eagerly, false)
         )
         linkSession.begin()
+        micTest = MicTest(
+            record = AudioRecordSource(this),
+            scope = appScope,
+            log = { AppLog.i("MicTest", it) },
+            context = {
+                "app ${if (visible.value) "on screen" else "in background"}, " +
+                    "mic access ${micAccess.value}, link ${link.status.value.javaClass.simpleName}"
+            }
+        )
+    }
+
+    /** MainActivity is on screen, or left it. */
+    fun onVisible(isVisible: Boolean) {
+        visible.value = isVisible
+        if (isVisible) visibleTicks.value += 1
     }
 
     /** The user's Disconnect, from Home or the notification: drop the link and the service. */

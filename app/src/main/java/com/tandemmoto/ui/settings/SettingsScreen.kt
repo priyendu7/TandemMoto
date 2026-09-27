@@ -1,7 +1,9 @@
 package com.tandemmoto.ui.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -9,6 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -21,12 +24,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import com.tandemmoto.BuildConfig
 import com.tandemmoto.R
 import com.tandemmoto.permissions.PermissionStatus
 import com.tandemmoto.transfer.WindowSettings
 import com.tandemmoto.ui.components.BackTopBar
 import com.tandemmoto.ui.theme.TandemMotoTheme
+import com.tandemmoto.voice.MicTestResult
+import com.tandemmoto.voice.MicTestState
+import kotlin.math.roundToInt
 
 private const val SOURCE_URL = "https://github.com/priyendu7/TandemMoto"
 private const val PRIVACY_URL = "$SOURCE_URL/blob/main/docs/PRIVACY.md"
@@ -46,7 +53,11 @@ fun SettingsScreen(
     /** Shown when paired (#50); null hides the section. */
     partnerSongs: PartnerSongsUi? = null,
     onWindowChange: (WindowSettings) -> Unit = {},
-    onRemovePartnerSongs: () -> Unit = {}
+    onRemovePartnerSongs: () -> Unit = {},
+    /** Diagnostics → Mic test (#70); null hides the row. */
+    micTest: MicTestState? = null,
+    onMicTest: (delaySeconds: Int) -> Unit = {},
+    onCancelMicTest: () -> Unit = {}
 ) {
     val uriHandler = LocalUriHandler.current
     var confirmForget by rememberSaveable { mutableStateOf(false) }
@@ -135,9 +146,76 @@ fun SettingsScreen(
                 },
                 modifier = Modifier.clickable(onClick = onExportLogs)
             )
+            if (micTest != null) {
+                HorizontalDivider()
+                MicTestRow(micTest, onMicTest, onCancelMicTest)
+            }
         }
     }
 }
+
+/**
+ * Checks the mic works with the screen locked or the app in the background (#70): it waits, so
+ * there's time to lock the screen or leave the app, then records 5 s and says what it heard. The
+ * details go to the logs.
+ */
+@Composable
+private fun MicTestRow(
+    state: MicTestState,
+    onStart: (delaySeconds: Int) -> Unit,
+    onCancel: () -> Unit
+) {
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.settings_mic_test)) },
+        supportingContent = {
+            Column {
+                val result = state.result
+                Text(
+                    when {
+                        state.startsIn != null ->
+                            stringResource(R.string.settings_mic_test_starts_in, state.startsIn)
+                        state.recording -> stringResource(R.string.settings_mic_test_recording)
+                        result is MicTestResult.Heard -> stringResource(
+                            R.string.settings_mic_test_heard,
+                            result.levelsDb.max().roundToInt()
+                        )
+                        result == MicTestResult.Silent ->
+                            stringResource(R.string.settings_mic_test_silent)
+                        result == MicTestResult.CouldNotOpen ->
+                            stringResource(R.string.settings_mic_test_could_not_open)
+                        else -> stringResource(R.string.settings_mic_test_summary)
+                    }
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (state.busy) {
+                        OutlinedButton(onClick = onCancel) {
+                            Text(stringResource(R.string.pair_cancel))
+                        }
+                    } else {
+                        OutlinedButton(onClick = { onStart(SHORT_DELAY_S) }) {
+                            Text(
+                                stringResource(R.string.settings_mic_test_in_seconds, SHORT_DELAY_S)
+                            )
+                        }
+                        OutlinedButton(onClick = { onStart(LONG_DELAY_S) }) {
+                            Text(
+                                stringResource(
+                                    R.string.settings_mic_test_in_minutes,
+                                    LONG_DELAY_S / 60
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    )
+}
+
+private const val SHORT_DELAY_S = 10
+
+/** Long enough to lock both phones, or leave the app and make it reconnect. */
+private const val LONG_DELAY_S = 5 * 60
 
 @Preview(showBackground = true)
 @Composable

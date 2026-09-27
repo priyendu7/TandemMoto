@@ -122,7 +122,14 @@ The app runs a foreground service of type **connectedDevice** while the phones a
   > TandemMoto plays the rider's and pillion's shared playlist of local songs (files they chose on their phones) while they ride. Playback continues with the screen locked and is controlled from the app, the notification, the lock screen and headset or handlebar buttons. The service is the same one that keeps the phones linked; it shows one notification with the song and the link status, and stops when the music stops and the phones aren't linked.
 - **Demo video** (30–60 s): open Playlist and tap a song; show the notification with ⏮ ⏯ ⏭ and the song; lock the screen and show the lock-screen controls while music plays; pause from the notification.
 
-Phase 4 adds the **microphone** type (intercom) with its own declaration and video.
+**Microphone** (from #70): the same service holds the **microphone** type so the intercom works with the screens locked. Android 14+ only lets a service take that type while the app is on screen, so the service takes it when the phones connect with the app open and keeps it while it runs; the mic itself is only recorded in mic mode (music paused while linked, Phase 4) and for Settings → Mic test. Tick **Microphone** and fill in:
+
+- **Task description** (paste):
+  > TandemMoto is an intercom for a motorcycle rider and pillion. When either of them pauses the shared music, both phones open a two-way voice channel directly between the phones over Wi-Fi Direct, so they can talk while riding with the phones locked in their pockets. Resuming the music closes it. The microphone is only used while the music is paused (and for a mic test the user starts in Settings); voice is sent only to the partner's phone and is never recorded or stored. Each person can mute themselves at any time.
+- **Why it must continue in the background**: the phones are locked in pockets for the whole ride; the intercom must open when either rider pauses the music with the handlebar or earbud buttons.
+- **Demo video** (30–60 s): with both phones linked, show Home; pause the music on one phone, lock the screen, and talk: the other phone hears it (show Android's mic indicator); resume the music and show the indicator going off.
+
+Until the intercom exists (#72), the video can use Settings → Mic test with the screen locked.
 
 ### Service account for CI
 
