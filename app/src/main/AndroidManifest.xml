@@ -28,12 +28,16 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <!-- The same service while music plays (#51); needs its own Play declaration. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- The intercom (Phase 4, #70): the mic, and the same service holding the microphone type,
+         which Android 11+ needs for mic use with the screen locked. Optional: music works
+         without it. Needs its own Play declaration and demo video (docs/RELEASING.md). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <!-- Optional (Android 13+): shows the service's notification; it runs without it. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Permissions are added in the PR that builds the feature using them, never ahead of it:
-         RECORD_AUDIO and FOREGROUND_SERVICE_MICROPHONE with the intercom (Phase 4, plus its own
-         Play declaration and demo video); READ_PHONE_STATE with call hold (Phase 5).
+         READ_PHONE_STATE with call hold (Phase 5).
          No Bluetooth permission: the handlebar remote arrives as media-button events via
          MediaSession, and earbud audio/mic routing goes through AudioManager. -->
 
@@ -58,7 +62,7 @@
         <service
             android:name=".service.LinkService"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice|mediaPlayback" />
+            android:foregroundServiceType="connectedDevice|mediaPlayback|microphone" />
 
         <!-- Shares the diagnostic log export only when the user asks (Settings → Export). -->
         <provider

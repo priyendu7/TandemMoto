@@ -37,8 +37,9 @@ import kotlinx.coroutines.launch
  * Keeps the app in the foreground while the phones are linked (#40): without it the S25 closes
  * the socket within a second of the screen locking (spike #22). It does no work itself; being a
  * foreground service keeps the process, and so the link, out of Android's background limits.
- * [LinkSession] decides when it runs. Type `connectedDevice` (allowed by CHANGE_WIFI_STATE);
- * `microphone` joins in Phase 4.
+ * [LinkSession] decides when it runs. Types: `connectedDevice` (allowed by CHANGE_WIFI_STATE),
+ * `mediaPlayback` while music plays, and `microphone` for the intercom, taken while the app is on
+ * screen and kept ([ServiceTypes], #70).
  */
 class LinkService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -80,6 +81,18 @@ class LinkService : Service() {
         goForeground(app.link.status.value, app.playback.state.value)
         if (!updating) updating = true else return START_NOT_STICKY
         scope.launch {
+            // The app came on screen (or the mic permission may have just been granted there):
+            // take the microphone type now if the service is missing it.
+            app.visibleTicks.collect {
+                val playback = app.playback.state.value
+                if (typesFor(playback) !=
+                    currentTypes
+                ) {
+                    goForeground(app.link.status.value, playback)
+                }
+            }
+        }
+        scope.launch {
             combine(app.link.status, app.playback.state, ::Pair).collect { (status, playback) ->
                 if (typesFor(playback) != currentTypes) {
                     goForeground(status, playback) // the playing state changes the service type
@@ -96,6 +109,8 @@ class LinkService : Service() {
 
     override fun onDestroy() {
         scope.cancel()
+        micTaken = false
+        app.micAccess.value = MicAccess.of(Build.VERSION.SDK_INT, micGranted(), micTaken = false)
         // An update could land just as the service stops and leave a notification nothing can
         // remove (seen on the Redmi, #51): clear both.
         notifications.cancel(NOTIFICATION_ID)
@@ -116,22 +131,53 @@ class LinkService : Service() {
 
     private var currentTypes = -1
 
-    /** connectedDevice while the link wants it, mediaPlayback while music plays (#51). */
+    /** Holds the microphone type; kept until the service stops (#70). */
+    private var micTaken = false
+
+    private fun micGranted() = ContextCompat.checkSelfPermission(
+        this,
+        Manifest.permission.RECORD_AUDIO
+    ) == PackageManager.PERMISSION_GRANTED
+
     private fun typesFor(playback: PlaybackState): Int {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return 0
-        var types = 0
-        if (app.linkSession.linkWanted) {
-            types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-        }
-        if (playback.playWhenReady) {
-            types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-        }
-        return if (types == 0) ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE else types
+        val sdk = Build.VERSION.SDK_INT
+        val mic = ServiceTypes.wantsMic(sdk, micGranted(), app.visible.value, micTaken)
+        return ServiceTypes.forState(
+            sdk,
+            linkWanted = app.linkSession.linkWanted,
+            playing = playback.playWhenReady,
+            mic = mic
+        )
     }
 
+    @SuppressLint("InlinedApi") // the microphone type only on Android 11+ (checked)
     private fun goForeground(status: LinkStatus, playback: PlaybackState) {
-        currentTypes = typesFor(playback)
-        ServiceCompat.startForeground(this, NOTIFICATION_ID, linkNotification(status), currentTypes)
+        val types = typesFor(playback)
+        val mic = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            types and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE != 0
+        try {
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, linkNotification(status), types)
+            currentTypes = types
+            if (mic && !micTaken) AppLog.i(TAG, "Took the microphone type: intercom ready")
+            micTaken = mic
+        } catch (e: SecurityException) {
+            // Android refused the microphone type (e.g. the app wasn't on screen after all):
+            // keep the link and the music, without the mic.
+            AppLog.w(TAG, "Android refused the microphone type; going on without it", e)
+            micTaken = false
+            currentTypes = types and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE.inv()
+            ServiceCompat.startForeground(
+                this,
+                NOTIFICATION_ID,
+                linkNotification(status),
+                currentTypes
+            )
+        }
+        val access = MicAccess.of(Build.VERSION.SDK_INT, micGranted(), micTaken)
+        if (access == MicAccess.OpenAppFirst && app.micAccess.value != access) {
+            AppLog.i(TAG, "Started without the microphone type: intercom waits for the app")
+        }
+        app.micAccess.value = access
     }
 
     private fun openApp() = PendingIntent.getActivity(

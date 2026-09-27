@@ -1,6 +1,7 @@
 package com.tandemmoto.ui
 
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties.StateDescription
 import androidx.compose.ui.test.SemanticsMatcher
@@ -24,6 +25,8 @@ import com.tandemmoto.ui.ride.RideUiState
 import com.tandemmoto.ui.settings.PartnerSongsUi
 import com.tandemmoto.ui.settings.SettingsScreen
 import com.tandemmoto.ui.theme.TandemMotoTheme
+import com.tandemmoto.voice.MicTestResult
+import com.tandemmoto.voice.MicTestState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -204,6 +207,35 @@ class RideScreenTest {
     }
 
     @Test
+    fun settingsMicTestStartsWithAWaitAndShowsWhatItHeard() {
+        var started: Int? = null
+        val state = mutableStateOf(MicTestState())
+        compose.setContent {
+            TandemMotoTheme {
+                SettingsScreen(
+                    onBack = {},
+                    onExportLogs = {},
+                    micTest = state.value,
+                    onMicTest = { started = it }
+                )
+            }
+        }
+        compose.onNodeWithText(str(R.string.settings_mic_test_in_seconds, 10))
+            .performScrollTo()
+            .performClick()
+        assertEquals(10, started)
+        compose.onNodeWithText(str(R.string.settings_mic_test_in_minutes, 5)).performClick()
+        assertEquals(300, started)
+        state.value = MicTestState(startsIn = 7)
+        compose.onNodeWithText(str(R.string.settings_mic_test_starts_in, 7)).assertExists()
+        compose.onNodeWithText(str(R.string.pair_cancel)).assertExists()
+        state.value = MicTestState(result = MicTestResult.Heard(listOf(-50.0, -31.6)))
+        compose.onNodeWithText(str(R.string.settings_mic_test_heard, -32)).assertExists()
+        state.value = MicTestState(result = MicTestResult.Silent)
+        compose.onNodeWithText(str(R.string.settings_mic_test_silent)).assertExists()
+    }
+
+    @Test
     fun notConnectedTapsToConnect() {
         showRide(RideUiState(connection = ConnectionStatus.NotConnected))
         compose.onNodeWithText(str(R.string.status_not_connected)).performClick()
@@ -369,6 +401,32 @@ class RideScreenTest {
         )
         compose.onNodeWithText(str(R.string.ride_getting_song_named, "Redmi")).assertExists()
         compose.onNodeWithText("Band").assertDoesNotExist()
+    }
+
+    @Test
+    fun withoutTheMicTheIntercomLineAsksForItAndMusicStillWorks() {
+        showRide(
+            RideUiState(hasSongs = true, nowPlaying = "Song"),
+            PermissionsState(
+                34,
+                mapOf(
+                    AppPermission.NEARBY to PermissionStatus.Granted,
+                    AppPermission.MICROPHONE to PermissionStatus.Denied
+                )
+            )
+        )
+        compose.onNodeWithText(str(R.string.permission_microphone_prompt)).assertExists()
+        compose.onNodeWithText(str(R.string.ride_intercom_off)).assertDoesNotExist()
+        compose.onNodeWithText(str(R.string.permission_allow)).performClick()
+        assertEquals(AppPermission.MICROPHONE, requested)
+        compose.onNodeWithContentDescription(str(R.string.ride_play)).assertIsEnabled()
+    }
+
+    @Test
+    fun withTheMicTheIntercomLineShows() {
+        showRide(RideUiState(hasSongs = true, nowPlaying = "Song"))
+        compose.onNodeWithText(str(R.string.permission_microphone_prompt)).assertDoesNotExist()
+        compose.onNodeWithText(str(R.string.ride_intercom_off)).assertExists()
     }
 
     @Test

@@ -37,7 +37,12 @@ import com.tandemmoto.ui.theme.TandemMotoTheme
 
 /** Current permission state plus the one action a section needs: ask, or open settings. */
 @Stable
-class PermissionRequester(val state: PermissionsState, val request: (AppPermission) -> Unit)
+class PermissionRequester(
+    val state: PermissionsState,
+    val request: (AppPermission) -> Unit,
+    /** Asks for several at once: Android shows their dialogs one after another. */
+    val requestAll: (List<AppPermission>) -> Unit = { it.forEach(request) }
+)
 
 /**
  * Tracks permissions for the Home screen and re-checks them on resume, so a permission granted in
@@ -68,7 +73,11 @@ fun rememberPermissionRequester(): PermissionRequester {
         refresh++
         onPauseOrDispose { }
     }
-    return PermissionRequester(state) { permission ->
+    val requestAll: (List<AppPermission>) -> Unit = { permissions ->
+        val keys = permissions.flatMap { it.permissionsFor(sdk) }
+        if (keys.isNotEmpty()) launcher.launch(keys.toTypedArray())
+    }
+    return PermissionRequester(state, requestAll = requestAll, request = { permission ->
         if (state.status(permission) == PermissionStatus.PermanentlyDenied) {
             // The system dialog won't show again; only app settings can grant it now.
             context.startActivity(
@@ -80,7 +89,7 @@ fun rememberPermissionRequester(): PermissionRequester {
         } else {
             launcher.launch(permission.permissionsFor(sdk).toTypedArray())
         }
-    }
+    })
 }
 
 /**

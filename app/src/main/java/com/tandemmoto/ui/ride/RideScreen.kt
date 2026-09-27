@@ -74,17 +74,19 @@ fun RideRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val permissions = rememberPermissionRequester()
     val context = LocalContext.current
-    // Notifications (Android 13+, optional) are offered once, the first time the link connects:
-    // that's when the connection notification appears, so the reason is obvious.
+    // Offered once, the first time the link connects, one dialog after the other:
+    // notifications (Android 13+), when the connection notification appears; and the microphone
+    // for the intercom, while the app is on screen, so the link service can take the microphone
+    // type that lets it talk with the screen locked (#70). Both are optional.
     LaunchedEffect(state.connection) {
+        if (state.connection != ConnectionStatus.Connected) return@LaunchedEffect
         val askedOnce = AskedOnce(context)
-        if (state.connection == ConnectionStatus.Connected &&
-            permissions.state.status(AppPermission.NOTIFICATIONS) == PermissionStatus.Denied &&
-            !askedOnce.wasAsked(AppPermission.NOTIFICATIONS)
-        ) {
-            askedOnce.markAsked(AppPermission.NOTIFICATIONS)
-            permissions.request(AppPermission.NOTIFICATIONS)
+        val offer = connectOffers.filter {
+            permissions.state.status(it) == PermissionStatus.Denied && !askedOnce.wasAsked(it)
         }
+        if (offer.isEmpty()) return@LaunchedEffect
+        offer.forEach(askedOnce::markAsked)
+        permissions.requestAll(offer)
     }
     RideScreen(
         state = state,
@@ -189,11 +191,22 @@ fun RideScreen(
                     )
                 }
                 PlaybackControls(state, onPlayPause, onNext, onPrevious)
-                IntercomIndicator(state.intercomOn)
+                if (permissions.isGranted(AppPermission.MICROPHONE)) {
+                    IntercomIndicator(state.intercomOn)
+                } else {
+                    PermissionPrompt(
+                        permission = AppPermission.MICROPHONE,
+                        state = permissions,
+                        onRequest = { onRequestPermission(AppPermission.MICROPHONE) }
+                    )
+                }
             }
         }
     }
 }
+
+/** Offered once on the first connection, in this order. */
+private val connectOffers = listOf(AppPermission.NOTIFICATIONS, AppPermission.MICROPHONE)
 
 /**
  * Each Home section asks for its own permission in place, so the rest of the app keeps working
@@ -439,8 +452,13 @@ private fun IntercomIndicator(intercomOn: Boolean) {
     }
 }
 
-private val nearbyGranted =
-    PermissionsState(34, mapOf(AppPermission.NEARBY to PermissionStatus.Granted))
+private val nearbyGranted = PermissionsState(
+    34,
+    mapOf(
+        AppPermission.NEARBY to PermissionStatus.Granted,
+        AppPermission.MICROPHONE to PermissionStatus.Granted
+    )
+)
 
 @Composable
 private fun RidePreview(state: RideUiState, permissions: PermissionsState = nearbyGranted) {

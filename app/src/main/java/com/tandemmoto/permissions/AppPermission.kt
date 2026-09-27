@@ -22,7 +22,14 @@ enum class AppPermission {
      * Android 13+: shows the link's notification (the foreground service runs without it). Optional
      * and asked once, the first time the link connects; Settings can turn it on later.
      */
-    NOTIFICATIONS;
+    NOTIFICATIONS,
+
+    /**
+     * The intercom (Phase 4). Optional: the music works without it. Asked once, on the first
+     * connection after notifications, so the link service can take the microphone type while the
+     * app is on screen (#70).
+     */
+    MICROPHONE;
 
     /**
      * Android permissions to request on [sdk], empty when none are needed there. The first entry
@@ -45,6 +52,7 @@ enum class AppPermission {
             } else {
                 emptyList()
             }
+        MICROPHONE -> listOf(Manifest.permission.RECORD_AUDIO)
     }
 
     /**
@@ -59,6 +67,7 @@ enum class AppPermission {
             else -> R.string.permission_location_prompt
         }
         NOTIFICATIONS -> R.string.permission_notifications_prompt
+        MICROPHONE -> R.string.permission_microphone_prompt
     }
 
     companion object {
