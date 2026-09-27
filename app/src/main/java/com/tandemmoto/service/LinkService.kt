@@ -85,10 +85,13 @@ class LinkService : Service() {
             // take the microphone type now if the service is missing it.
             app.visibleTicks.collect {
                 val playback = app.playback.state.value
-                if (typesFor(playback) !=
-                    currentTypes
-                ) {
+                if (typesFor(playback) != currentTypes) {
                     goForeground(app.link.status.value, playback)
+                } else {
+                    // The types didn't change (always the case before Android 10), but the
+                    // permission may have just been granted (#70 phone test on the Redmi).
+                    app.micAccess.value =
+                        MicAccess.of(Build.VERSION.SDK_INT, micGranted(), micTaken)
                 }
             }
         }
