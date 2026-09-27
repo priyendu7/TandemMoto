@@ -87,6 +87,11 @@ class CommandChannel(
      */
     val clockOffsetNanos: StateFlow<Long?> = _clockOffsetNanos.asStateFlow()
 
+    private val _partnerHost = MutableStateFlow<String?>(null)
+
+    /** The partner's IP address while a connection is open, for the voice channel (#71). */
+    val partnerHost: StateFlow<String?> = _partnerHost.asStateFlow()
+
     /** Set before [state] goes back to [ChannelState.Opening] after a connection ends. */
     @Volatile
     var lastLoss = ChannelLoss.None
@@ -130,6 +135,7 @@ class CommandChannel(
         job = null
         connection?.close()
         connection = null
+        _partnerHost.value = null
         if (_state.value != ChannelState.Idle) {
             _state.value = ChannelState.Idle
             keepAwake(false)
@@ -159,11 +165,13 @@ class CommandChannel(
             }
             failures = 0
             connection = opened
+            _partnerHost.value = opened.remoteHost
             val end = try {
                 session(opened, hello, check)
             } finally {
                 opened.close()
                 connection = null
+                _partnerHost.value = null
                 keepAwake(false)
             }
             when (end) {
