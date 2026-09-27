@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.tandemmoto.TandemMotoApp
 import com.tandemmoto.link.LinkStatus
+import com.tandemmoto.player.MissingOn
 import com.tandemmoto.player.PlaybackState
 import com.tandemmoto.ui.components.ConnectionStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -39,7 +40,9 @@ class RideViewModel(
                 nowPlaying = player.title,
                 artist = player.artist,
                 isPlaying = player.playWhenReady,
-                gettingSong = player.gettingSong,
+                gettingSong = player.gettingSong || player.waitingOn == MissingOn.ThisPhone,
+                waitingForPartner = player.waitingOn == MissingOn.Partner,
+                artwork = player.artwork,
                 hasSongs = player.hasSongs,
                 positionMs = player.positionMs,
                 durationMs = player.durationMs

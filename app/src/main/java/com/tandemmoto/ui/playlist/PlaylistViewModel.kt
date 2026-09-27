@@ -48,7 +48,9 @@ sealed interface PlaylistRow {
         /** The player's current song (#51). */
         val current: Boolean = false,
         /** This phone can't decode its audio format (#51). */
-        val cantPlay: Boolean = false
+        val cantPlay: Boolean = false,
+        /** The partner's phone can't decode it: skipped on both (#61). */
+        val partnerCantPlay: Boolean = false
     ) : PlaylistRow {
         override val key get() = song.id
     }
@@ -130,7 +132,8 @@ internal fun playlistUi(
             mine = mine,
             onThisPhone = onThisPhone,
             badge = badge,
-            current = entry.id == currentId
+            current = entry.id == currentId,
+            partnerCantPlay = partner != null && entry.id in transfers.partnerCantPlay
         )
     } + library.reading.map { PlaylistRow.Reading(it.uri, it.name) },
     loaded = ride.loaded && library.loaded,

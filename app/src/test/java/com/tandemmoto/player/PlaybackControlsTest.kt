@@ -3,6 +3,7 @@ package com.tandemmoto.player
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.tandemmoto.library.LibraryState
+import com.tandemmoto.library.Song
 import com.tandemmoto.playlist.RideEntry
 import com.tandemmoto.playlist.Stamp
 import kotlinx.coroutines.CoroutineScope
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -27,6 +29,8 @@ class PlaybackControlsTest {
     private val songs = MutableStateFlow(listOf(entry("a", "0"), entry("b", "1"), entry("c", "2")))
     private val controls = mutableListOf<String>()
     private var queueChanges = 0
+    private var linked = false
+    private var partner = PartnerSongs()
     private lateinit var playback: Playback
 
     private fun entry(id: String, position: String): RideEntry {
@@ -40,11 +44,18 @@ class PlaybackControlsTest {
             context = ApplicationProvider.getApplicationContext<Context>(),
             scope = scope,
             songs = songs,
-            library = MutableStateFlow(LibraryState()),
+            // This phone's own songs: all here.
+            library = MutableStateFlow(
+                LibraryState(
+                    songs = listOf("a", "b", "c", "z").map { Song(it, "uri-$it", it, null, 1, 1) },
+                    loaded = true
+                )
+            ),
             downloaded = { null },
-            linked = { true },
+            linked = { linked },
             storageFull = { false },
-            currentIndex = MutableStateFlow(0)
+            currentIndex = MutableStateFlow(0),
+            partnerSongs = { partner }
         )
         playback.listener = object : PlaybackListener {
             override fun onControl(control: String) {
@@ -53,6 +64,11 @@ class PlaybackControlsTest {
 
             override fun onQueueChanged() {
                 queueChanges++
+            }
+
+            override fun onStartTogether(): Long {
+                controls += "StartTogether"
+                return 0
             }
         }
         playback.start()
@@ -105,5 +121,81 @@ class PlaybackControlsTest {
         songs.value = songs.value + entry("z", "3")
         assertTrue(playback.hasSong("z"))
         assertTrue(queueChanges > before)
+    }
+
+    @Test
+    fun linkedASongThePartnerHasntGotHoldsWantingToPlay() {
+        linked = true
+        playback.play()
+        val state = playback.state.value
+        assertTrue(state.playWhenReady)
+        assertFalse(playback.player.playWhenReady)
+        assertEquals(MissingOn.Partner, state.waitingOn)
+        assertEquals(PlayerPosition("a", true, 0, waiting = true), playback.position())
+    }
+
+    @Test
+    fun whenThePartnerGetsItBothStartTogether() {
+        linked = true
+        playback.play()
+        partner = PartnerSongs(has = setOf("a"))
+        playback.recheck()
+        assertEquals(listOf("Play", "StartTogether"), controls)
+        assertTrue(playback.player.playWhenReady)
+        assertNull(playback.state.value.waitingOn)
+    }
+
+    @Test
+    fun onBothPhonesItPlaysAtOnce() {
+        linked = true
+        partner = PartnerSongs(has = setOf("a", "b", "c"))
+        playback.play()
+        assertTrue(playback.player.playWhenReady)
+        assertNull(playback.state.value.waitingOn)
+    }
+
+    @Test
+    fun pauseStopsWaiting() {
+        linked = true
+        playback.play()
+        playback.pause()
+        assertNull(playback.state.value.waitingOn)
+        assertFalse(playback.state.value.playWhenReady)
+    }
+
+    @Test
+    fun theLinkDroppingWhileHeldPlaysOnThisPhone() {
+        linked = true
+        playback.play()
+        linked = false
+        playback.recheck()
+        assertTrue(playback.player.playWhenReady)
+        assertEquals(listOf("Play"), controls) // no start together to send
+    }
+
+    @Test
+    fun aSongThePartnerCantPlayIsSkippedOnPlay() {
+        linked = true
+        partner = PartnerSongs(has = setOf("a", "b", "c"), cantPlay = setOf("a"))
+        playback.play()
+        assertEquals("b", playback.position().songId)
+        assertTrue(playback.player.playWhenReady)
+    }
+
+    @Test
+    fun thePartnerPlayingASongMeansItHasIt() {
+        linked = true
+        playback.apply("b", 0, playing = true, partnerPlaying = true)
+        assertTrue(playback.player.playWhenReady)
+        assertTrue(controls.isEmpty())
+    }
+
+    @Test
+    fun aStartAheadWaitsThenPlays() {
+        linked = true
+        partner = PartnerSongs(has = setOf("b"))
+        playback.apply("b", 0, playing = true, startInMs = 300, partnerPlaying = true)
+        assertFalse(playback.player.playWhenReady)
+        assertTrue(playback.state.value.playWhenReady)
     }
 }

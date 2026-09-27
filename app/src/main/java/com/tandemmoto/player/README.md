@@ -41,4 +41,23 @@ players in step (#60). The handlebar remote is a spike after Phase 3.
   their latest control's stamp; the newer wins. A restarted app is at clock 0, so it joins the
   partner. A state whose song isn't in the queue yet waits for it (`onQueueChanged`).
 - **Logs:** "Followed the partner's Pause in 18 ms" on the phone that follows (hashed song IDs).
-  Keeping the positions in step over time and waiting for both phones to have a song is #61.
+
+## Starting together and staying in step (#61)
+
+- **Start gate (`StartGate`).** While linked, a song starts only when both phones have it: this
+  phone's file (`SongFiles`) and the partner's `SongsOnPhone`. Otherwise the player **holds** at
+  the song's start, still wanting to play (the button shows Pause): "Getting song…" on the phone
+  without it, "Getting song on …" on the other. A partner that says it's playing the song has it.
+  Not linked, each phone plays on its own. Controls, the partner's state and a song ending all go
+  through the gate.
+- **Start together.** When a held song reaches both phones (a download finished, the partner's
+  list arrived: `Playback.recheck`), the phone that notices sends a start 300 ms ahead
+  (`atNanos` in the future) and both start then. If both notice, the newer stamp wins and the
+  other phone moves its start to match.
+- **Giving up.** The phone without the song skips after its wait rules (60 s linked) and the
+  skip is mirrored; a hold also gives up after 75 s as a backstop.
+- **Can't play.** `SongsOnPhone.cantPlay` carries the songs a phone can't decode; the gate skips
+  them on both phones, and Playlist says "Can't play on …".
+- **Staying in step.** Every 5 s while playing, the phone that made the latest control sends a
+  `Sync` with its position. Only the other phone corrects, and only past 0.5 s (a smaller jump
+  would be heard for nothing).

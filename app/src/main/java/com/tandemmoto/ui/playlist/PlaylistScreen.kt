@@ -617,15 +617,16 @@ private fun SongRow(
             )
         },
         supportingContent = {
-            if (entry.missing || entry.cantPlay) {
+            if (entry.missing || entry.cantPlay || entry.partnerCantPlay) {
                 Text(
-                    stringResource(
-                        if (entry.missing) {
-                            R.string.playlist_file_missing
-                        } else {
-                            R.string.playlist_cant_play
-                        }
-                    ),
+                    when {
+                        entry.missing -> stringResource(R.string.playlist_file_missing)
+                        entry.cantPlay -> stringResource(R.string.playlist_cant_play)
+                        else -> stringResource(
+                            R.string.playlist_partner_cant_play,
+                            partnerName ?: stringResource(R.string.ride_your_partner)
+                        )
+                    },
                     color = MaterialTheme.colorScheme.error
                 )
             } else {
@@ -636,7 +637,7 @@ private fun SongRow(
         },
         trailingContent = {
             Box {
-                if (entry.missing || entry.cantPlay) {
+                if (entry.missing || entry.cantPlay || entry.partnerCantPlay) {
                     Icon(
                         Icons.Filled.Warning,
                         contentDescription = null,

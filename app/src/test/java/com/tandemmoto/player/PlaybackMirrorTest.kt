@@ -7,6 +7,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -19,14 +20,24 @@ class PlaybackMirrorTest {
         var now = PlayerPosition("a", playing = false, positionMs = 0)
         val queue = mutableListOf("a", "b", "c")
         val applied = mutableListOf<PlayerPosition>()
+        var startInMs = 0L
+        var partnerPlaying = false
 
         override fun position() = now
 
         override fun hasSong(songId: String) = songId in queue
 
-        override fun apply(songId: String, positionMs: Long, playing: Boolean) {
+        override fun apply(
+            songId: String,
+            positionMs: Long,
+            playing: Boolean,
+            startInMs: Long,
+            partnerPlaying: Boolean
+        ) {
             now = PlayerPosition(songId, playing, positionMs)
             applied += now
+            this.startInMs = startInMs
+            this.partnerPlaying = partnerPlaying
         }
     }
 
@@ -219,6 +230,112 @@ class PlaybackMirrorTest {
     fun aStateWithNoSongChangesNothing() = runTest {
         mirror()
         incoming.emit(theirs(null, playing = false, positionMs = 0, clock = 3))
+        runCurrent()
+        assertTrue(player.applied.isEmpty())
+    }
+
+    @Test
+    fun startTogetherPlansTheStartAheadOnBothPhones() = runTest {
+        val mirror = mirror()
+        channel.value = ChannelState.Open(hello)
+        runCurrent()
+        sent.clear()
+        player.now = PlayerPosition("b", playing = true, positionMs = 0, waiting = true)
+        nowNanos = 1_000_000_000
+        assertEquals(PlaybackMirror.START_LEAD_MS, mirror.onStartTogether())
+        runCurrent()
+        val start = sent.single()
+        assertEquals(1_300_000_000L, start.atNanos)
+        assertEquals(PlaybackMirror.START_TOGETHER, start.control)
+        assertTrue(start.playing && !start.waiting)
+    }
+
+    @Test
+    fun startTogetherWhenNotLinkedStartsNow() = runTest {
+        val mirror = mirror()
+        assertEquals(0L, mirror.onStartTogether())
+    }
+
+    @Test
+    fun aStartAheadIsAppliedToStartThen() = runTest {
+        mirror()
+        offset.value = 0
+        nowNanos = 1_000_000_000
+        incoming.emit(
+            theirs("b", playing = true, positionMs = 0, clock = 3, atNanos = 1_250_000_000)
+        )
+        runCurrent()
+        assertEquals(PlayerPosition("b", true, 0), player.now)
+        assertEquals(250L, player.startInMs)
+        assertTrue(player.partnerPlaying)
+    }
+
+    @Test
+    fun aHoldingPartnerIsntTakenToHaveTheSong() = runTest {
+        mirror()
+        incoming.emit(
+            theirs("b", playing = true, positionMs = 0, clock = 3).copy(waiting = true)
+        )
+        runCurrent()
+        assertEquals("b", player.now.songId)
+        assertTrue(!player.partnerPlaying)
+    }
+
+    @Test
+    fun theLeaderSendsWhereItIsEveryFewSeconds() = runTest {
+        val mirror = mirror()
+        channel.value = ChannelState.Open(hello)
+        runCurrent()
+        player.now = PlayerPosition("a", playing = true, positionMs = 10_000)
+        mirror.onControl("Play")
+        runCurrent()
+        sent.clear()
+        advanceTimeBy(PlaybackMirror.SYNC_EVERY_MS + 1)
+        val sync = sent.single()
+        assertEquals(PlaybackMirror.SYNC, sync.control)
+        assertEquals(Stamp(1, "me"), sync.stamp)
+    }
+
+    @Test
+    fun theFollowerSendsNoSync() = runTest {
+        mirror()
+        channel.value = ChannelState.Open(hello)
+        runCurrent()
+        incoming.emit(theirs("a", playing = true, positionMs = 0, clock = 2))
+        runCurrent()
+        sent.clear()
+        advanceTimeBy(PlaybackMirror.SYNC_EVERY_MS * 2 + 1)
+        assertTrue(sent.isEmpty())
+    }
+
+    @Test
+    fun theFollowerJumpsOnlyWhenItDriftedTooFar() = runTest {
+        mirror()
+        offset.value = 0
+        incoming.emit(theirs("a", playing = true, positionMs = 0, clock = 2))
+        runCurrent()
+        player.applied.clear()
+        // 300 ms apart: left alone.
+        player.now = PlayerPosition("a", playing = true, positionMs = 30_300)
+        incoming.emit(theirs("a", true, 30_000, clock = 2).copy(control = PlaybackMirror.SYNC))
+        runCurrent()
+        assertTrue(player.applied.isEmpty())
+        // 600 ms apart: back in step.
+        player.now = PlayerPosition("a", playing = true, positionMs = 60_600)
+        incoming.emit(theirs("a", true, 60_000, clock = 2).copy(control = PlaybackMirror.SYNC))
+        runCurrent()
+        assertEquals(listOf(PlayerPosition("a", true, 60_000)), player.applied)
+    }
+
+    @Test
+    fun aHeldPhoneDoesntJumpOnASync() = runTest {
+        mirror()
+        offset.value = 0
+        incoming.emit(theirs("a", playing = true, positionMs = 0, clock = 2))
+        runCurrent()
+        player.applied.clear()
+        player.now = PlayerPosition("a", playing = true, positionMs = 0, waiting = true)
+        incoming.emit(theirs("a", true, 60_000, clock = 2).copy(control = PlaybackMirror.SYNC))
         runCurrent()
         assertTrue(player.applied.isEmpty())
     }

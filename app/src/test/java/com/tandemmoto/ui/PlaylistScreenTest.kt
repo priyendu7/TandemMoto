@@ -124,6 +124,23 @@ class PlaylistScreenTest {
     }
 
     @Test
+    fun aSongThePartnerCantPlaySaysItsSkippedOnBoth() {
+        show(
+            PlaylistUiState(
+                rows = listOf(
+                    PlaylistRow.Entry(alpha, false, badge = SongBadge.NotOnPartner).copy(
+                        partnerCantPlay = true
+                    )
+                ),
+                loaded = true,
+                sharing = Sharing.Shared,
+                partnerName = "Redmi"
+            )
+        )
+        compose.onNodeWithText(str(R.string.playlist_partner_cant_play, "Redmi")).assertExists()
+    }
+
+    @Test
     fun rowsSayWhoseSongItIsOnceThereIsAPartner() {
         show(
             PlaylistUiState(
