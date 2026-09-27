@@ -12,9 +12,11 @@ import com.tandemmoto.library.LibraryState
 import com.tandemmoto.library.Song
 import com.tandemmoto.link.LinkStatus
 import com.tandemmoto.link.Partner
+import com.tandemmoto.player.PlaybackState
 import com.tandemmoto.playlist.RidePlaylist
 import com.tandemmoto.playlist.RidePlaylistState
 import com.tandemmoto.transfer.TransferState
+import com.tandemmoto.ui.ride.PlayerControls
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -46,7 +48,9 @@ sealed interface PlaylistRow {
         /** The player's current song (#51). */
         val current: Boolean = false,
         /** This phone can't decode its audio format (#51). */
-        val cantPlay: Boolean = false
+        val cantPlay: Boolean = false,
+        /** The partner's phone can't decode it: skipped on both (#61). */
+        val partnerCantPlay: Boolean = false
     ) : PlaylistRow {
         override val key get() = song.id
     }
@@ -83,6 +87,15 @@ sealed interface SongBadge {
 /** Whether edits reach the partner now. */
 enum class Sharing { NotPaired, Shared, WaitingToSync }
 
+/** Playlist's now-playing bar: the current song, play/pause and a seek bar (#60). */
+data class NowPlayingBar(
+    val title: String,
+    val artist: String?,
+    val isPlaying: Boolean,
+    val positionMs: Long,
+    val durationMs: Long
+)
+
 data class PlaylistUiState(
     val rows: List<PlaylistRow> = emptyList(),
     val loaded: Boolean = false,
@@ -90,7 +103,9 @@ data class PlaylistUiState(
     /** Single files that can still be added before Android's permission limit. */
     val fileSlotsLeft: Int = Int.MAX_VALUE,
     val sharing: Sharing = Sharing.NotPaired,
-    val partnerName: String? = null
+    val partnerName: String? = null,
+    /** The song playing, for the bar under the list; null with nothing to play. */
+    val nowPlaying: NowPlayingBar? = null
 ) {
     /** Songs only (reading rows excluded), in playlist order: what move indexes refer to. */
     val songCount: Int get() = rows.count { it is PlaylistRow.Entry }
@@ -117,7 +132,8 @@ internal fun playlistUi(
             mine = mine,
             onThisPhone = onThisPhone,
             badge = badge,
-            current = entry.id == currentId
+            current = entry.id == currentId,
+            partnerCantPlay = partner != null && entry.id in transfers.partnerCantPlay
         )
     } + library.reading.map { PlaylistRow.Reading(it.uri, it.name) },
     loaded = ride.loaded && library.loaded,
@@ -159,7 +175,9 @@ class PlaylistViewModel(
     transfers: StateFlow<TransferState>,
     currentSong: Flow<String?> = flowOf(null),
     private val playAt: (Int) -> Unit = {},
-    cantPlay: Flow<Set<String>> = flowOf(emptySet())
+    cantPlay: Flow<Set<String>> = flowOf(emptySet()),
+    playback: Flow<PlaybackState> = flowOf(PlaybackState()),
+    private val controls: PlayerControls = PlayerControls()
 ) : ViewModel() {
     private val linked = linkStatus.map { it is LinkStatus.Connected }
 
@@ -185,6 +203,8 @@ class PlaylistViewModel(
                         }
                     }
                 )
+            }.combine(playback) { ui, player ->
+                ui.copy(nowPlaying = player.nowPlayingBar())
             }.stateIn(viewModelScope, SharingStarted.Eagerly, PlaylistUiState())
 
     private data class Inputs(
@@ -197,6 +217,11 @@ class PlaylistViewModel(
 
     /** A tap on a song: play from there (#51). */
     fun play(index: Int) = playAt(index)
+
+    fun playPause() = controls.playPause()
+
+    /** The now-playing bar's seek bar, let go at [positionMs] (mirrored, #60). */
+    fun seek(positionMs: Long) = controls.seekTo(positionMs)
 
     val summaries: Flow<ImportSummary> = library.summaries
 
@@ -227,9 +252,25 @@ class PlaylistViewModel(
                     app.transfers.state,
                     app.playback.state.map { it.currentId },
                     app.playback::playAt,
-                    app.playback.state.map { it.cantPlay }
+                    app.playback.state.map { it.cantPlay },
+                    app.playback.state,
+                    PlayerControls(
+                        playPause = app.playback::togglePlay,
+                        seekTo = app.playback::seekTo
+                    )
                 )
             }
         }
     }
+}
+
+private fun PlaybackState.nowPlayingBar(): NowPlayingBar? {
+    if (!hasSongs) return null
+    return NowPlayingBar(
+        title = title ?: return null,
+        artist = artist,
+        isPlaying = playWhenReady,
+        positionMs = positionMs,
+        durationMs = durationMs
+    )
 }

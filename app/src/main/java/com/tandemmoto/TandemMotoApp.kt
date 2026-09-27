@@ -19,7 +19,9 @@ import com.tandemmoto.link.InstallId
 import com.tandemmoto.link.Link
 import com.tandemmoto.link.LowLatencyWifiLock
 import com.tandemmoto.link.SocketFrameTransport
+import com.tandemmoto.player.PartnerSongs
 import com.tandemmoto.player.Playback
+import com.tandemmoto.player.PlaybackMirror
 import com.tandemmoto.playlist.JsonFileRidePlaylistStore
 import com.tandemmoto.playlist.PlaylistSync
 import com.tandemmoto.playlist.RidePlaylist
@@ -35,8 +37,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 private val Context.partnerDataStore by preferencesDataStore(name = "partner")
 private val Context.identityDataStore by preferencesDataStore(name = "identity")
@@ -152,9 +157,32 @@ class TandemMotoApp : Application() {
             linked = { link.channel.state.value is ChannelState.Open },
             storageFull = { transfers.state.value.storageFull },
             currentIndex = currentSongIndex,
+            partnerSongs = {
+                transfers.state.value.let { PartnerSongs(it.partnerHas, it.partnerCantPlay) }
+            },
             log = { AppLog.i("Player", it) }
         )
         playback.start()
+        // The start gate (#61): a held song may start when a download finishes, the partner's
+        // song list changes or the link comes or goes; and the partner hears what can't play.
+        appScope.launch {
+            combine(transfers.state, library.state, link.channel.state) { _, _, _ -> }
+                .collect { playback.recheck() }
+        }
+        appScope.launch {
+            playback.state.map { it.cantPlay }.distinctUntilChanged()
+                .collect { transfers.setCantPlay(it) }
+        }
+        PlaybackMirror(
+            player = playback,
+            installId = installId::get,
+            channelState = link.channel.state,
+            incoming = link.channel.incoming,
+            send = link.channel::send,
+            clockOffsetNanos = link.channel.clockOffsetNanos,
+            scope = appScope,
+            log = { AppLog.i("Mirror", it) }
+        ).also { playback.listener = it }.start()
         linkSession = LinkSession(
             status = link.status,
             scope = appScope,

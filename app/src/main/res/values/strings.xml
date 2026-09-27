@@ -99,14 +99,16 @@
     <string name="ride_disconnect_title">Disconnect from %1$s?</string>
     <string name="ride_disconnect_body">The phones stop sharing and won\'t reconnect until you tap Connect. %1$s will see that you disconnected.</string>
     <string name="ride_open_settings">Settings</string>
-    <string name="ride_now_playing">Now playing</string>
     <string name="ride_no_song">No song selected</string>
     <string name="ride_getting_song">Getting song…</string>
     <string name="ride_getting_song_named">Getting song from %1$s…</string>
+    <string name="ride_getting_song_on">Getting song on %1$s…</string>
     <string name="ride_play">Play</string>
     <string name="ride_pause">Pause</string>
     <string name="ride_next">Next song</string>
     <string name="ride_previous">Previous song</string>
+    <string name="ride_seek">Song position</string>
+    <string name="ride_seek_position">%1$s of %2$s</string>
     <string name="ride_controls_disabled_hint">Add songs in Playlist to start playing.</string>
     <string name="playlist_now_playing">Now playing</string>
     <string name="playlist_play_from_here">Play from here</string>
@@ -169,6 +171,7 @@
     <string name="playlist_on_this_phone">On this phone</string>
     <string name="playlist_file_missing">File missing</string>
     <string name="playlist_cant_play">Can\'t play on this phone (audio format not supported)</string>
+    <string name="playlist_partner_cant_play">Can\'t play on %1$s: skipped on both phones</string>
     <string name="playlist_added_by_you">Added by you</string>
     <string name="playlist_on_both_phones">On both phones ✓</string>
     <string name="playlist_not_on_partner">Not on %1$s yet</string>

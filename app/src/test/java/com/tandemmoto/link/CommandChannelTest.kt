@@ -92,7 +92,12 @@ class CommandChannelTest {
         assertEquals(ourHello, theirs.receiveMessage())
         theirs.sendMessage(Message.Ping(42))
         runCurrent()
-        assertEquals(Message.Pong(42), theirs.receiveMessage())
+        advanceTimeBy(5)
+        theirs.sendMessage(Message.Ping(43))
+        runCurrent()
+        // Our clock goes back with it, for the partner's clock offset (#60).
+        assertEquals(Message.Pong(42, 0), theirs.receiveMessage())
+        assertEquals(Message.Pong(43, 5_000_000), theirs.receiveMessage())
     }
 
     @Test

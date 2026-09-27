@@ -1,5 +1,6 @@
 package com.tandemmoto.state
 
+import com.tandemmoto.playlist.Stamp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,6 +15,19 @@ class MessageCodecTest {
             hello.copy(partnerInstallId = "install-b"),
             Message.Ping(123_456_789L),
             Message.Pong(123_456_789L),
+            Message.Pong(123_456_789L, 987_654_321L),
+            Message.PlaybackState(
+                songId = "abc",
+                playing = true,
+                positionMs = 61_000,
+                atNanos = 5_000_000_000,
+                stamp = Stamp(4, "install-a"),
+                control = "Seek"
+            ),
+            Message.PlaybackState(null, false, 0, 0, Stamp(0, "install-b"), "Connect"),
+            Message.PlaybackState("abc", true, 0, 9, Stamp(2, "install-b"), "Next", waiting = true),
+            Message.SongsOnPhone(listOf("a", "b")),
+            Message.SongsOnPhone(listOf("a"), cantPlay = listOf("b")),
             Message.Bye(Message.Bye.Reason.NotYourPartner),
             Message.Bye(Message.Bye.Reason.ProtocolMismatch),
             Message.Bye(Message.Bye.Reason.Closing)
@@ -22,6 +36,24 @@ class MessageCodecTest {
             val decoded = MessageCodec.decode(MessageCodec.encode(message, seq.toLong()))
             assertEquals(Envelope.Known(PROTOCOL_VERSION, seq.toLong(), message), decoded)
         }
+    }
+
+    @Test
+    fun aPongFromAnAppBefore60HasNoReplyTime() {
+        val frame = """{"v":1,"type":"pong","seq":2,"payload":{"sentAtNanos":7}}"""
+        assertEquals(
+            Envelope.Known(1, 2, Message.Pong(7, 0)),
+            MessageCodec.decode(frame.encodeToByteArray())
+        )
+    }
+
+    @Test
+    fun songsOnPhoneFromAnAppBefore61HaveNoCantPlay() {
+        val frame = """{"v":1,"type":"songs_on_phone","seq":2,"payload":{"ids":["a"]}}"""
+        assertEquals(
+            Envelope.Known(1, 2, Message.SongsOnPhone(listOf("a"))),
+            MessageCodec.decode(frame.encodeToByteArray())
+        )
     }
 
     @Test

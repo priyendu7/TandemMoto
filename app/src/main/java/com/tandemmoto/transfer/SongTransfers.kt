@@ -34,6 +34,8 @@ data class TransferState(
     val sending: Progress? = null,
     /** Songs the partner's phone can play (its own, copies, downloads), from `SongsOnPhone`. */
     val partnerHas: Set<String> = emptySet(),
+    /** Songs the partner's phone can't decode (#61). */
+    val partnerCantPlay: Set<String> = emptySet(),
     /** The partner's songs downloaded on this phone. */
     val stored: Set<String> = emptySet(),
     val storedBytes: Long = 0,
@@ -85,7 +87,8 @@ class SongTransfers(
     private var watchdog: Job? = null
     private var sending: Job? = null
     private var sendGeneration = 0
-    private var lastInventory: Set<String>? = null
+    private var lastInventory: Pair<Set<String>, Set<String>>? = null
+    private var cantPlay: Set<String> = emptySet()
     private val failures = mutableMapOf<String, Int>()
     private val unavailable = mutableSetOf<String>()
 
@@ -117,7 +120,12 @@ class SongTransfers(
                         stopActive()
                         lastInventory = null
                         _state.update {
-                            it.copy(partnerHas = emptySet(), linked = false, sending = null)
+                            it.copy(
+                                partnerHas = emptySet(),
+                                partnerCantPlay = emptySet(),
+                                linked = false,
+                                sending = null
+                            )
                         }
                     }
                     sending?.cancel()
@@ -134,7 +142,12 @@ class SongTransfers(
                     is Message.SongRequest -> serve(message)
                     is Message.SongUnavailable -> onUnavailable(message.id)
                     is Message.SongsOnPhone ->
-                        _state.update { it.copy(partnerHas = message.ids.toSet()) }
+                        _state.update {
+                            it.copy(
+                                partnerHas = message.ids.toSet(),
+                                partnerCantPlay = message.cantPlay.toSet()
+                            )
+                        }
                     else -> Unit
                 }
             }
@@ -188,14 +201,26 @@ class SongTransfers(
                     aheadLimitedTo = plan.aheadLimitedTo
                 )
             }
+            val fetchable = plan.wanted.filter {
+                it.id !in stored &&
+                    it.id !in unavailable &&
+                    (failures[it.id] ?: 0) < MAX_FAILURES
+            }
+            // The song that's playing comes first: another download stops for it (what arrived
+            // is kept, and it resumes after), so "Getting song…" isn't stuck behind it.
+            val currentId = ride.songs.getOrNull(currentIndex.value)?.id
+            val downloading = active
+            if (downloading != null &&
+                downloading != currentId &&
+                fetchable.any { it.id == currentId }
+            ) {
+                log("${logId(currentId!!)} is playing: it comes before ${logId(downloading)}")
+                stopActive()
+            }
             if (active != null || !linked || !connection.ready.value) {
                 null
             } else {
-                plan.wanted.firstOrNull {
-                    it.id !in stored &&
-                        it.id !in unavailable &&
-                        (failures[it.id] ?: 0) < MAX_FAILURES
-                }
+                fetchable.firstOrNull { it.id == currentId } ?: fetchable.firstOrNull()
             }
         }
         sendInventory()
@@ -326,12 +351,20 @@ class SongTransfers(
         }
     }
 
+    /** Songs this phone's player can't decode (#51), for the partner's start gate (#61). */
+    suspend fun setCantPlay(ids: Set<String>) {
+        if (ids == cantPlay) return
+        cantPlay = ids
+        sendInventory()
+    }
+
     private suspend fun sendInventory() {
         if (!linked) return
         val songs = library.value
         val ids = songs.songs.map { it.id }.toSet() + songs.copyOf.keys + _state.value.stored
-        if (ids == lastInventory) return
-        if (send(Message.SongsOnPhone(ids.toList()))) lastInventory = ids
+        val inventory = ids to cantPlay
+        if (inventory == lastInventory) return
+        if (send(Message.SongsOnPhone(ids.toList(), cantPlay.toList()))) lastInventory = inventory
     }
 
     /** Call with [lock] held. */

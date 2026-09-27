@@ -1,17 +1,22 @@
 package com.tandemmoto.ui.ride
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,14 +29,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,9 +56,12 @@ import com.tandemmoto.ui.components.ConnectionStatus
 import com.tandemmoto.ui.components.ConnectionStatusBar
 import com.tandemmoto.ui.components.ControlButton
 import com.tandemmoto.ui.components.PermissionPrompt
+import com.tandemmoto.ui.components.SongSeekBar
 import com.tandemmoto.ui.components.openWifiSettings
 import com.tandemmoto.ui.components.rememberPermissionRequester
 import com.tandemmoto.ui.theme.TandemMotoTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** The Home screen: the app opens here, and every feature is reached from it. */
 @Composable
@@ -84,7 +98,8 @@ fun RideRoute(
         onNext = viewModel::onNext,
         onPrevious = viewModel::onPrevious,
         onOpenPlaylist = onOpenPlaylist,
-        onOpenSettings = onOpenSettings
+        onOpenSettings = onOpenSettings,
+        onSeek = viewModel::onSeek
     )
 }
 
@@ -102,7 +117,8 @@ fun RideScreen(
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     onOpenPlaylist: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onSeek: (Long) -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -142,13 +158,36 @@ fun RideScreen(
             )
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(24.dp)
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
             ) {
-                NowPlayingCard(state)
-                Spacer(Modifier.weight(1f))
+                // The picture takes the room that's left, as a square: large on a tall phone,
+                // smaller on a short one, and never pushing the controls off the screen.
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    Artwork(
+                        state.artwork,
+                        Modifier
+                            .widthIn(max = 320.dp)
+                            .aspectRatio(1f, matchHeightConstraintsFirst = true)
+                    )
+                }
+                SongInfo(state)
+                if (state.nowPlaying != null) {
+                    SongSeekBar(
+                        positionMs = state.positionMs,
+                        durationMs = state.durationMs,
+                        enabled = state.controlsEnabled,
+                        onSeek = onSeek,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
                 PlaybackControls(state, onPlayPause, onNext, onPrevious)
                 IntercomIndicator(state.intercomOn)
             }
@@ -257,33 +296,75 @@ private fun ConnectionSection(
     }
 }
 
+/** The song's own picture (album art), or a music note when the file has none. */
 @Composable
-private fun NowPlayingCard(state: RideUiState) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text(
-                text = stringResource(R.string.ride_now_playing),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = state.nowPlaying ?: stringResource(R.string.ride_no_song),
-                style = MaterialTheme.typography.headlineMedium
-            )
-            val below = when {
-                state.gettingSong ->
-                    state.partnerName
-                        ?.let { stringResource(R.string.ride_getting_song_named, it) }
-                        ?: stringResource(R.string.ride_getting_song)
-                else -> state.artist
+private fun Artwork(bytes: ByteArray?, modifier: Modifier = Modifier) {
+    val image by produceState<ImageBitmap?>(null, bytes) {
+        value = bytes?.let {
+            withContext(Dispatchers.Default) {
+                BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap()
             }
-            if (below != null && state.nowPlaying != null) {
-                Text(
-                    text = below,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+        }
+    }
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        val picture = image
+        if (picture != null) {
+            // Decorative: the title and artist below say what's playing.
+            Image(
+                bitmap = picture,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Icon(
+                painter = painterResource(R.drawable.ic_music_note),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxSize(0.4f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SongInfo(state: RideUiState) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        // Song names are often file names: two lines at most, so a long one can't push the
+        // controls off a small screen.
+        Text(
+            text = state.nowPlaying ?: stringResource(R.string.ride_no_song),
+            style = MaterialTheme.typography.headlineSmall,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        val partner = state.partnerName ?: stringResource(R.string.ride_your_partner)
+        val below = when {
+            state.waitingForPartner -> stringResource(R.string.ride_getting_song_on, partner)
+            state.gettingSong ->
+                state.partnerName
+                    ?.let { stringResource(R.string.ride_getting_song_named, it) }
+                    ?: stringResource(R.string.ride_getting_song)
+            else -> state.artist
+        }
+        if (below != null && state.nowPlaying != null) {
+            Text(
+                text = below,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -403,7 +484,13 @@ private fun RideNotPairedPreview() {
 private fun RideConnectedPreview() {
     TandemMotoTheme(darkTheme = true, dynamicColor = false) {
         RidePreview(
-            RideUiState(connection = ConnectionStatus.Connected, nowPlaying = "Highway Song")
+            RideUiState(
+                connection = ConnectionStatus.Connected,
+                nowPlaying = "Highway Song",
+                hasSongs = true,
+                positionMs = 83_000,
+                durationMs = 245_000
+            )
         )
     }
 }

@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.tandemmoto.TandemMotoApp
 import com.tandemmoto.link.LinkStatus
+import com.tandemmoto.player.MissingOn
 import com.tandemmoto.player.PlaybackState
 import com.tandemmoto.ui.components.ConnectionStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -20,8 +21,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
 
 /**
- * Holds the Ride (Home) screen state: the link status comes from the shared link; playback
- * (Phase 2–3) still has its fixed initial state. [connect] and [disconnect] are the link's, passed
+ * Holds the Ride (Home) screen state: the link status comes from the shared link, playback from
+ * the player (#51). [connect] and [disconnect] are the link's, passed
  * in so tests can use a fake status flow.
  */
 class RideViewModel(
@@ -39,8 +40,12 @@ class RideViewModel(
                 nowPlaying = player.title,
                 artist = player.artist,
                 isPlaying = player.playWhenReady,
-                gettingSong = player.gettingSong,
-                hasSongs = player.hasSongs
+                gettingSong = player.gettingSong || player.waitingOn == MissingOn.ThisPhone,
+                waitingForPartner = player.waitingOn == MissingOn.Partner,
+                artwork = player.artwork,
+                hasSongs = player.hasSongs,
+                positionMs = player.positionMs,
+                durationMs = player.durationMs
             )
         }
             .stateIn(viewModelScope, SharingStarted.Eagerly, RideUiState())
@@ -51,12 +56,15 @@ class RideViewModel(
     /** Tapping the connected bar, after confirming: same as the notification's Disconnect. */
     fun onDisconnect() = disconnect()
 
-    // Local in Phase 2 (#51); Phase 3 mirrors them to the partner.
+    // The player mirrors each control to the partner's phone (#60).
     fun onPlayPause() = controls.playPause()
 
     fun onNext() = controls.next()
 
     fun onPrevious() = controls.previous()
+
+    /** The seek bar, let go at [positionMs]. */
+    fun onSeek(positionMs: Long) = controls.seekTo(positionMs)
 
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
@@ -71,7 +79,8 @@ class RideViewModel(
                     PlayerControls(
                         app.playback::togglePlay,
                         app.playback::next,
-                        app.playback::previous
+                        app.playback::previous,
+                        app.playback::seekTo
                     )
                 )
             }
@@ -83,7 +92,8 @@ class RideViewModel(
 class PlayerControls(
     val playPause: () -> Unit = {},
     val next: () -> Unit = {},
-    val previous: () -> Unit = {}
+    val previous: () -> Unit = {},
+    val seekTo: (Long) -> Unit = {}
 )
 
 /** How long a blip away from Connected is held back before it's shown (and announced). */
