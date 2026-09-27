@@ -2,6 +2,7 @@ package com.tandemmoto
 
 import android.app.Application
 import android.content.Context
+import android.media.AudioAttributes
 import android.os.Process
 import android.os.StatFs
 import androidx.core.net.toUri
@@ -34,10 +35,15 @@ import com.tandemmoto.transfer.SongStore
 import com.tandemmoto.transfer.SongTransfers
 import com.tandemmoto.transfer.TransferConnection
 import com.tandemmoto.transfer.WindowSettingsStore
+import com.tandemmoto.voice.AndroidAudioRoute
 import com.tandemmoto.voice.AudioModeControl
 import com.tandemmoto.voice.AudioRecordSource
 import com.tandemmoto.voice.AudioTrackSource
+import com.tandemmoto.voice.EarbudMicSetting
+import com.tandemmoto.voice.Intercom
 import com.tandemmoto.voice.MicTest
+import com.tandemmoto.voice.RouteKind
+import com.tandemmoto.voice.SharedPrefsMuteStore
 import com.tandemmoto.voice.TalkTest
 import com.tandemmoto.voice.VoiceChannel
 import java.io.File
@@ -97,6 +103,18 @@ class TandemMotoApp : Application() {
 
     /** Each person's voice to the other phone (#71). */
     lateinit var voice: VoiceChannel
+        private set
+
+    /** Settings → Advanced → Use earbud mic for the intercom (#72). */
+    lateinit var earbudMic: EarbudMicSetting
+        private set
+
+    /** Mic mode and self-mute (#72). */
+    lateinit var intercom: Intercom
+        private set
+
+    /** Playback mirroring (#60), which also carries whether the intercom is wanted (#72). */
+    lateinit var mirror: PlaybackMirror
         private set
 
     /** Settings → Diagnostics → Talk test (#71). */
@@ -206,7 +224,7 @@ class TandemMotoApp : Application() {
             playback.state.map { it.cantPlay }.distinctUntilChanged()
                 .collect { transfers.setCantPlay(it) }
         }
-        PlaybackMirror(
+        mirror = PlaybackMirror(
             player = playback,
             installId = installId::get,
             channelState = link.channel.state,
@@ -215,7 +233,10 @@ class TandemMotoApp : Application() {
             clockOffsetNanos = link.channel.clockOffsetNanos,
             scope = appScope,
             log = { AppLog.i("Mirror", it) }
-        ).also { playback.listener = it }.start()
+        ).also {
+            playback.listener = it
+            it.start()
+        }
         linkSession = LinkSession(
             status = link.status,
             scope = appScope,
@@ -239,9 +260,17 @@ class TandemMotoApp : Application() {
     }
 
     private fun startVoice() {
+        earbudMic = EarbudMicSetting(this)
         voice = VoiceChannel(
             mic = AudioRecordSource(this),
-            speaker = AudioTrackSource(),
+            // Media while the earbuds stay in music mode, so it plays on them (#72).
+            speaker = AudioTrackSource {
+                if (intercom.state.value.route == RouteKind.EarbudsMusicMode) {
+                    AudioAttributes.USAGE_MEDIA
+                } else {
+                    AudioAttributes.USAGE_VOICE_COMMUNICATION
+                }
+            },
             partnerHost = link.channel.partnerHost,
             clockOffsetNanos = link.channel.clockOffsetNanos,
             scope = appScope,
@@ -251,8 +280,35 @@ class TandemMotoApp : Application() {
             }
         )
         voice.start()
+        // The voice goes out while mic mode wants it or the Talk test is on.
+        val intercomSends = MutableStateFlow(false)
+        val talkTestSends = MutableStateFlow(false)
+        appScope.launch {
+            combine(intercomSends, talkTestSends) { a, b -> a || b }.collect(voice::setSending)
+        }
+        val linked = link.channel.state.map { it is ChannelState.Open }
+            .stateIn(appScope, SharingStarted.Eagerly, false)
+        intercom = Intercom(
+            linked = linked,
+            wanted = mirror.intercomWanted,
+            playing = playback.state.map { it.playWhenReady }
+                .stateIn(appScope, SharingStarted.Eagerly, false),
+            micAccess = micAccess,
+            mute = SharedPrefsMuteStore(this),
+            incoming = link.channel.incoming,
+            send = link.channel::send,
+            route = AndroidAudioRoute(
+                this,
+                log = { AppLog.i("Intercom", it) },
+                useEarbudMic = { earbudMic.on.value }
+            ),
+            setSending = { intercomSends.value = it },
+            scope = appScope,
+            log = { AppLog.i("Intercom", it) }
+        )
+        intercom.start()
         talkTest = TalkTest(
-            setSending = voice::setSending,
+            setSending = { talkTestSends.value = it },
             callMode = AudioModeControl(this)::set,
             scope = appScope,
             log = { AppLog.i("Voice", it) }
@@ -267,6 +323,7 @@ class TandemMotoApp : Application() {
 
     /** The user's Disconnect, from Home or the notification: drop the link and the service. */
     fun disconnect() {
+        mirror.onDisconnect() // the next ride starts without the intercom (#72)
         link.disconnect()
         linkSession.stopNow()
     }

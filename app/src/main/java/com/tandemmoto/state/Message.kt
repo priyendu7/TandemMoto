@@ -72,7 +72,9 @@ sealed interface Message {
      * is playing (or paused) at [positionMs] as of [atNanos] on the sender's clock; the newest
      * [stamp] wins on both phones. [control] names what caused it, for logs. [waiting]: the
      * sender wants to play but is holding until both phones have the song (#61); an [atNanos] in
-     * the future is a start both phones make at that moment.
+     * the future is a start both phones make at that moment. [intercom]: the intercom is wanted
+     * (#72): music has played this ride, or Start intercom; it's on while the music isn't
+     * playing, and Stop intercom or Disconnect turn it off.
      */
     @Serializable
     data class PlaybackState(
@@ -82,8 +84,13 @@ sealed interface Message {
         val atNanos: Long,
         val stamp: Stamp,
         val control: String,
-        val waiting: Boolean = false
+        val waiting: Boolean = false,
+        val intercom: Boolean = false
     ) : Message
+
+    /** The sender muted or unmuted itself (#72); sent on change and on every connection. */
+    @Serializable
+    data class Muted(val muted: Boolean) : Message
 
     /** The sender is closing the connection, and why. */
     @Serializable
@@ -149,6 +156,7 @@ object MessageCodec {
             )
             is Message.PlaybackState ->
                 json.encodeToJsonElement(Message.PlaybackState.serializer(), message)
+            is Message.Muted -> json.encodeToJsonElement(Message.Muted.serializer(), message)
         }
         val envelope = buildJsonObject {
             put("v", version)
@@ -177,6 +185,7 @@ object MessageCodec {
                 SONG_UNAVAILABLE -> payload.decodeAs(Message.SongUnavailable.serializer())
                 SONGS_ON_PHONE -> payload.decodeAs(Message.SongsOnPhone.serializer())
                 PLAYBACK -> payload.decodeAs(Message.PlaybackState.serializer())
+                MUTED -> payload.decodeAs(Message.Muted.serializer())
                 else -> return Envelope.Unknown(version, type)
             }
             return Envelope.Known(version, seq, message)
@@ -206,6 +215,7 @@ object MessageCodec {
         is Message.SongUnavailable -> SONG_UNAVAILABLE
         is Message.SongsOnPhone -> SONGS_ON_PHONE
         is Message.PlaybackState -> PLAYBACK
+        is Message.Muted -> MUTED
     }
 
     private const val HELLO = "hello"
@@ -217,4 +227,5 @@ object MessageCodec {
     private const val SONG_UNAVAILABLE = "song_unavailable"
     private const val SONGS_ON_PHONE = "songs_on_phone"
     private const val PLAYBACK = "playback"
+    private const val MUTED = "muted"
 }

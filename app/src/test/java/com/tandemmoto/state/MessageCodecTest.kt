@@ -27,6 +27,17 @@ class MessageCodecTest {
             Message.PlaybackState(null, false, 0, 0, Stamp(0, "install-b"), "Connect"),
             Message.PlaybackState("abc", true, 0, 9, Stamp(2, "install-b"), "Next", waiting = true),
             Message.SongsOnPhone(listOf("a", "b")),
+            Message.Muted(true),
+            Message.Muted(false),
+            Message.PlaybackState(
+                null,
+                false,
+                0,
+                0,
+                Stamp(3, "a"),
+                "StartIntercom",
+                intercom = true
+            ),
             Message.SongsOnPhone(listOf("a"), cantPlay = listOf("b")),
             Message.Bye(Message.Bye.Reason.NotYourPartner),
             Message.Bye(Message.Bye.Reason.ProtocolMismatch),

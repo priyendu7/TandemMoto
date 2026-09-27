@@ -260,7 +260,8 @@ class CommandChannel(
                     is Message.SongRequest,
                     is Message.SongUnavailable,
                     is Message.SongsOnPhone,
-                    is Message.PlaybackState ->
+                    is Message.PlaybackState,
+                    is Message.Muted ->
                         if (_state.value is ChannelState.Open) _incoming.emit(message)
                     // New message types get a branch here that emits to _incoming once Open.
                 }

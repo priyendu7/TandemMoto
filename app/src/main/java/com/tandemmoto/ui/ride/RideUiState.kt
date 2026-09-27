@@ -1,6 +1,7 @@
 package com.tandemmoto.ui.ride
 
 import com.tandemmoto.ui.components.ConnectionStatus
+import com.tandemmoto.voice.IntercomLine
 
 data class RideUiState(
     val connection: ConnectionStatus = ConnectionStatus.NotPaired,
@@ -20,7 +21,13 @@ data class RideUiState(
     val hasSongs: Boolean = false,
     /** Where the current song is and how long it is, for the seek bar (0: not known yet). */
     val positionMs: Long = 0,
-    val durationMs: Long = 0
+    val durationMs: Long = 0,
+    /** The intercom (#72): what its line says, and who is muted. */
+    val intercom: IntercomLine = IntercomLine.NotLinked,
+    val muted: Boolean = false,
+    val partnerMuted: Boolean = false,
+    /** The earbuds stay in music mode: you talk into the phone (#72). */
+    val talkIntoPhone: Boolean = false
 ) {
     /**
      * Each phone plays the ride playlist, linked or not; while linked, every control is mirrored
@@ -28,6 +35,7 @@ data class RideUiState(
      */
     val controlsEnabled: Boolean get() = hasSongs
 
-    /** PRD: pausing the music (while connected) opens the intercom on both phones. */
-    val intercomOn: Boolean get() = connection == ConnectionStatus.Connected && !isPlaying
+    /** PRD: pausing the music (while connected) opens the intercom on both phones (#72). */
+    val intercomOn: Boolean
+        get() = intercom == IntercomLine.On || intercom == IntercomLine.OnPhone
 }

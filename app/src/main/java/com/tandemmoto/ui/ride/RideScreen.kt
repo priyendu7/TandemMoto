@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -18,9 +20,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,6 +45,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -60,6 +67,7 @@ import com.tandemmoto.ui.components.SongSeekBar
 import com.tandemmoto.ui.components.openWifiSettings
 import com.tandemmoto.ui.components.rememberPermissionRequester
 import com.tandemmoto.ui.theme.TandemMotoTheme
+import com.tandemmoto.voice.IntercomLine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -101,7 +109,10 @@ fun RideRoute(
         onPrevious = viewModel::onPrevious,
         onOpenPlaylist = onOpenPlaylist,
         onOpenSettings = onOpenSettings,
-        onSeek = viewModel::onSeek
+        onSeek = viewModel::onSeek,
+        onStartIntercom = viewModel::onStartIntercom,
+        onStopIntercom = viewModel::onStopIntercom,
+        onMute = viewModel::onMute
     )
 }
 
@@ -120,7 +131,10 @@ fun RideScreen(
     onPrevious: () -> Unit,
     onOpenPlaylist: () -> Unit,
     onOpenSettings: () -> Unit,
-    onSeek: (Long) -> Unit = {}
+    onSeek: (Long) -> Unit = {},
+    onStartIntercom: () -> Unit = {},
+    onStopIntercom: () -> Unit = {},
+    onMute: (Boolean) -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -192,7 +206,7 @@ fun RideScreen(
                 }
                 PlaybackControls(state, onPlayPause, onNext, onPrevious)
                 if (permissions.isGranted(AppPermission.MICROPHONE)) {
-                    IntercomIndicator(state.intercomOn)
+                    IntercomSection(state, onStartIntercom, onStopIntercom, onMute)
                 } else {
                     PermissionPrompt(
                         permission = AppPermission.MICROPHONE,
@@ -430,25 +444,81 @@ private fun PlaybackControls(
     }
 }
 
+/**
+ * The intercom (#72): what it's doing, Start or Stop intercom (both phones), and this phone's
+ * mute. Buttons are 56 dp tall, for gloves.
+ */
 @Composable
-private fun IntercomIndicator(intercomOn: Boolean) {
+private fun IntercomSection(
+    state: RideUiState,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+    onMute: (Boolean) -> Unit
+) {
     val colors = MaterialTheme.colorScheme
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_mic),
-            contentDescription = null,
-            tint = if (intercomOn) colors.primary else colors.onSurfaceVariant,
-            modifier = Modifier.size(24.dp)
-        )
-        Text(
-            text = stringResource(
-                if (intercomOn) R.string.ride_intercom_on else R.string.ride_intercom_off
-            ),
-            style = MaterialTheme.typography.bodyLarge
-        )
+    val partner = state.partnerName ?: stringResource(R.string.ride_your_partner)
+    val line = when (state.intercom) {
+        IntercomLine.NotLinked -> stringResource(R.string.ride_intercom_not_linked)
+        IntercomLine.Ready -> stringResource(R.string.ride_intercom_ready)
+        IntercomLine.WaitingForPause -> stringResource(R.string.ride_intercom_off)
+        IntercomLine.Connecting -> stringResource(R.string.ride_intercom_connecting)
+        IntercomLine.OnPhone -> stringResource(R.string.ride_intercom_on_phone)
+        IntercomLine.On -> when {
+            state.muted && state.partnerMuted ->
+                stringResource(R.string.ride_intercom_on_both_muted)
+            state.muted -> stringResource(R.string.ride_intercom_on_you_muted)
+            state.partnerMuted -> stringResource(R.string.ride_intercom_on_partner_muted, partner)
+            state.talkIntoPhone -> stringResource(R.string.ride_intercom_on_talk_into_phone)
+            else -> stringResource(R.string.ride_intercom_on)
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            // A change is read out, like the connection bar.
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+        ) {
+            Icon(
+                painter = painterResource(
+                    if (state.muted) R.drawable.ic_mic_off else R.drawable.ic_mic
+                ),
+                contentDescription = null,
+                tint = if (state.intercomOn) colors.primary else colors.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
+            )
+            Text(text = line, style = MaterialTheme.typography.bodyLarge)
+        }
+        if (state.intercom == IntercomLine.NotLinked) return@Column
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            val buttonModifier = Modifier
+                .weight(1f)
+                .height(56.dp)
+            when (state.intercom) {
+                IntercomLine.Ready -> FilledTonalButton(
+                    onClick = onStart,
+                    modifier = buttonModifier
+                ) {
+                    Text(stringResource(R.string.ride_intercom_start))
+                }
+                IntercomLine.Connecting, IntercomLine.On, IntercomLine.OnPhone ->
+                    OutlinedButton(onClick = onStop, modifier = buttonModifier) {
+                        Text(stringResource(R.string.ride_intercom_stop))
+                    }
+                else -> Unit
+            }
+            FilledTonalButton(onClick = { onMute(!state.muted) }, modifier = buttonModifier) {
+                Icon(
+                    painter = painterResource(
+                        if (state.muted) R.drawable.ic_mic else R.drawable.ic_mic_off
+                    ),
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.size(8.dp))
+                Text(stringResource(if (state.muted) R.string.ride_unmute else R.string.ride_mute))
+            }
+        }
     }
 }
 

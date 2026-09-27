@@ -25,6 +25,7 @@ import com.tandemmoto.ui.ride.RideUiState
 import com.tandemmoto.ui.settings.PartnerSongsUi
 import com.tandemmoto.ui.settings.SettingsScreen
 import com.tandemmoto.ui.theme.TandemMotoTheme
+import com.tandemmoto.voice.IntercomLine
 import com.tandemmoto.voice.MicTestResult
 import com.tandemmoto.voice.MicTestState
 import com.tandemmoto.voice.TalkTestState
@@ -154,7 +155,7 @@ class RideScreenTest {
             compose.onNodeWithContentDescription(str(it)).assertIsNotEnabled()
         }
         compose.onNodeWithText(str(R.string.ride_controls_disabled_hint)).assertExists()
-        compose.onNodeWithText(str(R.string.ride_intercom_off)).assertExists()
+        compose.onNodeWithText(str(R.string.ride_intercom_not_linked)).assertExists()
     }
 
     @Test
@@ -163,7 +164,8 @@ class RideScreenTest {
             RideUiState(
                 connection = ConnectionStatus.Connected,
                 nowPlaying = "Highway Song",
-                hasSongs = true
+                hasSongs = true,
+                intercom = IntercomLine.On
             )
         )
         compose.onNodeWithContentDescription(str(R.string.ride_play)).assertIsEnabled()
@@ -174,7 +176,12 @@ class RideScreenTest {
     @Test
     fun playingShowsPauseAndIntercomOff() {
         showRide(
-            RideUiState(connection = ConnectionStatus.Connected, isPlaying = true, hasSongs = true)
+            RideUiState(
+                connection = ConnectionStatus.Connected,
+                isPlaying = true,
+                hasSongs = true,
+                intercom = IntercomLine.WaitingForPause
+            )
         )
         compose.onNodeWithContentDescription(str(R.string.ride_pause)).assertIsEnabled()
         compose.onNodeWithText(str(R.string.ride_intercom_off)).assertExists()
@@ -221,6 +228,7 @@ class RideScreenTest {
                 )
             }
         }
+        compose.onNodeWithText(str(R.string.settings_advanced)).performScrollTo().performClick()
         compose.onNodeWithText(str(R.string.settings_mic_test_in_seconds, 10))
             .performScrollTo()
             .performClick()
@@ -250,6 +258,7 @@ class RideScreenTest {
                 )
             }
         }
+        compose.onNodeWithText(str(R.string.settings_advanced)).performScrollTo().performClick()
         compose.onNodeWithText(str(R.string.settings_talk_test)).performScrollTo().performClick()
         assertEquals(true, toggled)
         state.value = TalkTestState(on = true, secondsLeft = 95)
@@ -259,8 +268,24 @@ class RideScreenTest {
     }
 
     @Test
+    fun advancedHoldsTheEarbudMicSwitchOffByDefault() {
+        var earbudMic: Boolean? = null
+        compose.setContent {
+            TandemMotoTheme {
+                SettingsScreen(onBack = {}, onExportLogs = {}, onEarbudMic = { earbudMic = it })
+            }
+        }
+        compose.onNodeWithText(str(R.string.settings_earbud_mic)).assertDoesNotExist()
+        compose.onNodeWithText(str(R.string.settings_advanced)).performScrollTo().performClick()
+        compose.onNodeWithText(str(R.string.settings_earbud_mic_off)).assertExists()
+        compose.onNodeWithText(str(R.string.settings_earbud_mic)).performScrollTo().performClick()
+        assertEquals(true, earbudMic)
+    }
+
+    @Test
     fun withoutALinkThereIsNoTalkTest() {
         compose.setContent { TandemMotoTheme { SettingsScreen(onBack = {}, onExportLogs = {}) } }
+        compose.onNodeWithText(str(R.string.settings_advanced)).performScrollTo().performClick()
         compose.onNodeWithText(str(R.string.settings_talk_test)).assertDoesNotExist()
     }
 
@@ -452,10 +477,117 @@ class RideScreenTest {
     }
 
     @Test
+    fun beforeTheFirstPauseStartIntercomTurnsItOnForBoth() {
+        var started = false
+        compose.setContent {
+            TandemMotoTheme {
+                RideScreen(
+                    state = RideUiState(
+                        connection = ConnectionStatus.Connected,
+                        intercom = IntercomLine.Ready
+                    ),
+                    permissions = nearby(PermissionStatus.Granted),
+                    onRequestPermission = {},
+                    onOpenPair = {},
+                    onConnect = {},
+                    onDisconnect = {},
+                    onOpenWifiSettings = {},
+                    onPlayPause = {},
+                    onNext = {},
+                    onPrevious = {},
+                    onOpenPlaylist = {},
+                    onOpenSettings = {},
+                    onStartIntercom = { started = true }
+                )
+            }
+        }
+        compose.onNodeWithText(str(R.string.ride_intercom_ready)).assertExists()
+        compose.onNodeWithText(str(R.string.ride_intercom_stop)).assertDoesNotExist()
+        compose.onNodeWithText(str(R.string.ride_intercom_start)).performClick()
+        assertTrue(started)
+    }
+
+    @Test
+    fun inMicModeStopAndMuteWork() {
+        var stopped = false
+        var muted: Boolean? = null
+        val state = mutableStateOf(
+            RideUiState(connection = ConnectionStatus.Connected, intercom = IntercomLine.On)
+        )
+        compose.setContent {
+            TandemMotoTheme {
+                RideScreen(
+                    state = state.value,
+                    permissions = nearby(PermissionStatus.Granted),
+                    onRequestPermission = {},
+                    onOpenPair = {},
+                    onConnect = {},
+                    onDisconnect = {},
+                    onOpenWifiSettings = {},
+                    onPlayPause = {},
+                    onNext = {},
+                    onPrevious = {},
+                    onOpenPlaylist = {},
+                    onOpenSettings = {},
+                    onStopIntercom = { stopped = true },
+                    onMute = { muted = it }
+                )
+            }
+        }
+        compose.onNodeWithText(str(R.string.ride_intercom_on)).assertExists()
+        compose.onNodeWithText(str(R.string.ride_intercom_stop)).performClick()
+        assertTrue(stopped)
+        compose.onNodeWithText(str(R.string.ride_mute)).performClick()
+        assertEquals(true, muted)
+        state.value = state.value.copy(muted = true)
+        compose.onNodeWithText(str(R.string.ride_intercom_on_you_muted)).assertExists()
+        compose.onNodeWithText(str(R.string.ride_unmute)).performClick()
+        assertEquals(false, muted)
+    }
+
+    @Test
+    fun theIntercomLineSaysWhatsHappening() {
+        val state = mutableStateOf(
+            RideUiState(
+                connection = ConnectionStatus.Connected,
+                partnerName = "Redmi",
+                intercom = IntercomLine.Connecting
+            )
+        )
+        compose.setContent {
+            TandemMotoTheme {
+                RideScreen(
+                    state = state.value,
+                    permissions = nearby(PermissionStatus.Granted),
+                    onRequestPermission = {},
+                    onOpenPair = {},
+                    onConnect = {},
+                    onDisconnect = {},
+                    onOpenWifiSettings = {},
+                    onPlayPause = {},
+                    onNext = {},
+                    onPrevious = {},
+                    onOpenPlaylist = {},
+                    onOpenSettings = {}
+                )
+            }
+        }
+        compose.onNodeWithText(str(R.string.ride_intercom_connecting)).assertExists()
+        state.value = state.value.copy(intercom = IntercomLine.On, partnerMuted = true)
+        compose.onNodeWithText(str(R.string.ride_intercom_on_partner_muted, "Redmi")).assertExists()
+        state.value = state.value.copy(muted = true)
+        compose.onNodeWithText(str(R.string.ride_intercom_on_both_muted)).assertExists()
+        state.value = state.value.copy(muted = false, partnerMuted = false, talkIntoPhone = true)
+        compose.onNodeWithText(str(R.string.ride_intercom_on_talk_into_phone)).assertExists()
+        state.value = state.value.copy(intercom = IntercomLine.OnPhone, talkIntoPhone = false)
+        compose.onNodeWithText(str(R.string.ride_intercom_on_phone)).assertExists()
+    }
+
+    @Test
     fun withTheMicTheIntercomLineShows() {
         showRide(RideUiState(hasSongs = true, nowPlaying = "Song"))
         compose.onNodeWithText(str(R.string.permission_microphone_prompt)).assertDoesNotExist()
-        compose.onNodeWithText(str(R.string.ride_intercom_off)).assertExists()
+        compose.onNodeWithText(str(R.string.ride_intercom_not_linked)).assertExists()
     }
 
     @Test
