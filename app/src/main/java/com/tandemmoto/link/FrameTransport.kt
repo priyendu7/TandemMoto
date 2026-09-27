@@ -37,28 +37,62 @@ interface FrameTransport {
 }
 
 /**
+ * How a socket's traffic is treated on the Wi-Fi link (#62). Wi-Fi sends each packet from one of
+ * four queues (WMM: voice, video, best effort, background) picked from its DSCP mark, and a busy
+ * queue doesn't hold up the others: with every socket in best effort, a song transfer made the
+ * heartbeat wait 0.6–1.3 s (phone test on #61). [bufferBytes] caps a socket's send and receive
+ * buffers, so a bulk transfer can't pile up seconds of data on the link.
+ */
+data class SocketTraffic(val dscpTos: Int, val bufferBytes: Int? = null) {
+    companion object {
+        /** Commands and the heartbeat: tiny, and wanted at once (EF, Wi-Fi's voice/video queue). */
+        val Commands = SocketTraffic(dscpTos = 0xB8)
+
+        /** Song transfer: large, and fine to wait (CS1, Wi-Fi's background queue). */
+        val Bulk = SocketTraffic(dscpTos = 0x20, bufferBytes = 256 * 1024)
+    }
+}
+
+/**
  * TCP over the Wi-Fi Direct group. Uses NIO channels because they're interruptible: cancelling
  * the coroutine interrupts the blocked thread, which closes the channel, so a blocked read or
  * accept never outlives the channel (issue #25: no leaked threads).
  */
-class SocketFrameTransport(private val io: CoroutineDispatcher = Dispatchers.IO) : FrameTransport {
+class SocketFrameTransport(
+    private val io: CoroutineDispatcher = Dispatchers.IO,
+    private val traffic: SocketTraffic = SocketTraffic.Commands
+) : FrameTransport {
     override suspend fun accept(port: Int): FrameConnection = runInterruptible(io) {
         ServerSocketChannel.open().use { server ->
             // The partner's app may reconnect right after we close; don't wait out TIME_WAIT.
             server.setOption(StandardSocketOptions.SO_REUSEADDR, true)
+            // Before bind: the receive window is agreed during the handshake.
+            traffic.bufferBytes?.let {
+                runCatching { server.setOption(StandardSocketOptions.SO_RCVBUF, it) }
+            }
             server.bind(InetSocketAddress(port))
-            SocketFrameConnection(server.accept(), io)
+            SocketFrameConnection(server.accept().also(::mark), io)
         }
     }
 
     override suspend fun connect(host: String, port: Int): FrameConnection = runInterruptible(io) {
         val channel = SocketChannel.open()
         try {
+            mark(channel) // before connecting: the receive window is agreed in the handshake
             channel.connect(InetSocketAddress(host, port))
             SocketFrameConnection(channel, io)
         } catch (e: IOException) {
             channel.close()
             throw e
+        }
+    }
+
+    /** Marks the socket's packets; a phone that refuses an option still connects. */
+    private fun mark(channel: SocketChannel) {
+        runCatching { channel.setOption(StandardSocketOptions.IP_TOS, traffic.dscpTos) }
+        traffic.bufferBytes?.let { bytes ->
+            runCatching { channel.setOption(StandardSocketOptions.SO_SNDBUF, bytes) }
+            runCatching { channel.setOption(StandardSocketOptions.SO_RCVBUF, bytes) }
         }
     }
 }

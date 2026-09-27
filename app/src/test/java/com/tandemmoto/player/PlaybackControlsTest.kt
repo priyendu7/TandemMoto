@@ -25,7 +25,8 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class PlaybackControlsTest {
-    private val scope = CoroutineScope(Dispatchers.Unconfined)
+    // The main thread, like the app: the player may only be used there.
+    private val scope = CoroutineScope(Dispatchers.Main.immediate)
     private val songs = MutableStateFlow(listOf(entry("a", "0"), entry("b", "1"), entry("c", "2")))
     private val controls = mutableListOf<String>()
     private var queueChanges = 0
