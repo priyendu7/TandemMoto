@@ -126,9 +126,7 @@ class Playback(
         }
         // Decoder fallback: if the phone's first audio decoder can't start, try its next one.
         // Not float output: on the S25 it crackled and ran fast (#62 phone test).
-        val renderers = DefaultRenderersFactory(context)
-            .setEnableDecoderFallback(true)
-            .setMediaCodecSelector(DecoderChoice.selector())
+        val renderers = DefaultRenderersFactory(context).setEnableDecoderFallback(true)
         player = ExoPlayer.Builder(context, renderers)
             .setMediaSourceFactory(DefaultMediaSourceFactory(files))
             .setAudioAttributes(
