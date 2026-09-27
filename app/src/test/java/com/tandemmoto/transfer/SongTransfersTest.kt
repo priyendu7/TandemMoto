@@ -267,6 +267,16 @@ class SongTransfersTest {
     }
 
     @Test
+    fun songsAPhoneCantPlayReachThePartner() = runTest {
+        val songs = songs(2)
+        val (s25, redmi) = phones(songs)
+        link(s25, redmi)
+        redmi.transfers.setCantPlay(setOf(songs[1].first.id))
+        runCurrent()
+        assertEquals(setOf(songs[1].first.id), s25.transfers.state.value.partnerCantPlay)
+    }
+
+    @Test
     fun aCorruptedSongIsFetchedAgain() = runTest {
         val songs = songs(1)
         val (s25, redmi) = phones(songs)

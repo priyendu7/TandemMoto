@@ -3,14 +3,24 @@ package com.tandemmoto.player
 import com.tandemmoto.link.ChannelState
 import com.tandemmoto.playlist.Stamp
 import com.tandemmoto.state.Message
+import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
 
-/** Where this phone's player is: its song, whether it's meant to play, and its position now. */
-data class PlayerPosition(val songId: String?, val playing: Boolean, val positionMs: Long)
+/**
+ * Where this phone's player is: its song, whether it's meant to play, and its position now.
+ * [waiting]: it wants to play but holds until both phones have the song (#61).
+ */
+data class PlayerPosition(
+    val songId: String?,
+    val playing: Boolean,
+    val positionMs: Long,
+    val waiting: Boolean = false
+)
 
 /** What [PlaybackMirror] needs from the local player ([Playback]); a fake in tests. */
 interface LocalPlayer {
@@ -20,9 +30,17 @@ interface LocalPlayer {
 
     /**
      * Brings the player to [songId] at [positionMs], playing or paused, as the partner's phone
-     * is: quietly, not as a control (it's never sent back).
+     * is: quietly, not as a control (it's never sent back). [startInMs] > 0: a start both phones
+     * make at the same moment, that far ahead. [partnerPlaying]: the partner is playing it (not
+     * holding), so it has the song.
      */
-    fun apply(songId: String, positionMs: Long, playing: Boolean)
+    fun apply(
+        songId: String,
+        positionMs: Long,
+        playing: Boolean,
+        startInMs: Long = 0,
+        partnerPlaying: Boolean = false
+    )
 }
 
 /** How [Playback] tells the mirror about controls and queue changes. */
@@ -32,6 +50,12 @@ interface PlaybackListener {
 
     /** The queue changed: a song the partner is on may be here now. */
     fun onQueueChanged()
+
+    /**
+     * Both phones have the held song (#61): tell the partner to start at a moment shortly
+     * ahead. Returns how far ahead, in ms, so this phone starts then too (0: start now).
+     */
+    fun onStartTogether(): Long
 }
 
 /**
@@ -45,6 +69,12 @@ interface PlaybackListener {
  * stamp of their latest control, and the newer one wins. A phone that was restarted starts at
  * clock 0, so it joins what the partner is playing. A state whose song isn't in this phone's
  * queue yet (the playlist edit is still on its way) is applied when the song arrives.
+ *
+ * Starting together (#61): when a held song reaches both phones, the phone that notices sends a
+ * start [START_LEAD_MS] ahead and both start then. Staying in step: every [SYNC_EVERY_MS] while
+ * playing, the phone that made the latest control sends where it is; only the other phone
+ * corrects, and only when it's more than [DRIFT_MS] off (a smaller jump would be heard for
+ * nothing).
  */
 class PlaybackMirror(
     private val player: LocalPlayer,
@@ -71,6 +101,12 @@ class PlaybackMirror(
 
     fun start() {
         scope.launch {
+            while (true) {
+                delay(SYNC_EVERY_MS)
+                sendSync()
+            }
+        }
+        scope.launch {
             me = installId()
             incoming.filterIsInstance<Message.PlaybackState>().collect(::onReceived)
         }
@@ -82,12 +118,49 @@ class PlaybackMirror(
     }
 
     override fun onControl(control: String) {
-        val by = me ?: return // a control before the install ID loads: nothing to mirror yet
+        val stamp = newStamp() ?: return
+        val state = whereWeAre(control, stamp, nanoTime())
+        scope.launch { send(state) }
+    }
+
+    override fun onStartTogether(): Long {
+        if (channelState.value !is ChannelState.Open) return 0
+        val stamp = newStamp() ?: return 0
+        val state = whereWeAre(START_TOGETHER, stamp, nanoTime() + START_LEAD_MS * NANOS_PER_MS)
+            .copy(playing = true, waiting = false)
+        scope.launch { send(state) }
+        return START_LEAD_MS
+    }
+
+    private fun newStamp(): Stamp? {
+        val by = me ?: return null // before the install ID loads: nothing to mirror yet
         clock += 1
-        val stamp = Stamp(clock, by)
-        latest = stamp
-        pending = null
-        scope.launch { sendWhereWeAre(control, stamp) }
+        return Stamp(clock, by).also {
+            latest = it
+            pending = null
+        }
+    }
+
+    private fun whereWeAre(control: String, stamp: Stamp, atNanos: Long): Message.PlaybackState {
+        val now = player.position()
+        return Message.PlaybackState(
+            songId = now.songId,
+            playing = now.playing,
+            positionMs = now.positionMs,
+            atNanos = atNanos,
+            stamp = stamp,
+            control = control,
+            waiting = now.waiting
+        )
+    }
+
+    /** The latest control was this phone's: tell the partner where it is, to stay in step. */
+    private suspend fun sendSync() {
+        val stamp = latest ?: return
+        if (stamp.by != me || channelState.value !is ChannelState.Open) return
+        val now = player.position()
+        if (!now.playing || now.waiting || now.songId == null) return
+        send(whereWeAre(SYNC, stamp, nanoTime()))
     }
 
     override fun onQueueChanged() {
@@ -100,23 +173,17 @@ class PlaybackMirror(
 
     private suspend fun sendWhereWeAre(control: String, stamp: Stamp?) {
         val by = me ?: installId().also { me = it }
-        val now = player.position()
-        send(
-            Message.PlaybackState(
-                songId = now.songId,
-                playing = now.playing,
-                positionMs = now.positionMs,
-                atNanos = nanoTime(),
-                stamp = stamp ?: Stamp(0, by),
-                control = control
-            )
-        )
+        send(whereWeAre(control, stamp ?: Stamp(0, by), nanoTime()))
     }
 
     private fun onReceived(state: Message.PlaybackState) {
         clock = maxOf(clock, state.stamp.clock)
         // Clock 0: the partner hasn't had a control since its app started; nothing to follow.
         if (state.stamp.clock == 0L) return
+        if (state.control == SYNC && state.stamp == latest) {
+            keepInStep(state)
+            return
+        }
         val current = latest
         if (current != null && state.stamp <= current) return
         latest = state.stamp
@@ -130,22 +197,67 @@ class PlaybackMirror(
         apply(state)
     }
 
+    /** How long ago the partner's state was made, on this phone's clock; negative: ahead. */
+    private fun sinceMs(state: Message.PlaybackState): Long? = clockOffsetNanos.value?.let {
+        (nanoTime() - (state.atNanos - it)) / NANOS_PER_MS
+    }
+
     private fun apply(state: Message.PlaybackState) {
         val songId = state.songId ?: return
-        val offset = clockOffsetNanos.value
-        // When the partner acted, on this phone's clock (unknown offset: as good as now).
-        val sinceMs = offset?.let { ((nanoTime() - (state.atNanos - it)) / NANOS_PER_MS) }
-            ?.coerceAtLeast(0)
-        val positionMs = state.positionMs + if (state.playing) sinceMs ?: 0 else 0
-        player.apply(songId, positionMs, state.playing)
-        val after = sinceMs?.let { "in $it ms" } ?: "(clock offset unknown)"
+        // Unknown clock offset: as good as now.
+        val sinceMs = sinceMs(state)
+        val elapsed = if (state.playing && !state.waiting) (sinceMs ?: 0).coerceAtLeast(0) else 0
+        val startInMs = (-(sinceMs ?: 0)).coerceAtLeast(0)
+        val positionMs = state.positionMs + elapsed
+        player.apply(
+            songId,
+            positionMs,
+            state.playing,
+            startInMs,
+            partnerPlaying = state.playing && !state.waiting
+        )
+        val after = when {
+            sinceMs == null -> "(clock offset unknown)"
+            sinceMs < 0 -> "to start in ${-sinceMs} ms"
+            else -> "in $sinceMs ms"
+        }
+        val what = when {
+            !state.playing -> "paused"
+            state.waiting -> "waiting for the song"
+            else -> "playing"
+        }
         log(
-            "Followed the partner's ${state.control} $after: song-${songId.take(8)} " +
-                "${if (state.playing) "playing" else "paused"} at ${positionMs / 1_000} s"
+            "Followed the partner's ${state.control} $after: song-${songId.take(8)} $what " +
+                "at ${positionMs / 1_000} s"
         )
     }
 
-    private companion object {
-        const val NANOS_PER_MS = 1_000_000L
+    /** The partner (which made the latest control) says where it is: jump if we drifted. */
+    private fun keepInStep(state: Message.PlaybackState) {
+        val songId = state.songId ?: return
+        val sinceMs = sinceMs(state) ?: return
+        val here = player.position()
+        if (here.songId != songId || !here.playing || here.waiting) return
+        if (!state.playing || state.waiting) return
+        val expected = state.positionMs + sinceMs.coerceAtLeast(0)
+        val drift = here.positionMs - expected
+        if (abs(drift) <= DRIFT_MS) return
+        log("Drifted $drift ms from the partner on song-${songId.take(8)}: back in step")
+        player.apply(songId, expected, playing = true, partnerPlaying = true)
+    }
+
+    companion object {
+        private const val NANOS_PER_MS = 1_000_000L
+
+        /** How far ahead a start together is planned: well over a message's trip (~10 ms). */
+        const val START_LEAD_MS = 300L
+
+        const val SYNC_EVERY_MS = 5_000L
+
+        /** Further apart than this, the following phone jumps back in step. */
+        const val DRIFT_MS = 500L
+
+        const val START_TOGETHER = "StartTogether"
+        const val SYNC = "Sync"
     }
 }

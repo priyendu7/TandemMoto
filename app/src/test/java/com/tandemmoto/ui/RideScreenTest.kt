@@ -372,6 +372,22 @@ class RideScreenTest {
     }
 
     @Test
+    fun waitingForThePartnersPhoneSaysSo() {
+        showRide(
+            RideUiState(
+                hasSongs = true,
+                nowPlaying = "My Song",
+                artist = "Band",
+                isPlaying = true,
+                waitingForPartner = true,
+                partnerName = "Redmi"
+            )
+        )
+        compose.onNodeWithText(str(R.string.ride_getting_song_on, "Redmi")).assertExists()
+        compose.onNodeWithContentDescription(str(R.string.ride_pause)).assertExists()
+    }
+
+    @Test
     fun partnerDisconnectedSaysTheyNeedToTapConnect() {
         showRide(
             RideUiState(connection = ConnectionStatus.PartnerDisconnected, partnerName = "Redmi")

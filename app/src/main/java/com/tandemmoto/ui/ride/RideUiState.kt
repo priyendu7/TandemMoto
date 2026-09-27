@@ -13,6 +13,10 @@ data class RideUiState(
     val isPlaying: Boolean = false,
     /** The current song isn't on this phone yet: "Getting song…" (#51). */
     val gettingSong: Boolean = false,
+    /** Holding until the partner's phone has the song: "Getting song on …" (#61). */
+    val waitingForPartner: Boolean = false,
+    /** The song's embedded picture (album art), if any. */
+    val artwork: ByteArray? = null,
     val hasSongs: Boolean = false,
     /** Where the current song is and how long it is, for the seek bar (0: not known yet). */
     val positionMs: Long = 0,

@@ -7,10 +7,12 @@ import com.tandemmoto.link.Partner
 import com.tandemmoto.playlist.RideEntry
 import com.tandemmoto.playlist.RidePlaylistState
 import com.tandemmoto.playlist.Stamp
+import com.tandemmoto.transfer.TransferState
 import com.tandemmoto.ui.playlist.PlaylistRow
 import com.tandemmoto.ui.playlist.Sharing
 import com.tandemmoto.ui.playlist.playlistUi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PlaylistUiMappingTest {
@@ -49,5 +51,17 @@ class PlaylistUiMappingTest {
     fun sharingFollowsThePartnerAndTheLink() {
         assertEquals(Sharing.NotPaired, playlistUi(ride, library, null, false, 10).sharing)
         assertEquals(Sharing.WaitingToSync, playlistUi(ride, library, partner, false, 10).sharing)
+    }
+
+    @Test
+    fun songsThePartnerCantPlayAreMarkedOnlyWhilePaired() {
+        val transfers = TransferState(partnerCantPlay = setOf("mine"))
+        val paired = playlistUi(ride, library, partner, true, 10, transfers)
+        assertEquals(
+            listOf(true, false, false),
+            paired.rows.filterIsInstance<PlaylistRow.Entry>().map { it.partnerCantPlay }
+        )
+        val alone = playlistUi(ride, library, null, false, 10, transfers)
+        assertTrue(alone.rows.filterIsInstance<PlaylistRow.Entry>().none { it.partnerCantPlay })
     }
 }

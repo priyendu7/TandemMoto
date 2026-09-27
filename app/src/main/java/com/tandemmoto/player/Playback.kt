@@ -40,6 +40,13 @@ data class PlaybackState(
     val playWhenReady: Boolean = false,
     /** The current song isn't on this phone yet: "Getting song…". */
     val gettingSong: Boolean = false,
+    /**
+     * Holding at the start of the song until both phones have it (#61): which phone it's
+     * missing on ("Getting song…" here, "Getting song on …" for the partner's). Null otherwise.
+     */
+    val waitingOn: MissingOn? = null,
+    /** The current song's embedded picture (album art), when the file has one. */
+    val artwork: ByteArray? = null,
     /** Songs whose audio format this phone can't decode (skipped; phone test on #51). */
     val cantPlay: Set<String> = emptySet(),
     /** Where the current song is, for Home's seek bar (updated every 0.5 s while playing). */
@@ -70,6 +77,8 @@ class Playback(
     private val storageFull: () -> Boolean,
     /** The current song's place, for the song window (#50). */
     private val currentIndex: MutableStateFlow<Int>,
+    /** What the partner's phone has, for the start gate (#61). */
+    private val partnerSongs: () -> PartnerSongs = { PartnerSongs() },
     private val log: (String) -> Unit = {},
     private val now: () -> Long = System::currentTimeMillis
 ) : SongAvailability,
@@ -94,6 +103,18 @@ class Playback(
     val session: MediaSession
 
     private var ticker: Job? = null
+
+    /** Holding at the start of [Held.songId] until both phones have it (#61). */
+    private data class Held(val songId: String, val missingOn: MissingOn)
+
+    private var held: Held? = null
+    private var holdTimeout: Job? = null
+
+    /** A start both phones make at the same moment, scheduled (#61). */
+    private var startJob: Job? = null
+
+    /** The song the partner last said it's playing (so it has it). */
+    private var partnerPlayingSong: String? = null
 
     init {
         val files = DataSource.Factory {
@@ -120,8 +141,12 @@ class Playback(
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 onCurrentChanged()
-                // The song ended and the next began: both phones move on together.
-                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) control("SongEnd")
+                // The song ended and the next began: both phones move on together, through the
+                // start gate (#61).
+                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                    startPlaying()
+                    control("SongEnd")
+                }
             }
 
             override fun onEvents(player: Player, events: Player.Events) = publish()
@@ -152,7 +177,7 @@ class Playback(
     }
 
     fun togglePlay() {
-        if (player.isPlaying || player.playWhenReady) pause() else play()
+        if (player.isPlaying || wantsToPlay()) pause() else play()
     }
 
     fun play() {
@@ -161,28 +186,58 @@ class Playback(
     }
 
     fun pause() {
+        stopWaiting()
         player.pause()
+        publish() // a held song was already paused underneath: no player event
         control("Pause")
     }
 
     fun next() {
         if (!player.hasNextMediaItem()) return
-        player.seekToNextMediaItem()
+        moveThen { player.seekToNextMediaItem() }
         control("Next")
     }
 
     /** Over 3 s into a song it starts again; otherwise the previous song (Media3's rule). */
     fun previous() {
-        player.seekToPrevious()
+        moveThen { player.seekToPrevious() }
         control("Previous")
     }
 
     /** Plays from the song at [index] of the ride playlist (a tap in Playlist). */
     fun playAt(index: Int) {
         if (index !in 0 until player.mediaItemCount) return
+        stopWaiting()
         player.seekTo(index, 0)
         startPlaying()
         control("PlaylistTap")
+    }
+
+    /**
+     * What the start gate depends on changed (a download finished, the partner's song list
+     * arrived, the link came or went): a held song may start now (#61).
+     */
+    fun recheck() {
+        val waiting = held ?: return
+        val id = player.currentMediaItem?.mediaId
+        if (id != waiting.songId) {
+            stopWaiting()
+            publish()
+            return
+        }
+        when (val decision = decideStart(id)) {
+            StartDecision.Play -> {
+                log("song-${id.take(8)} is on both phones: starting")
+                startTogether(id)
+            }
+            is StartDecision.Hold -> if (decision.missingOn != waiting.missingOn) {
+                hold(id, decision.missingOn)
+            }
+            StartDecision.Skip -> {
+                skipForward()
+                control("SkipCantPlay")
+            }
+        }
     }
 
     /** Home's seek bar, when it's let go. */
@@ -195,6 +250,7 @@ class Playback(
 
     fun release() {
         ticker?.cancel()
+        stopWaiting()
         session.release()
         player.release()
     }
@@ -203,20 +259,42 @@ class Playback(
 
     override fun position() = PlayerPosition(
         songId = player.currentMediaItem?.mediaId,
-        playing = player.playWhenReady,
-        positionMs = player.currentPosition
+        playing = wantsToPlay(),
+        positionMs = player.currentPosition,
+        waiting = held != null
     )
 
     override fun hasSong(songId: String) = indexOf(songId) >= 0
 
-    override fun apply(songId: String, positionMs: Long, playing: Boolean) {
+    override fun apply(
+        songId: String,
+        positionMs: Long,
+        playing: Boolean,
+        startInMs: Long,
+        partnerPlaying: Boolean
+    ) {
         val index = indexOf(songId)
         if (index < 0) return
-        val offMs = abs(player.currentPosition - positionMs)
-        if (index != player.currentMediaItemIndex || offMs > APPLY_TOLERANCE_MS || !playing) {
-            player.seekTo(index, positionMs)
+        partnerPlayingSong = songId.takeIf { partnerPlaying }
+        val sameSong = index == player.currentMediaItemIndex
+        val inStep = sameSong &&
+            player.isPlaying &&
+            startInMs == 0L &&
+            abs(player.currentPosition - positionMs) <= APPLY_TOLERANCE_MS
+        stopWaiting()
+        if (!inStep) player.seekTo(index, positionMs)
+        when {
+            !playing -> player.pause()
+            inStep -> Unit
+            else -> when (val decision = decideStart(songId)) {
+                StartDecision.Play -> scheduleStart(songId, startInMs)
+                is StartDecision.Hold -> hold(songId, decision.missingOn)
+                StartDecision.Skip -> {
+                    skipForward()
+                    control("SkipCantPlay")
+                }
+            }
         }
-        if (playing) startPlaying() else player.pause()
         publish()
     }
 
@@ -228,7 +306,11 @@ class Playback(
         listener?.onControl(name)
     }
 
-    /** Prepares if needed and plays; false with nothing to play. */
+    /**
+     * Prepares if needed and plays the current song, if both phones have it (#61): otherwise it
+     * holds at its start, and a song one of the phones can't play is skipped. False with nothing
+     * to play.
+     */
     private fun startPlaying(): Boolean {
         if (player.mediaItemCount == 0) return false
         if (player.playbackState == Player.STATE_IDLE ||
@@ -237,8 +319,119 @@ class Playback(
             if (player.playbackState == Player.STATE_ENDED) player.seekTo(0, 0)
             player.prepare()
         }
-        player.play()
-        return true
+        repeat(player.mediaItemCount) {
+            val id = player.currentMediaItem?.mediaId ?: return false
+            when (val decision = decideStart(id)) {
+                StartDecision.Play -> {
+                    stopWaiting()
+                    player.play()
+                    return true
+                }
+                is StartDecision.Hold -> {
+                    hold(id, decision.missingOn)
+                    return true
+                }
+                StartDecision.Skip -> {
+                    log("Skipping song-${id.take(8)}: one of the phones can't play it")
+                    if (!player.hasNextMediaItem()) {
+                        stopWaiting()
+                        player.pause()
+                        return false
+                    }
+                    player.seekToNextMediaItem()
+                }
+            }
+        }
+        return false
+    }
+
+    private fun decideStart(id: String) = StartGate.decide(
+        songId = id,
+        linked = linked(),
+        hereReady = find(id) is SongFileState.Ready,
+        cantPlayHere = _state.value.cantPlay,
+        partner = partnerSongs(),
+        partnerPlaying = partnerPlayingSong == id
+    )
+
+    /** Playing, or wanting to: held until both phones have the song, or starting shortly. */
+    private fun wantsToPlay() = player.playWhenReady || held != null || startJob?.isActive == true
+
+    /** Waits at the start of [id] until both phones have it (#61). */
+    private fun hold(id: String, missingOn: MissingOn) {
+        startJob?.cancel()
+        player.pause()
+        val first = held?.songId != id
+        held = Held(id, missingOn)
+        log(
+            "Holding song-${id.take(8)}: not on " +
+                if (missingOn == MissingOn.ThisPhone) "this phone yet" else "the partner's yet"
+        )
+        if (first) {
+            holdTimeout?.cancel()
+            // The phone without the song gives up after its wait rules (#51) and the skip is
+            // mirrored; this is the backstop if that never comes (e.g. the link dropped).
+            holdTimeout = scope.launch {
+                delay(HOLD_GIVE_UP_MS)
+                if (held?.songId == id) {
+                    log("song-${id.take(8)} never reached both phones: skipping")
+                    skipForward()
+                    control("SkipNotOnBoth")
+                }
+            }
+        }
+        publish()
+    }
+
+    /** Both phones have it: start at the same moment on both (a start planned ahead). */
+    private fun startTogether(id: String) {
+        stopWaiting()
+        scheduleStart(id, if (linked()) listener?.onStartTogether() ?: 0 else 0)
+    }
+
+    private fun scheduleStart(id: String, inMs: Long) {
+        startJob?.cancel()
+        if (inMs <= 0) {
+            player.play()
+            publish()
+            return
+        }
+        player.pause()
+        startJob = scope.launch {
+            delay(inMs)
+            if (player.currentMediaItem?.mediaId == id) player.play()
+            publish()
+        }
+    }
+
+    private fun stopWaiting() {
+        held = null
+        holdTimeout?.cancel()
+        holdTimeout = null
+        startJob?.cancel()
+        startJob = null
+    }
+
+    /** Moves (next/previous), then plays the new song if the old one was playing or held. */
+    private inline fun moveThen(move: () -> Unit) {
+        val wanted = wantsToPlay()
+        stopWaiting()
+        move()
+        if (wanted) startPlaying()
+    }
+
+    /** On to the next song (playing it if this one was), or stop at the end. */
+    private fun skipForward() {
+        val wanted = wantsToPlay()
+        stopWaiting()
+        if (player.hasNextMediaItem()) {
+            player.seekToNextMediaItem()
+            player.prepare()
+            if (wanted) startPlaying()
+        } else {
+            player.pause()
+        }
+        publish()
     }
 
     /** Home's seek bar moves every [TICK_MS] while playing. */
@@ -313,12 +506,10 @@ class Playback(
     private fun skipUnplayable(error: PlaybackException) {
         val cause = error.cause?.let { " (${it.javaClass.simpleName}: ${it.message})" }.orEmpty()
         log("Skipping song-${currentId?.take(8)}: ${error.errorCodeName}$cause")
-        val wasPlaying = player.playWhenReady
         if (player.hasNextMediaItem()) {
-            player.seekToNextMediaItem()
-            player.prepare()
-            if (wasPlaying) player.play()
+            skipForward()
         } else {
+            stopWaiting()
             player.stop()
         }
         control("SkipUnplayable")
@@ -343,13 +534,7 @@ class Playback(
                 "encoding ${format?.pcmEncoding}, ${format?.bitrate} bit/s"
         )
         _state.update { it.copy(cantPlay = it.cantPlay + id) }
-        val wasPlaying = player.playWhenReady
-        if (player.hasNextMediaItem()) {
-            player.seekToNextMediaItem()
-            if (wasPlaying) player.play()
-        } else {
-            player.pause()
-        }
+        skipForward()
         control("SkipCantPlay")
     }
 
@@ -362,9 +547,12 @@ class Playback(
                 title = metadata?.title?.toString(),
                 artist = metadata?.artist?.toString(),
                 isPlaying = player.isPlaying,
+                waitingOn = held?.takeIf { h -> h.songId == player.currentMediaItem?.mediaId }
+                    ?.missingOn,
+                artwork = player.mediaMetadata.artworkData,
                 positionMs = player.currentPosition,
                 durationMs = player.duration.takeIf { d -> d != C.TIME_UNSET } ?: 0,
-                playWhenReady = player.playWhenReady,
+                playWhenReady = wantsToPlay(),
                 gettingSong = waitingFor != null && waitingFor == player.currentMediaItem?.mediaId
             )
         }
@@ -406,5 +594,8 @@ class Playback(
 
         /** Closer than this to the partner's position: no seek (it would be heard). */
         const val APPLY_TOLERANCE_MS = 150L
+
+        /** A hold's backstop: past the linked wait (60 s) of the phone without the song. */
+        const val HOLD_GIVE_UP_MS = 75_000L
     }
 }

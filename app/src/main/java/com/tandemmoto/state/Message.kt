@@ -59,14 +59,20 @@ sealed interface Message {
     @Serializable
     data class SongUnavailable(val id: String) : Message
 
-    /** Every song this phone can play (its own, its copies, its downloads), for "On both phones". */
+    /**
+     * Every song this phone has (its own, its copies, its downloads), for "On both phones" and
+     * the start gate (#61); [cantPlay]: songs whose audio format it can't decode (#61).
+     */
     @Serializable
-    data class SongsOnPhone(val ids: List<String>) : Message
+    data class SongsOnPhone(val ids: List<String>, val cantPlay: List<String> = emptyList()) :
+        Message
 
     /**
      * Shared playback (#60): what the sender's player is doing after its latest control. [songId]
      * is playing (or paused) at [positionMs] as of [atNanos] on the sender's clock; the newest
-     * [stamp] wins on both phones. [control] names what caused it, for logs.
+     * [stamp] wins on both phones. [control] names what caused it, for logs. [waiting]: the
+     * sender wants to play but is holding until both phones have the song (#61); an [atNanos] in
+     * the future is a start both phones make at that moment.
      */
     @Serializable
     data class PlaybackState(
@@ -75,7 +81,8 @@ sealed interface Message {
         val positionMs: Long,
         val atNanos: Long,
         val stamp: Stamp,
-        val control: String
+        val control: String,
+        val waiting: Boolean = false
     ) : Message
 
     /** The sender is closing the connection, and why. */
