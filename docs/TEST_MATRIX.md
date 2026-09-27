@@ -35,7 +35,7 @@ The rider controls music from the bike. TandemMoto expects those controls to rea
 
 | ID | Model | A2DP (music) | HFP (mic for intercom and calls) | Owner | Notes |
 |---|---|---|---|---|---|
-| E1 | boAt Nirvana Ion | Yes | Yes | @priyendu7 | Budget TWS; check SCO mic quality and whether calls take the headset back cleanly (T9) |
+| E1 | boAt Nirvana Ion | Yes | Yes | @priyendu7 | Budget TWS; the pillion setup for Phase 4 (with P4, #74). Record: A2DP → HFP switch time, narrowband (CVSD) or wideband (mSBC) voice, and whether calls take the headset back cleanly (T9) |
 | — | **Wanted:** Samsung Galaxy Buds (any) | | | | Pairs with P1; tests Samsung's own audio stack |
 | — | **Wanted:** another popular budget TWS (e.g. OnePlus Nord Buds, Noise, JBL) | | | | |
 
