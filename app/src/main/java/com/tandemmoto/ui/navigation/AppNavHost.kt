@@ -4,6 +4,7 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
@@ -20,6 +21,7 @@ import com.tandemmoto.ui.ride.RideRoute
 import com.tandemmoto.ui.settings.PartnerSongsUi
 import com.tandemmoto.ui.settings.SettingsScreen
 import com.tandemmoto.ui.setup.PairRoute
+import com.tandemmoto.voice.VoiceEffect
 
 object Routes {
     const val RIDE = "ride"
@@ -61,6 +63,9 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             val micTest by app.micTest.state.collectAsStateWithLifecycle()
             val talkTest by app.talkTest.state.collectAsStateWithLifecycle()
             val earbudMic by app.earbudMic.on.collectAsStateWithLifecycle()
+            val talkLevelDb by app.voice.micLevelDb.collectAsStateWithLifecycle()
+            val voiceProcessing by app.voiceProcessing.on.collectAsStateWithLifecycle()
+            val voiceEffects = remember { VoiceEffect.available() }
             val partnerHost by app.link.channel.partnerHost.collectAsStateWithLifecycle()
             SettingsScreen(
                 onBack = { navController.popBackStack() },
@@ -85,6 +90,10 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 onTalkTest = app.talkTest::set,
                 earbudMic = earbudMic,
                 onEarbudMic = app.earbudMic::set,
+                talkLevelDb = talkLevelDb,
+                voiceProcessing = voiceProcessing,
+                onVoiceProcessing = app.voiceProcessing::set,
+                voiceEffects = voiceEffects,
                 notifications = permissions.state.statuses[AppPermission.NOTIFICATIONS],
                 onNotificationsClick = {
                     if (permissions.state.isGranted(AppPermission.NOTIFICATIONS)) {

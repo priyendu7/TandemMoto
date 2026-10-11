@@ -46,6 +46,7 @@ import com.tandemmoto.voice.RouteKind
 import com.tandemmoto.voice.SharedPrefsMuteStore
 import com.tandemmoto.voice.TalkTest
 import com.tandemmoto.voice.VoiceChannel
+import com.tandemmoto.voice.VoiceProcessingSetting
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +55,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -103,6 +105,10 @@ class TandemMotoApp : Application() {
 
     /** Each person's voice to the other phone (#71). */
     lateinit var voice: VoiceChannel
+        private set
+
+    /** Settings → Advanced → Voice processing (#73). */
+    lateinit var voiceProcessing: VoiceProcessingSetting
         private set
 
     /** Settings → Advanced → Use earbud mic for the intercom (#72). */
@@ -247,8 +253,9 @@ class TandemMotoApp : Application() {
                 .stateIn(appScope, SharingStarted.Eagerly, false)
         )
         linkSession.begin()
+        voiceProcessing = VoiceProcessingSetting(this)
         micTest = MicTest(
-            record = AudioRecordSource(this),
+            record = mic(),
             scope = appScope,
             log = { AppLog.i("MicTest", it) },
             context = {
@@ -259,10 +266,16 @@ class TandemMotoApp : Application() {
         startVoice()
     }
 
+    private fun mic() = AudioRecordSource(
+        this,
+        processing = { voiceProcessing.on.value },
+        log = { AppLog.i("Mic", it) }
+    )
+
     private fun startVoice() {
         earbudMic = EarbudMicSetting(this)
         voice = VoiceChannel(
-            mic = AudioRecordSource(this),
+            mic = mic(),
             // Media while the earbuds stay in music mode, so it plays on them (#72).
             speaker = AudioTrackSource {
                 if (intercom.state.value.route == RouteKind.EarbudsMusicMode) {
@@ -280,6 +293,8 @@ class TandemMotoApp : Application() {
             }
         )
         voice.start()
+        // The A/B switch applies straight away, even mid-sentence (#73).
+        appScope.launch { voiceProcessing.on.drop(1).collect { voice.reopenMic() } }
         // The voice goes out while mic mode wants it or the Talk test is on.
         val intercomSends = MutableStateFlow(false)
         val talkTestSends = MutableStateFlow(false)

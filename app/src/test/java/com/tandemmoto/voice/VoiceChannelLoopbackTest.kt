@@ -113,9 +113,19 @@ class VoiceChannelLoopbackTest {
             }
         )
         assertTrue(logsA.any { it.startsWith("Voice: sent") })
+        // A tone at a quarter of full scale: about -15 dBFS (#73).
+        assertTrue(logsA.toString(), logsA.any { it.contains("mic level median -15 dBFS") })
+        val level = a.micLevelDb.value
+        assertTrue("level meter: $level", level != null && level > -17 && level < -13)
+
+        a.reopenMic() // the voice processing switch (#73)
+        Thread.sleep(200)
+        assertEquals("reopened once", 2, micA.opened)
+        assertEquals("the old mic released", 1, micA.closed)
 
         a.setSending(false)
         Thread.sleep(1_800)
+        assertEquals("the meter clears when the mic closes", null, a.micLevelDb.value)
         assertEquals("the mic is released", micA.opened, micA.closed)
         assertFalse("B's speaker closes after a second of silence", speakerB.open)
         a.stop()
