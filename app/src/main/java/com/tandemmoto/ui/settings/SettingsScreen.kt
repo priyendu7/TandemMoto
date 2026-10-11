@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
@@ -15,6 +16,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -41,6 +43,7 @@ import com.tandemmoto.ui.theme.TandemMotoTheme
 import com.tandemmoto.voice.MicTestResult
 import com.tandemmoto.voice.MicTestState
 import com.tandemmoto.voice.TalkTestState
+import com.tandemmoto.voice.VoiceEffect
 import kotlin.math.roundToInt
 
 private const val SOURCE_URL = "https://github.com/priyendu7/TandemMoto"
@@ -71,7 +74,13 @@ fun SettingsScreen(
     onTalkTest: (Boolean) -> Unit = {},
     /** Advanced → Use earbud mic for the intercom (#72). */
     earbudMic: Boolean = false,
-    onEarbudMic: (Boolean) -> Unit = {}
+    onEarbudMic: (Boolean) -> Unit = {},
+    /** The mic's level while the Talk test sends, in dBFS (#73); null hides the meter. */
+    talkLevelDb: Double? = null,
+    /** Advanced → Voice processing (#73), and the effects this phone has. */
+    voiceProcessing: Boolean = true,
+    onVoiceProcessing: (Boolean) -> Unit = {},
+    voiceEffects: Set<VoiceEffect> = emptySet()
 ) {
     var advanced by rememberSaveable { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
@@ -188,21 +197,25 @@ fun SettingsScreen(
                         onValueChange = onEarbudMic
                     )
                 )
+                VoiceProcessingRow(voiceProcessing, onVoiceProcessing, voiceEffects)
                 if (micTest != null) MicTestRow(micTest, onMicTest, onCancelMicTest)
                 if (talkTest != null) {
                     ListItem(
                         headlineContent = { Text(stringResource(R.string.settings_talk_test)) },
                         supportingContent = {
-                            Text(
-                                if (talkTest.on) {
-                                    stringResource(
-                                        R.string.settings_talk_test_on,
-                                        talkTest.secondsLeft
-                                    )
-                                } else {
-                                    stringResource(R.string.settings_talk_test_summary)
-                                }
-                            )
+                            Column {
+                                Text(
+                                    if (talkTest.on) {
+                                        stringResource(
+                                            R.string.settings_talk_test_on,
+                                            talkTest.secondsLeft
+                                        )
+                                    } else {
+                                        stringResource(R.string.settings_talk_test_summary)
+                                    }
+                                )
+                                if (talkTest.on && talkLevelDb != null) LevelMeter(talkLevelDb)
+                            }
                         },
                         trailingContent = {
                             Switch(checked = talkTest.on, onCheckedChange = null)
@@ -226,6 +239,55 @@ fun SettingsScreen(
         }
     }
 }
+
+/** Compares the processed voice with the raw mic (#73); applies when the mic next opens. */
+@Composable
+private fun VoiceProcessingRow(
+    on: Boolean,
+    onChange: (Boolean) -> Unit,
+    effects: Set<VoiceEffect>
+) {
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.settings_voice_processing)) },
+        supportingContent = {
+            val summary = stringResource(
+                if (on) {
+                    R.string.settings_voice_processing_on
+                } else {
+                    R.string.settings_voice_processing_off
+                }
+            )
+            val has = if (effects.isEmpty()) {
+                stringResource(R.string.settings_voice_processing_no_effects)
+            } else {
+                stringResource(
+                    R.string.settings_voice_processing_effects,
+                    effects.sorted().joinToString(", ") { it.label }
+                )
+            }
+            Text("$summary\n$has")
+        },
+        trailingContent = { Switch(checked = on, onCheckedChange = null) },
+        modifier = Modifier.toggleable(value = on, role = Role.Switch, onValueChange = onChange)
+    )
+}
+
+/** The mic's loudness while sending, to compare gain between phones (#73). */
+@Composable
+private fun LevelMeter(levelDb: Double) {
+    Column(Modifier.padding(top = 4.dp)) {
+        LinearProgressIndicator(
+            progress = {
+                ((levelDb - METER_FLOOR_DB) / -METER_FLOOR_DB).toFloat().coerceIn(0f, 1f)
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Text(stringResource(R.string.settings_talk_test_level, levelDb.roundToInt()))
+    }
+}
+
+/** The meter's empty end: quieter than a quiet room. */
+private const val METER_FLOOR_DB = -60.0
 
 /**
  * Checks the mic works with the screen locked or the app in the background (#70): it waits, so

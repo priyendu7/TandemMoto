@@ -252,6 +252,12 @@
     <string name="settings_talk_test">Talk test</string>
     <string name="settings_talk_test_summary">Sends your mic to your partner\'s phone. To talk both ways, switch it on for both phones. Stops by itself after 2 minutes.</string>
     <string name="settings_talk_test_on">Sending your voice: stops in %1$d s</string>
+    <string name="settings_talk_test_level">Your mic: %1$d dBFS</string>
+    <string name="settings_voice_processing">Voice processing (test)</string>
+    <string name="settings_voice_processing_on">On: your voice goes through the phone\'s call processing, which cuts wind and engine noise.</string>
+    <string name="settings_voice_processing_off">Off: the raw mic, for comparing. Applies the next time the mic opens.</string>
+    <string name="settings_voice_processing_effects">This phone has: %1$s</string>
+    <string name="settings_voice_processing_no_effects">This phone has none of Android\'s voice effects.</string>
     <string name="settings_advanced">Advanced</string>
     <string name="settings_advanced_summary">Intercom audio and test tools</string>
     <string name="settings_earbud_mic">Use earbud mic for the intercom</string>

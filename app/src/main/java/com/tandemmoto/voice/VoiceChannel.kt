@@ -43,6 +43,11 @@ class VoiceChannel(
     private val _sending = MutableStateFlow(false)
     val sending: StateFlow<Boolean> = _sending.asStateFlow()
 
+    private val _micLevelDb = MutableStateFlow<Double?>(null)
+
+    /** The mic's loudness while sending, in dBFS, every [LEVEL_EVERY_FRAMES] frames (#73). */
+    val micLevelDb: StateFlow<Double?> = _micLevelDb.asStateFlow()
+
     private val jitter = JitterBuffer()
     private val lock = Any()
 
@@ -58,6 +63,7 @@ class VoiceChannel(
     // Stats since the last report (guarded by lock).
     private var sent = 0
     private val networkMs = mutableListOf<Long>()
+    private val levelsDb = mutableListOf<Double>()
 
     @Volatile
     private var micLatencyMs = 0
@@ -138,11 +144,21 @@ class VoiceChannel(
         }
         micLatencyMs = capture.latencyMs
         val frame = ShortArray(JitterBuffer.FRAME_SAMPLES)
+        var frames = 0
+        var loudest = MicLevels.FLOOR_DB
         try {
             while (_sending.value) {
                 val out = socket ?: break
                 val to = partner ?: break
                 if (!readFully(capture, frame)) break
+                val level = MicLevels.dbfs(frame)
+                synchronized(lock) { levelsDb += level }
+                loudest = maxOf(loudest, level)
+                if (++frames % LEVEL_EVERY_FRAMES == 0) {
+                    _micLevelDb.value = loudest
+                    loudest = MicLevels.FLOOR_DB
+                    micLatencyMs = capture.latencyMs
+                }
                 val bytes = VoicePackets.encode(VoicePacket(seq++, nanoTime(), frame.copyOf()))
                 try {
                     out.send(DatagramPacket(bytes, bytes.size, to))
@@ -153,6 +169,7 @@ class VoiceChannel(
             }
         } finally {
             capture.close() // releases the mic: Android's mic indicator goes off
+            _micLevelDb.value = null
         }
     }
 
@@ -224,15 +241,22 @@ class VoiceChannel(
 
     private fun report() {
         val stats = jitter.takeStats()
-        val (sentNow, network) = synchronized(lock) {
-            (sent to networkMs.sorted()).also {
+        val (sentNow, network, levels) = synchronized(lock) {
+            Triple(sent, networkMs.sorted(), levelsDb.sorted()).also {
                 sent = 0
                 networkMs.clear()
+                levelsDb.clear()
             }
         }
         if (sentNow == 0 && stats.received == 0) return
         val parts = mutableListOf<String>()
         if (sentNow > 0) parts += "sent $sentNow"
+        if (levels.isNotEmpty()) {
+            // Median is mostly the background; the 95th percentile is speech (#73).
+            val p95 = levels[(levels.size * 95 / 100).coerceAtMost(levels.size - 1)]
+            val median = levels[levels.size / 2]
+            parts += "mic level median %.0f dBFS, p95 %.0f dBFS".format(median, p95)
+        }
         if (stats.received > 0) {
             parts += "received ${stats.received}, filled in ${stats.filledIn}, " +
                 "late ${stats.late}, trimmed ${stats.trimmed}, " +
@@ -258,6 +282,9 @@ class VoiceChannel(
         const val VOICE_TOS = 0xB8
         const val SPEAKER_IDLE_MS = 1_000L
         const val STATS_EVERY_MS = 10_000L
+
+        /** 100 ms: often enough for a level meter. */
+        const val LEVEL_EVERY_FRAMES = 5
         private const val MAX_PACKET_BYTES = 2_048
     }
 }

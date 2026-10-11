@@ -3,7 +3,7 @@
 The intercom's audio (Phase 4). So far:
 
 - `MicSource` / `AudioRecordSource`: the mic at 16 kHz mono, 16-bit, from the voice-call source
-  (the maker's call processing; noise suppression is #73). `MicCapture` is closed to release the
+  (the maker's call processing, plus Android's effects: see #73 below). `MicCapture` is closed to release the
   mic, which turns Android's mic indicator off.
 - `MicTest` (#70): Settings → Diagnostics → Mic test. Waits 10 s or 5 min (time to lock the
   screen, or leave the app and make it reconnect), records 5 s, and logs the loudness every
@@ -59,3 +59,23 @@ mic (16 kHz, 20 ms frames) → VoicePacket → UDP 48154 (DSCP EF) → partner �
   heard. `Message.Muted` goes to the partner on every change and every connection ("… is muted").
 - Logs: mic mode on/off, the route used, the earbuds' switch time, and the time from the pause to
   talking.
+
+## Noise suppression and gain control (#73)
+
+- With **voice processing on** (the default), `AudioRecordSource` uses the voice-call source and
+  attaches Android's `NoiseSuppressor`, `AutomaticGainControl` and `AcousticEchoCanceler` where
+  the phone has them (`MicEffects`). They belong to the open mic's audio session, so they run
+  only while a mic is open (mic mode, the Talk test, the Mic test) and are released with it.
+  Each open logs what it got: `Mic open with the voice-call source; noise suppressor on, …`.
+- **Settings → Advanced → Voice processing (test)** turns it off for A/B tests: the
+  voice-recognition source (Android requires it to be unprocessed) and no effects. It applies the
+  next time the mic opens (toggle the Talk test off and on). The row lists the effects this phone
+  has.
+- The Talk test shows a **level meter** (`VoiceChannel.micLevelDb`, the loudest 20 ms frame of
+  every 100 ms), and the 10 s voice log adds `mic level median … dBFS, p95 … dBFS` (median is
+  mostly background, p95 speech), to compare gain between phones.
+- The mic delay in the mouth-to-ear estimate is now measured from Android's capture timestamp
+  (refreshed every 100 ms) instead of guessed from the buffer size. It covers buffering, not an
+  effect's own algorithmic delay; that needs the bench A/B.
+- WebRTC's audio processing (native) is the fallback if the bike test (Phase 6) shows this isn't
+  enough.
