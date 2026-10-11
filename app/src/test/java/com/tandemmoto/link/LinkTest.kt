@@ -803,16 +803,31 @@ class LinkTest {
     }
 
     @Test
-    fun listeningAfterThePartnersDisconnectEndsWithTheWindow() = runTest {
+    fun afterThePartnersDisconnectItListensThenKeepsTryingInSlots() = runTest {
         val partner = saved(s25, Acceptor)
         val link = link(InMemoryPartnerStore(partner))
         partnerApp.refuseWith = Bye.Reason.Disconnected
         driver.formGroupWith(s25, isGroupOwner = false)
         runCurrent()
         driver.group.value = null
+        runCurrent()
+        assertEquals(
+            Reason.PartnerDisconnected,
+            (link.status.value as LinkStatus.NotConnected).reason
+        )
         advanceTimeBy(Reconnector.WINDOW_MS + 1)
-        assertEquals(LinkStatus.NotConnected(partner.learned()), link.status.value)
+        assertEquals(
+            LinkStatus.Reconnecting(partner.learned(), nextTryAtMs = 240_000),
+            link.status.value
+        )
         assertEquals(DiscoveryState.Idle, link.discovery.state.value)
+
+        // They tap Connect 5 minutes later: their invitation arrives in a slot.
+        advanceTimeBy(360_000 - testScheduler.currentTime + 5_000)
+        partnerApp.refuseWith = null
+        driver.formGroupWith(s25, isGroupOwner = false)
+        runCurrent()
+        assertEquals(LinkStatus.Connected(partner.learned()), link.status.value)
     }
 
     @Test

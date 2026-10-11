@@ -269,8 +269,8 @@ class Link(
         Drop,
 
         /**
-         * The partner tapped Disconnect: keep showing that, but listen for one window so they can
-         * reconnect. No slots: they chose to stop.
+         * The partner tapped Disconnect: keep showing that while listening for a 2-minute window,
+         * then slots, so their Connect tap later reconnects both without a tap here.
          */
         Listen
     }
@@ -305,14 +305,12 @@ class Link(
                 Attempt.Listen -> Unit
             }
             log("Connecting to ${partner.logId} as ${partner.role} ($attempt)")
-            if (attempt == Attempt.Listen) {
-                if (!reconnector.run(partner, Reconnector.WINDOW_MS) && !groupWithPartner) {
-                    _status.value = LinkStatus.NotConnected(partner, unreachable())
-                    log("Partner didn't reconnect; stopped listening")
-                }
-                return@launch
+            val firstWindowMs = if (attempt == Attempt.Listen) {
+                Reconnector.WINDOW_MS
+            } else {
+                ReconnectSchedule.FIRST_WINDOW_MS
             }
-            if (reconnector.run(partner, ReconnectSchedule.FIRST_WINDOW_MS)) return@launch
+            if (reconnector.run(partner, firstWindowMs)) return@launch
             keepCpuAwake(true)
             try {
                 trySlots(partner)

@@ -73,7 +73,7 @@ class Reconnector(
     }
 
     companion object {
-        /** Listening after the partner's Disconnect (#27); slots use [ReconnectSchedule]. */
+        /** Listening after the partner's Disconnect (#27), before the [ReconnectSchedule] slots. */
         const val WINDOW_MS = 120_000L
 
         /** A persistent-group reconnection took 1.4–7 s in the spike. */

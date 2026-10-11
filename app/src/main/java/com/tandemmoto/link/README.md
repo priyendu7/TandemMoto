@@ -67,6 +67,8 @@ persistent command/state socket, auto-reconnect, connection status.
   phones use the same slots, so they search at the same time; Home and the notification show
   "Reconnecting to … · next try 13:22" between slots. It never gives up by itself: only
   Disconnect, Forget partner, the Pair screen or Wi-Fi off stop it (Wi-Fi back on starts again).
+  This includes after the partner's Disconnect: a 2-minute listening window, then the same slots,
+  so their Connect tap even much later reconnects both.
   A partial wake lock (`CpuWakeLock`) keeps the CPU up between slots, so a screen-off phone
   doesn't sleep through one. Logs: `Partner not reached; next try at 13:22:00`, `Slot try at
   13:22:00`, and on connect `Partner's clock is 1.2 s ahead`, since the slots need both wall
@@ -75,7 +77,7 @@ persistent command/state socket, auto-reconnect, connection status.
   that group removed, so a fresh one can form. Removing the active group keeps Android's saved one
   (no prompt on reconnect).
 - Disconnect turns reconnecting off on this phone until Connect is tapped. The partner, told by
-  `Bye(Disconnected)`, keeps listening for one 2-minute window (no slots), so one tap on the phone that disconnected
+  `Bye(Disconnected)`, listens for 2 minutes and then keeps trying in slots, so one tap on the phone that disconnected
   reconnects both. No retries after "no longer paired", "update needed" or a rejection guess.
 
 Design notes come from the spike: [`docs/spikes/wifi-direct.md`](../../../../../../../docs/spikes/wifi-direct.md).
