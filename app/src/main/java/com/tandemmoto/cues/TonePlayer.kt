@@ -12,14 +12,14 @@ import kotlin.math.sin
 object Tones {
     const val SAMPLE_RATE = 48_000
     private const val AMPLITUDE = 0.3
-    private const val FADE_MS = 5
+    private const val FADE_MS = 10
 
-    /** (Hz, ms) notes, about 200 ms in all. */
+    /** (Hz, ms) notes, about 400 ms in all. */
     fun notes(cue: Cue): List<Pair<Int, Int>> = when (cue) {
-        Cue.PartnerConnected -> listOf(660 to 100, 880 to 100)
-        Cue.PartnerDisconnected -> listOf(880 to 70, 523 to 70, 392 to 70)
-        Cue.MusicOn -> listOf(1_000 to 150)
-        Cue.MusicOff -> listOf(500 to 150)
+        Cue.PartnerConnected -> listOf(660 to 200, 880 to 200)
+        Cue.PartnerDisconnected -> listOf(880 to 140, 523 to 140, 392 to 140)
+        Cue.MusicOn -> listOf(1_000 to 300)
+        Cue.MusicOff -> listOf(500 to 300)
     }
 
     /** 16-bit mono PCM; each note fades in and out so it doesn't click. */

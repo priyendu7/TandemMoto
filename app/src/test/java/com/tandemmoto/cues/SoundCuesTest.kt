@@ -119,10 +119,10 @@ class SoundCuesTest {
     }
 
     @Test
-    fun tonesAreAboutAFifthOfASecond() {
+    fun tonesLastAboutFourHundredMs() {
         for (cue in Cue.entries) {
             val ms = Tones.pcm(cue).size * 1_000 / Tones.SAMPLE_RATE
-            assert(ms in 150..250) { "$cue is $ms ms" }
+            assert(ms in 300..450) { "$cue is $ms ms" }
         }
     }
 }
