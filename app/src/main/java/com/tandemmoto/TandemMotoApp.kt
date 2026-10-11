@@ -16,6 +16,7 @@ import com.tandemmoto.library.Library
 import com.tandemmoto.link.AndroidDiscoveryPreconditions
 import com.tandemmoto.link.AndroidWifiP2pDriver
 import com.tandemmoto.link.ChannelState
+import com.tandemmoto.link.CpuWakeLock
 import com.tandemmoto.link.DataStorePartnerStore
 import com.tandemmoto.link.InstallId
 import com.tandemmoto.link.Link
@@ -151,7 +152,8 @@ class TandemMotoApp : Application() {
             transport = SocketFrameTransport(),
             installId = installId::get,
             appVersion = BuildConfig.VERSION_NAME,
-            keepAwake = LowLatencyWifiLock(this)::hold
+            keepAwake = LowLatencyWifiLock(this)::hold,
+            keepCpuAwake = CpuWakeLock(this)::hold
         )
         link.start()
         ridePlaylist = RidePlaylist(

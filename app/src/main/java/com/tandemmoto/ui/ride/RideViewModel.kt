@@ -41,6 +41,7 @@ class RideViewModel(
             RideUiState(
                 connection = status.toUi(),
                 partnerName = status.partnerName(),
+                nextTryAtMs = (status as? LinkStatus.Reconnecting)?.nextTryAtMs,
                 nowPlaying = player.title,
                 artist = player.artist,
                 isPlaying = player.playWhenReady,

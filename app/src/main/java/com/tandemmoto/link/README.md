@@ -57,18 +57,25 @@ persistent command/state socket, auto-reconnect, connection status.
 
 ## Auto-reconnect (#27)
 
-- `Reconnector` runs one 2-minute window of attempts: both phones search the whole time (a phone
-  only receives an invitation while discovering); the initiator connects whenever the partner is
+- `Reconnector` runs one window of attempts: both phones search the whole time (a phone only
+  receives an invitation while discovering); the initiator connects whenever the partner is
   visible and backs off 1, 2, 4, 8 s after an attempt that forms no group within 15 s; the
   acceptor never connects. Android never reconnects by itself (spike #22).
-- `Link` starts a window at startup ("Looking for …"), after a drop ("Reconnecting to …"), when
-  Wi-Fi comes back, when the Pair screen closes, and on a tap. After the window: "Couldn't reach … ·
-  Tap to try again" (after Disconnect it's "Not connected · Tap to connect" instead). Wi-Fi off pauses it without using up the window.
+- `Link` starts trying at startup ("Looking for …"), after a drop ("Reconnecting to …"), when
+  Wi-Fi comes back, when the Pair screen closes, and on a tap: **a 60 s search, then a 20 s search
+  at every even wall-clock minute** (`ReconnectSchedule`, #85) until the partner is back. Both
+  phones use the same slots, so they search at the same time; Home and the notification show
+  "Reconnecting to … · next try 13:22" between slots. It never gives up by itself: only
+  Disconnect, Forget partner, the Pair screen or Wi-Fi off stop it (Wi-Fi back on starts again).
+  A partial wake lock (`CpuWakeLock`) keeps the CPU up between slots, so a screen-off phone
+  doesn't sleep through one. Logs: `Partner not reached; next try at 13:22:00`, `Slot try at
+  13:22:00`, and on connect `Partner's clock is 1.2 s ahead`, since the slots need both wall
+  clocks close.
 - A partner that goes silent while Android keeps the group (the Redmi kept a dead one ~13 s) gets
   that group removed, so a fresh one can form. Removing the active group keeps Android's saved one
   (no prompt on reconnect).
 - Disconnect turns reconnecting off on this phone until Connect is tapped. The partner, told by
-  `Bye(Disconnected)`, keeps listening for a window, so one tap on the phone that disconnected
+  `Bye(Disconnected)`, keeps listening for one 2-minute window (no slots), so one tap on the phone that disconnected
   reconnects both. No retries after "no longer paired", "update needed" or a rejection guess.
 
 Design notes come from the spike: [`docs/spikes/wifi-direct.md`](../../../../../../../docs/spikes/wifi-direct.md).

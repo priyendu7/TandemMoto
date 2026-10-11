@@ -24,13 +24,16 @@ sealed interface Message {
     /**
      * First message on every connection, from both phones. [partnerInstallId]: who the sender
      * thinks its partner is (null when it doesn't know yet, e.g. right after pairing).
+     * [wallClockMs] lets the partner log how far apart the clocks are (#85).
      */
     @Serializable
     data class Hello(
         val appVersion: String,
         val installId: String,
         val partnerInstallId: String?,
-        val role: String
+        val role: String,
+        /** The sender's wall clock (epoch ms) when sent; 0 from apps before #85. */
+        val wallClockMs: Long = 0
     ) : Message
 
     /**

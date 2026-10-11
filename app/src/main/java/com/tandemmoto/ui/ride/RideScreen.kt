@@ -59,6 +59,7 @@ import com.tandemmoto.permissions.AppPermission
 import com.tandemmoto.permissions.AskedOnce
 import com.tandemmoto.permissions.PermissionStatus
 import com.tandemmoto.permissions.PermissionsState
+import com.tandemmoto.service.nextTry
 import com.tandemmoto.ui.components.ConnectionStatus
 import com.tandemmoto.ui.components.ConnectionStatusBar
 import com.tandemmoto.ui.components.ControlButton
@@ -165,6 +166,7 @@ fun RideScreen(
             ConnectionSection(
                 state.connection,
                 state.partnerName,
+                state.nextTryAtMs,
                 permissions,
                 onRequestPermission,
                 onOpenPair,
@@ -230,6 +232,7 @@ private val connectOffers = listOf(AppPermission.NOTIFICATIONS, AppPermission.MI
 private fun ConnectionSection(
     connection: ConnectionStatus,
     partnerName: String?,
+    nextTryAtMs: Long?,
     permissions: PermissionsState,
     onRequestPermission: (AppPermission) -> Unit,
     onOpenPair: () -> Unit,
@@ -287,6 +290,7 @@ private fun ConnectionSection(
         ConnectionStatusBar(
             status = connection,
             partnerName = partnerName,
+            detail = nextTryAtMs?.let { nextTry(LocalContext.current, it) },
             onClickLabel = stringResource(
                 when (connection) {
                     ConnectionStatus.NotConnected -> R.string.ride_connect_action

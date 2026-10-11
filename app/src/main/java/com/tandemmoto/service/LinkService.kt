@@ -196,7 +196,10 @@ class LinkService : Service() {
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_link)
             .setContentTitle(getString(R.string.app_name))
-            .setContentText(getString(text.text, text.name))
+            .setContentText(
+                getString(text.text, text.name) +
+                    (text.nextTryAtMs?.let { " · " + nextTry(this, it) } ?: "")
+            )
             .setContentIntent(openApp())
             .setOngoing(true)
             .setOnlyAlertOnce(true)

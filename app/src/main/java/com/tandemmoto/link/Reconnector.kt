@@ -7,7 +7,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * The search-and-connect loop to the saved partner (#27), for one window of [windowMs]. Android
+ * The search-and-connect loop to the saved partner (#27), for one window. Android
  * never reconnects on its own (spike #22), and a phone only receives an invitation while it's
  * discovering, so both phones search the whole time:
  * - the [Partner.Role.Initiator] connects whenever the partner is visible, and after an attempt
@@ -19,14 +19,13 @@ class Reconnector(
     private val driver: WifiP2pDriver,
     private val discovery: PeerDiscovery,
     private val log: (String) -> Unit = {},
-    private val windowMs: Long = WINDOW_MS,
     private val attemptMs: Long = ATTEMPT_MS
 ) {
     /**
      * Tries until a group with [partner] forms (true) or the window ends (false). Cancelling
      * leaves discovery to the caller: the Pair screen or Wi-Fi-off handling takes it over.
      */
-    suspend fun run(partner: Partner): Boolean {
+    suspend fun run(partner: Partner, windowMs: Long = WINDOW_MS): Boolean {
         // A stuck invitation survives app restarts (spike); clear it before trying.
         if (driver.group.value == null) driver.cancelConnect()
         discovery.start(continuous = true)
@@ -74,7 +73,7 @@ class Reconnector(
     }
 
     companion object {
-        /** Give up after this long (the issue's ~2 min); a tap starts a fresh window. */
+        /** Listening after the partner's Disconnect (#27); slots use [ReconnectSchedule]. */
         const val WINDOW_MS = 120_000L
 
         /** A persistent-group reconnection took 1.4–7 s in the spike. */
