@@ -55,6 +55,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -292,6 +293,8 @@ class TandemMotoApp : Application() {
             }
         )
         voice.start()
+        // The A/B switch applies straight away, even mid-sentence (#73).
+        appScope.launch { voiceProcessing.on.drop(1).collect { voice.reopenMic() } }
         // The voice goes out while mic mode wants it or the Talk test is on.
         val intercomSends = MutableStateFlow(false)
         val talkTestSends = MutableStateFlow(false)

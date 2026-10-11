@@ -85,7 +85,7 @@ internal class MicEffects(sessionId: Int) : Closeable {
 
 /**
  * Settings → Advanced → Voice processing (#73): a test switch to compare the processed voice with
- * the raw mic. On by default; it applies the next time the mic opens.
+ * the raw mic. On by default; an open mic reopens to apply it.
  */
 class VoiceProcessingSetting(context: Context) {
     private val prefs = context.applicationContext

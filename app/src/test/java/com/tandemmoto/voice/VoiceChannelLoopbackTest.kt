@@ -118,6 +118,11 @@ class VoiceChannelLoopbackTest {
         val level = a.micLevelDb.value
         assertTrue("level meter: $level", level != null && level > -17 && level < -13)
 
+        a.reopenMic() // the voice processing switch (#73)
+        Thread.sleep(200)
+        assertEquals("reopened once", 2, micA.opened)
+        assertEquals("the old mic released", 1, micA.closed)
+
         a.setSending(false)
         Thread.sleep(1_800)
         assertEquals("the meter clears when the mic closes", null, a.micLevelDb.value)

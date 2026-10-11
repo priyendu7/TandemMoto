@@ -255,7 +255,7 @@
     <string name="settings_talk_test_level">Your mic: %1$d dBFS</string>
     <string name="settings_voice_processing">Voice processing (test)</string>
     <string name="settings_voice_processing_on">On: your voice goes through the phone\'s call processing, which cuts wind and engine noise.</string>
-    <string name="settings_voice_processing_off">Off: the raw mic, for comparing. Applies the next time the mic opens.</string>
+    <string name="settings_voice_processing_off">Off: the raw mic, for comparing. Switch it while talking to hear the difference.</string>
     <string name="settings_voice_processing_effects">This phone has: %1$s</string>
     <string name="settings_voice_processing_no_effects">This phone has none of Android\'s voice effects.</string>
     <string name="settings_advanced">Advanced</string>

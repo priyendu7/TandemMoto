@@ -134,20 +134,39 @@ class VoiceChannel(
         capturing = thread(name = "voice-capture", isDaemon = true) { captureLoop() }
     }
 
+    /**
+     * Closes and reopens the mic if it's open, so Settings → Advanced → Voice processing applies
+     * while talking (#73 phone test: mic mode stayed open, so the A/B never switched).
+     */
+    fun reopenMic() {
+        reopen = true
+    }
+
+    @Volatile
+    private var reopen = false
+
     private fun captureLoop() {
         audioPriority()
+        do {
+            reopen = false
+            if (!captureUntilStopped()) return
+        } while (reopen && _sending.value)
+    }
+
+    /** False when the mic couldn't be opened. */
+    private fun captureUntilStopped(): Boolean {
         val capture = mic.open()
         if (capture == null) {
             log("Couldn't open the mic for voice")
             _sending.value = false
-            return
+            return false
         }
         micLatencyMs = capture.latencyMs
         val frame = ShortArray(JitterBuffer.FRAME_SAMPLES)
         var frames = 0
         var loudest = MicLevels.FLOOR_DB
         try {
-            while (_sending.value) {
+            while (_sending.value && !reopen) {
                 val out = socket ?: break
                 val to = partner ?: break
                 if (!readFully(capture, frame)) break
@@ -171,6 +190,7 @@ class VoiceChannel(
             capture.close() // releases the mic: Android's mic indicator goes off
             _micLevelDb.value = null
         }
+        return true
     }
 
     private fun readFully(capture: MicCapture, frame: ShortArray): Boolean {

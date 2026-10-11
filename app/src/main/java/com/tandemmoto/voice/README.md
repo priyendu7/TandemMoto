@@ -68,9 +68,9 @@ mic (16 kHz, 20 ms frames) → VoicePacket → UDP 48154 (DSCP EF) → partner �
   only while a mic is open (mic mode, the Talk test, the Mic test) and are released with it.
   Each open logs what it got: `Mic open with the voice-call source; noise suppressor on, …`.
 - **Settings → Advanced → Voice processing (test)** turns it off for A/B tests: the
-  voice-recognition source (Android requires it to be unprocessed) and no effects. It applies the
-  next time the mic opens (toggle the Talk test off and on). The row lists the effects this phone
-  has.
+  voice-recognition source (Android requires it to be unprocessed) and no effects. Switching it
+  reopens an open mic straight away (`VoiceChannel.reopenMic`), so it can be compared while
+  talking. The row lists the effects this phone has.
 - The Talk test shows a **level meter** (`VoiceChannel.micLevelDb`, the loudest 20 ms frame of
   every 100 ms), and the 10 s voice log adds `mic level median … dBFS, p95 … dBFS` (median is
   mostly background, p95 speech), to compare gain between phones.
