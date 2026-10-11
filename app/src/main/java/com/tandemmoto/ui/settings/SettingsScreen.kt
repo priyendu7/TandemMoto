@@ -72,6 +72,9 @@ fun SettingsScreen(
     /** Diagnostics → Talk test (#71); null hides the row (e.g. not linked). */
     talkTest: TalkTestState? = null,
     onTalkTest: (Boolean) -> Unit = {},
+    /** Sound cues in the earbuds (#86). */
+    soundCues: Boolean = true,
+    onSoundCues: (Boolean) -> Unit = {},
     /** Advanced → Use earbud mic for the intercom (#72). */
     earbudMic: Boolean = false,
     onEarbudMic: (Boolean) -> Unit = {},
@@ -134,6 +137,17 @@ fun SettingsScreen(
             if (partnerSongs != null) {
                 PartnerSongsSection(partnerSongs, onWindowChange, onRemovePartnerSongs)
             }
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_sound_cues)) },
+                supportingContent = { Text(stringResource(R.string.settings_sound_cues_summary)) },
+                trailingContent = { Switch(checked = soundCues, onCheckedChange = null) },
+                modifier = Modifier.toggleable(
+                    value = soundCues,
+                    role = Role.Switch,
+                    onValueChange = onSoundCues
+                )
+            )
+            HorizontalDivider()
             if (notifications != null) {
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.settings_notifications)) },
