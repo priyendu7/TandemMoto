@@ -7,6 +7,9 @@ import android.os.Process
 import android.os.StatFs
 import androidx.core.net.toUri
 import androidx.datastore.preferences.preferencesDataStore
+import com.tandemmoto.cues.SoundCues
+import com.tandemmoto.cues.SoundCuesSetting
+import com.tandemmoto.cues.TonePlayer
 import com.tandemmoto.diagnostics.AppLog
 import com.tandemmoto.diagnostics.LogLevel
 import com.tandemmoto.diagnostics.RollingFileLog
@@ -122,6 +125,10 @@ class TandemMotoApp : Application() {
 
     /** Playback mirroring (#60), which also carries whether the intercom is wanted (#72). */
     lateinit var mirror: PlaybackMirror
+        private set
+
+    /** Settings → Sound cues (#86). */
+    lateinit var soundCues: SoundCuesSetting
         private set
 
     /** Settings → Diagnostics → Talk test (#71). */
@@ -324,6 +331,24 @@ class TandemMotoApp : Application() {
             log = { AppLog.i("Intercom", it) }
         )
         intercom.start()
+        soundCues = SoundCuesSetting(this)
+        SoundCues(
+            status = link.status,
+            playing = playback.state.map { it.playWhenReady },
+            enabled = soundCues.on,
+            // Media unless the intercom route is open in call mode, as for the voice above.
+            play = TonePlayer(
+                usage = {
+                    when (intercom.state.value.route) {
+                        null, RouteKind.EarbudsMusicMode -> AudioAttributes.USAGE_MEDIA
+                        else -> AudioAttributes.USAGE_VOICE_COMMUNICATION
+                    }
+                },
+                log = { AppLog.i("Cue", it) }
+            )::play,
+            scope = appScope,
+            log = { AppLog.i("Cue", it) }
+        ).start()
         talkTest = TalkTest(
             setSending = { talkTestSends.value = it },
             callMode = AudioModeControl(this)::set,
