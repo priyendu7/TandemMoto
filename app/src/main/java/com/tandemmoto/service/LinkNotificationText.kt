@@ -1,10 +1,13 @@
 package com.tandemmoto.service
 
+import android.content.Context
+import android.text.format.DateFormat
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import com.tandemmoto.R
 import com.tandemmoto.link.LinkStatus
 import com.tandemmoto.link.LinkStatus.NotConnected.Reason
+import java.util.Date
 
 /** A button on the link notification. */
 enum class NotificationAction(@StringRes val label: Int, @DrawableRes val icon: Int) {
@@ -32,7 +35,9 @@ enum class NotificationAction(@StringRes val label: Int, @DrawableRes val icon: 
 data class NotificationText(
     @StringRes val text: Int,
     val name: String? = null,
-    val actions: List<NotificationAction> = listOf(NotificationAction.Disconnect)
+    val actions: List<NotificationAction> = listOf(NotificationAction.Disconnect),
+    /** Waiting for the next reconnect slot (#85): "· next try 13:22" is added. */
+    val nextTryAtMs: Long? = null
 )
 
 private val reconnect = listOf(NotificationAction.Connect, NotificationAction.Close)
@@ -52,7 +57,8 @@ fun LinkStatus.notificationText(): NotificationText = when (this) {
     is LinkStatus.Reconnecting -> NotificationText(
         R.string.notification_reconnecting,
         partner.name,
-        listOf(NotificationAction.Stop)
+        listOf(NotificationAction.Stop),
+        nextTryAtMs
     )
     is LinkStatus.NotConnected -> when (reason) {
         Reason.WifiOff -> NotificationText(
@@ -80,3 +86,7 @@ fun LinkStatus.notificationText(): NotificationText = when (this) {
             NotificationText(R.string.notification_not_connected, partner.name, reconnect)
     }
 }
+
+/** "next try 13:22" in the phone's 12/24-hour style, for a reconnect slot (#85). */
+fun nextTry(context: Context, epochMs: Long): String =
+    context.getString(R.string.next_try, DateFormat.getTimeFormat(context).format(Date(epochMs)))

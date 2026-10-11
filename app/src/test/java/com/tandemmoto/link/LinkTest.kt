@@ -27,13 +27,22 @@ class LinkTest {
 
     private lateinit var transport: FakeTransport
     private lateinit var partnerApp: FakePartnerApp
+    private val logs = mutableListOf<String>()
+
+    /** The CPU wake lock between reconnect slots (#85). */
+    private var cpuAwake = false
 
     /** [partnerAppRunning]: the partner phone's app answers on the command channel. */
     private fun TestScope.link(
         store: PartnerStore = InMemoryPartnerStore(),
-        partnerAppRunning: Boolean = true
+        partnerAppRunning: Boolean = true,
+        /** The partner's wall clock in its Hello; 0 like an app from before #85. */
+        partnerWallClockMs: Long = 0
     ): Link {
-        partnerApp = FakePartnerApp(backgroundScope)
+        partnerApp = FakePartnerApp(
+            backgroundScope,
+            Message.Hello("0.1.0", "partner-install", null, "Acceptor", partnerWallClockMs)
+        )
         transport = FakeTransport(partnerApp.takeIf { partnerAppRunning })
         return Link(
             driver = driver,
@@ -44,7 +53,11 @@ class LinkTest {
             transport = transport,
             installId = { MY_INSTALL },
             appVersion = "0.1.0",
-            nanoTime = { testScheduler.currentTime * 1_000_000 }
+            nanoTime = { testScheduler.currentTime * 1_000_000 },
+            log = { logs += it },
+            keepCpuAwake = { cpuAwake = it },
+            // The test starts at 0: an even minute, so slots fall at 120 s, 240 s, …
+            wallClockMs = { testScheduler.currentTime }
         ).also {
             it.start()
             runCurrent()
@@ -272,14 +285,71 @@ class LinkTest {
     }
 
     @Test
-    fun notReachedWithinTheWindowMeansNotConnected() = runTest {
+    fun notReachedInTheFirstMinuteSearchesAgainAtEveryEvenMinute() = runTest {
         val partner = saved(redmi, Initiator)
         val link = link(InMemoryPartnerStore(partner))
-        advanceTimeBy(Reconnector.WINDOW_MS - 1_000)
+        advanceTimeBy(ReconnectSchedule.FIRST_WINDOW_MS - 1_000)
         assertEquals(LinkStatus.Connecting(partner), link.status.value)
         advanceTimeBy(1_001)
-        assertEquals(LinkStatus.NotConnected(partner), link.status.value)
-        assertEquals(DiscoveryState.Idle, link.discovery.state.value) // stopped searching
+        // Idle until the slot at 120 s, keeping the CPU awake for it.
+        assertEquals(LinkStatus.Reconnecting(partner, nextTryAtMs = 120_000), link.status.value)
+        assertEquals(DiscoveryState.Idle, link.discovery.state.value)
+        assertTrue(cpuAwake)
+
+        advanceTimeBy(120_000 - testScheduler.currentTime + 1)
+        assertEquals(LinkStatus.Reconnecting(partner), link.status.value)
+        assertTrue(link.discovery.state.value != DiscoveryState.Idle) // searching in the slot
+        assertTrue(logs.toString(), logs.any { it.startsWith("Slot try at") })
+
+        advanceTimeBy(ReconnectSchedule.SLOT_LENGTH_MS)
+        assertEquals(LinkStatus.Reconnecting(partner, nextTryAtMs = 240_000), link.status.value)
+        assertEquals(DiscoveryState.Idle, link.discovery.state.value)
+
+        // Never gives up by itself.
+        advanceTimeBy(60 * 60_000L)
+        assertTrue(link.status.value is LinkStatus.Reconnecting)
+    }
+
+    @Test
+    fun thePartnerAppearingInASlotConnects() = runTest {
+        val partner = saved(s25, Acceptor)
+        val link = link(InMemoryPartnerStore(partner))
+        advanceTimeBy(120_000 + 5_000) // in the first slot
+        driver.formGroupWith(s25, isGroupOwner = false) // the initiator's invitation
+        runCurrent()
+        assertEquals(LinkStatus.Connected(partner.learned()), link.status.value)
+        assertTrue("the wake lock is released", !cpuAwake)
+        advanceTimeBy(10 * 60_000L)
+        assertEquals(LinkStatus.Connected(partner.learned()), link.status.value)
+    }
+
+    @Test
+    fun disconnectWhileWaitingForASlotStopsTrying() = runTest {
+        val partner = saved(redmi, Initiator)
+        val link = link(InMemoryPartnerStore(partner))
+        advanceTimeBy(90_000)
+        assertTrue(cpuAwake)
+        link.disconnect()
+        runCurrent()
+        assertTrue(!cpuAwake)
+        advanceTimeBy(10 * 60_000L)
+        assertEquals(LinkStatus.NotConnected(partner, Reason.Disconnected), link.status.value)
+        assertEquals(DiscoveryState.Idle, link.discovery.state.value)
+    }
+
+    @Test
+    fun theConnectionLogsHowFarApartTheWallClocksAre() = runTest {
+        val partner = saved(redmi, Initiator)
+        val link = link(InMemoryPartnerStore(partner), partnerWallClockMs = 42_500)
+        driver.formGroupWith(redmi)
+        runCurrent()
+        assertEquals(LinkStatus.Connected(partner.learned()), link.status.value)
+        assertTrue(
+            logs.toString(),
+            logs.any {
+                it.startsWith("Partner's clock is 42.5 s ahead") && it.contains("too far")
+            }
+        )
     }
 
     @Test
@@ -373,20 +443,23 @@ class LinkTest {
     }
 
     @Test
-    fun reconnectingGivesUpAfterTheWindowAndATapStartsAFreshOne() = runTest {
+    fun aDropKeepsTryingInSlotsAndATapStartsAFreshMinute() = runTest {
         val partner = saved(redmi, Initiator)
         val link = link(InMemoryPartnerStore(partner))
         driver.formGroupWith(redmi)
         runCurrent()
         driver.group.value = null
         runCurrent()
-        advanceTimeBy(Reconnector.WINDOW_MS + 1)
-        assertEquals(LinkStatus.NotConnected(partner.learned()), link.status.value)
+        advanceTimeBy(ReconnectSchedule.FIRST_WINDOW_MS + 1)
+        assertEquals(
+            LinkStatus.Reconnecting(partner.learned(), nextTryAtMs = 120_000),
+            link.status.value
+        )
 
         link.connectToPartner()
         runCurrent()
         assertEquals(LinkStatus.Connecting(partner.learned()), link.status.value)
-        advanceTimeBy(Reconnector.WINDOW_MS - 1_000)
+        advanceTimeBy(ReconnectSchedule.FIRST_WINDOW_MS - 1_000)
         assertEquals(LinkStatus.Connecting(partner.learned()), link.status.value)
     }
 
@@ -409,8 +482,8 @@ class LinkTest {
     fun tapToConnectStartsAnotherAttempt() = runTest {
         val partner = saved(redmi, Initiator)
         val link = link(InMemoryPartnerStore(partner))
-        advanceTimeBy(Reconnector.WINDOW_MS + 1)
-        assertEquals(LinkStatus.NotConnected(partner), link.status.value)
+        advanceTimeBy(ReconnectSchedule.FIRST_WINDOW_MS + 1)
+        assertTrue(link.status.value is LinkStatus.Reconnecting)
         link.connectToPartner()
         runCurrent()
         assertEquals(LinkStatus.Connecting(partner), link.status.value)
@@ -730,16 +803,31 @@ class LinkTest {
     }
 
     @Test
-    fun listeningAfterThePartnersDisconnectEndsWithTheWindow() = runTest {
+    fun afterThePartnersDisconnectItListensThenKeepsTryingInSlots() = runTest {
         val partner = saved(s25, Acceptor)
         val link = link(InMemoryPartnerStore(partner))
         partnerApp.refuseWith = Bye.Reason.Disconnected
         driver.formGroupWith(s25, isGroupOwner = false)
         runCurrent()
         driver.group.value = null
+        runCurrent()
+        assertEquals(
+            Reason.PartnerDisconnected,
+            (link.status.value as LinkStatus.NotConnected).reason
+        )
         advanceTimeBy(Reconnector.WINDOW_MS + 1)
-        assertEquals(LinkStatus.NotConnected(partner.learned()), link.status.value)
+        assertEquals(
+            LinkStatus.Reconnecting(partner.learned(), nextTryAtMs = 240_000),
+            link.status.value
+        )
         assertEquals(DiscoveryState.Idle, link.discovery.state.value)
+
+        // They tap Connect 5 minutes later: their invitation arrives in a slot.
+        advanceTimeBy(360_000 - testScheduler.currentTime + 5_000)
+        partnerApp.refuseWith = null
+        driver.formGroupWith(s25, isGroupOwner = false)
+        runCurrent()
+        assertEquals(LinkStatus.Connected(partner.learned()), link.status.value)
     }
 
     @Test

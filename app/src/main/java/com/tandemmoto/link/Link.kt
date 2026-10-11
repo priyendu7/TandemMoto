@@ -2,6 +2,7 @@ package com.tandemmoto.link
 
 import com.tandemmoto.state.Message
 import com.tandemmoto.state.Message.Bye
+import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -34,8 +35,12 @@ sealed interface LinkStatus {
 
     data class Connecting(val partner: Partner) : LinkStatus
 
-    /** The link dropped; both phones are trying to get it back (#27). */
-    data class Reconnecting(val partner: Partner) : LinkStatus
+    /**
+     * The link dropped, or the first search didn't find the partner; both phones keep trying
+     * (#27, #85). [nextTryAtMs]: the next search slot (epoch ms) while waiting for it; null while
+     * searching.
+     */
+    data class Reconnecting(val partner: Partner, val nextTryAtMs: Long? = null) : LinkStatus
 
     /** The partner's app answered on the command channel (#25), not just "in a group". */
     data class Connected(val partner: Partner) : LinkStatus
@@ -43,7 +48,10 @@ sealed interface LinkStatus {
     data class NotConnected(val partner: Partner, val reason: Reason = Reason.Unreachable) :
         LinkStatus {
         enum class Reason {
-            /** Tried for a whole window without reaching the partner; not trying now. */
+            /**
+             * Not reached (yet). Since #85 the link never stops trying by itself, so this is only
+             * shown briefly (at start, before the first search).
+             */
             Unreachable,
 
             /** This phone's user tapped Disconnect; not trying until Connect. */
@@ -103,12 +111,15 @@ class Link(
     private val appVersion: String,
     nanoTime: () -> Long = System::nanoTime,
     keepAwake: (Boolean) -> Unit = {},
-    reconnectWindowMs: Long = Reconnector.WINDOW_MS,
+    /** Keeps the CPU awake between reconnect slots (#85). */
+    private val keepCpuAwake: (Boolean) -> Unit = {},
+    /** The wall clock the reconnect slots follow (#85); separate so tests can move it. */
+    private val wallClockMs: () -> Long = System::currentTimeMillis,
     private val inviteTimeoutMs: Long = INVITE_TIMEOUT_MS
 ) {
     val discovery = PeerDiscovery(driver, preconditions, scope, log = log)
 
-    private val reconnector = Reconnector(driver, discovery, log, reconnectWindowMs)
+    private val reconnector = Reconnector(driver, discovery, log)
 
     val channel = CommandChannel(transport, scope, nanoTime, log, keepAwake)
 
@@ -130,6 +141,9 @@ class Link(
     private var inviteJob: Job? = null
     private var reconnectJob: Job? = null
     private var groupWithPartner = false
+
+    /** The reconnect job is waiting for its next slot, not searching (#85). */
+    private var waitingForSlot = false
 
     /**
      * This phone wants a link with the partner: on after pairing, at start and on Connect; off
@@ -248,13 +262,16 @@ class Link(
 
     /** Why a window of attempts starts; decides what Home shows meanwhile. */
     private enum class Attempt {
-        /** Start, a tap, the Pair screen closing: "Looking for …". */
+        /** Start, a tap, the Pair screen closing: "Looking for …", then slots. */
         First,
 
-        /** After a drop: "Reconnecting to …". */
+        /** After a drop: "Reconnecting to …", then slots. */
         Drop,
 
-        /** The partner tapped Disconnect: keep showing that, but listen so they can reconnect. */
+        /**
+         * The partner tapped Disconnect: keep showing that while listening for a 2-minute window,
+         * then slots, so their Connect tap later reconnects both without a tap here.
+         */
         Listen
     }
 
@@ -265,7 +282,12 @@ class Link(
         reconnect(Attempt.First)
     }
 
-    /** Starts a window of attempts ([Reconnector]) unless one is running or can't help. */
+    /**
+     * Starts trying ([Reconnector]) unless it's already running or can't help: a first window of
+     * [ReconnectSchedule.FIRST_WINDOW_MS], then a short search at every even minute until the
+     * partner is back (#85). It ends only on reconnecting or when cancelled (Disconnect, Forget,
+     * the Pair screen, Wi-Fi off).
+     */
     private fun reconnect(attempt: Attempt) {
         val partner = _partner.value ?: return
         if (!wantsLink || groupWithPartner || reconnectJob?.isActive == true) return
@@ -283,11 +305,35 @@ class Link(
                 Attempt.Listen -> Unit
             }
             log("Connecting to ${partner.logId} as ${partner.role} ($attempt)")
-            val reached = reconnector.run(partner)
-            if (!reached && !groupWithPartner) {
-                _status.value = LinkStatus.NotConnected(partner, unreachable())
-                log("Partner not reached; stopped trying")
+            val firstWindowMs = if (attempt == Attempt.Listen) {
+                Reconnector.WINDOW_MS
+            } else {
+                ReconnectSchedule.FIRST_WINDOW_MS
             }
+            if (reconnector.run(partner, firstWindowMs)) return@launch
+            keepCpuAwake(true)
+            try {
+                trySlots(partner)
+            } finally {
+                waitingForSlot = false
+                keepCpuAwake(false)
+            }
+        }
+    }
+
+    /** Searches at every even minute until a group with the partner forms (#85). */
+    private suspend fun trySlots(partner: Partner) {
+        while (!groupWithPartner) {
+            val slot = ReconnectSchedule.nextSlotStart(wallClockMs())
+            _status.value = LinkStatus.Reconnecting(partner, nextTryAtMs = slot)
+            log("Partner not reached; next try at ${ReconnectSchedule.clockTime(slot)}")
+            waitingForSlot = true
+            delay(slot - wallClockMs())
+            waitingForSlot = false
+            if (groupWithPartner) return
+            _status.value = LinkStatus.Reconnecting(partner)
+            log("Slot try at ${ReconnectSchedule.clockTime(slot)}")
+            if (reconnector.run(partner, ReconnectSchedule.SLOT_LENGTH_MS)) return
         }
     }
 
@@ -416,6 +462,8 @@ class Link(
     private fun onGroupWithPartner(partner: Partner, group: GroupInfo) {
         if (!groupWithPartner) {
             groupWithPartner = true
+            // Back between slots (e.g. an old group came back): stop waiting.
+            if (waitingForSlot) reconnectJob?.cancel()
             answeredInGroup = false
             _status.value = LinkStatus.Connecting(partner)
             justFormed = true
@@ -440,7 +488,29 @@ class Link(
     }
 
     private fun hello() = _partner.value.let {
-        Message.Hello(appVersion, myInstallId, it?.installId, it?.role?.name ?: "None")
+        Message.Hello(
+            appVersion,
+            myInstallId,
+            it?.installId,
+            it?.role?.name ?: "None",
+            wallClockMs = wallClockMs()
+        )
+    }
+
+    /**
+     * The reconnect slots need both wall clocks close (#85): a phone set by hand shows up here.
+     * Measured when the Hello arrives, so it's off by the network delay (milliseconds).
+     */
+    private fun logWallClock(remote: Message.Hello) {
+        if (remote.wallClockMs == 0L) return // an app from before #85
+        val aheadMs = remote.wallClockMs - wallClockMs()
+        val far = abs(aheadMs) > ReconnectSchedule.SLOT_LENGTH_MS / 2
+        log(
+            "Partner's clock is %.1f s %s".format(
+                abs(aheadMs) / 1_000.0,
+                if (aheadMs >= 0) "ahead" else "behind"
+            ) + if (far) ": too far for the reconnect slots to line up" else ""
+        )
     }
 
     /** Vets the partner app's Hello; learns its install ID the first time. */
@@ -490,6 +560,7 @@ class Link(
                 answeredInGroup = true
                 _status.value = LinkStatus.Connected(partner)
                 log("Connected to ${partner.logId}")
+                logWallClock(state.partner)
             }
             is ChannelState.Refused -> {
                 appTimer?.cancel()

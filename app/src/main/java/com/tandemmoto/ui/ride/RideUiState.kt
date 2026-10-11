@@ -7,6 +7,8 @@ data class RideUiState(
     val connection: ConnectionStatus = ConnectionStatus.NotPaired,
     /** The paired phone's name, for "Connected to Redmi Y2"; null when not paired. */
     val partnerName: String? = null,
+    /** Waiting for the next reconnect slot (#85), epoch ms; null otherwise. */
+    val nextTryAtMs: Long? = null,
     /** The current song's title, and its artist. */
     val nowPlaying: String? = null,
     val artist: String? = null,

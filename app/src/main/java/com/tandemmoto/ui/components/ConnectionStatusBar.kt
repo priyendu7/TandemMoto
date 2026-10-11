@@ -44,6 +44,8 @@ fun ConnectionStatusBar(
     modifier: Modifier = Modifier,
     /** The paired phone's name; shown instead of "your partner" when known. */
     partnerName: String? = null,
+    /** Shown after the label, e.g. "next try 13:22" (#85); not announced each time it changes. */
+    detail: String? = null,
     onClickLabel: String? = null,
     onClick: (() -> Unit)? = null
 ) {
@@ -58,7 +60,7 @@ fun ConnectionStatusBar(
         container = container,
         content = content,
         icon = status.kind.icon(status),
-        text = if (hint != null) "$label · $hint" else label,
+        text = listOfNotNull(label, detail, hint).joinToString(" · "),
         modifier = modifier
             .then(
                 if (onClick != null) {

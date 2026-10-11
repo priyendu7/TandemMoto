@@ -153,6 +153,7 @@
     <string name="status_searching_named">Looking for %1$s…</string>
     <string name="status_connected">Connected to your partner</string>
     <string name="status_connected_named">Connected to %1$s</string>
+    <string name="next_try">next try %1$s</string>
     <string name="status_reconnecting">Reconnecting…</string>
     <string name="status_reconnecting_named">Reconnecting to %1$s…</string>
     <string name="status_partner_disconnected">Your partner disconnected · Ask them to tap Connect</string>

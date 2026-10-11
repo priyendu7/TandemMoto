@@ -87,7 +87,10 @@ class LinkSession(
     }
 
     companion object {
-        /** Matches the give-up window planned for auto-reconnect (#27). */
+        /**
+         * Not connected and not trying for this long. Reconnecting (#85) never counts: the link
+         * keeps trying in slots until Disconnect.
+         */
         const val IDLE_STOP_MS = 120_000L
     }
 }
