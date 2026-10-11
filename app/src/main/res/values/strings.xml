@@ -260,6 +260,8 @@
     <string name="settings_voice_processing_no_effects">This phone has none of Android\'s voice effects.</string>
     <string name="settings_advanced">Advanced</string>
     <string name="settings_advanced_summary">Intercom audio and test tools</string>
+    <string name="settings_sound_cues">Sound cues</string>
+    <string name="settings_sound_cues_summary">Short tones in your earbuds when your partner connects or drops, and when the music stops or starts.</string>
     <string name="settings_earbud_mic">Use earbud mic for the intercom</string>
     <string name="settings_earbud_mic_off">Off: your earbuds keep playing and you talk into the phone. Keep the phone in a chest pocket or on a mount for the clearest voice.</string>
     <string name="settings_earbud_mic_on">On: your earbuds switch to call mode when the intercom opens (1–2 s). Some earbuds disconnect briefly, and it can slow the link on older phones.</string>

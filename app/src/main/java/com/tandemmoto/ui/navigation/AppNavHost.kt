@@ -63,6 +63,7 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             val micTest by app.micTest.state.collectAsStateWithLifecycle()
             val talkTest by app.talkTest.state.collectAsStateWithLifecycle()
             val earbudMic by app.earbudMic.on.collectAsStateWithLifecycle()
+            val soundCues by app.soundCues.on.collectAsStateWithLifecycle()
             val talkLevelDb by app.voice.micLevelDb.collectAsStateWithLifecycle()
             val voiceProcessing by app.voiceProcessing.on.collectAsStateWithLifecycle()
             val voiceEffects = remember { VoiceEffect.available() }
@@ -88,6 +89,8 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 // Only while linked (or while it's on, so it can be turned off).
                 talkTest = talkTest.takeIf { partnerHost != null || it.on },
                 onTalkTest = app.talkTest::set,
+                soundCues = soundCues,
+                onSoundCues = app.soundCues::set,
                 earbudMic = earbudMic,
                 onEarbudMic = app.earbudMic::set,
                 talkLevelDb = talkLevelDb,

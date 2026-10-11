@@ -210,7 +210,7 @@ class RideScreenTest {
         compose.setContent {
             TandemMotoTheme { SettingsScreen(onBack = {}, onExportLogs = { exported = true }) }
         }
-        compose.onNodeWithText(str(R.string.settings_export_logs)).performClick()
+        compose.onNodeWithText(str(R.string.settings_export_logs)).performScrollTo().performClick()
         assertTrue(exported)
     }
 
