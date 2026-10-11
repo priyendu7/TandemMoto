@@ -7,7 +7,9 @@ import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
 
@@ -75,6 +77,10 @@ interface PlaybackListener {
  * playing, the phone that made the latest control sends where it is; only the other phone
  * corrects, and only when it's more than [DRIFT_MS] off (a smaller jump would be heard for
  * nothing).
+ *
+ * The intercom (#72) is part of the same state: [intercomWanted] turns on the first time music
+ * plays, or with Start intercom, and off with Stop intercom or Disconnect; the newest control
+ * wins on both phones like everything else. Mic mode is "wanted, linked, and not playing".
  */
 class PlaybackMirror(
     private val player: LocalPlayer,
@@ -99,6 +105,20 @@ class PlaybackMirror(
 
     private var me: String? = null
 
+    private val _intercomWanted = MutableStateFlow(false)
+
+    /** Whether the intercom is wanted on both phones (on while the music isn't playing). */
+    val intercomWanted: StateFlow<Boolean> = _intercomWanted.asStateFlow()
+
+    /** Home's Start intercom: on for both phones without music. */
+    fun startIntercom() = onControl(START_INTERCOM)
+
+    /** Home's Stop intercom: off for both, until the next pause or Start intercom. */
+    fun stopIntercom() = onControl(STOP_INTERCOM)
+
+    /** Disconnect: the next ride starts without the intercom until music plays or Start. */
+    fun onDisconnect() = onControl(DISCONNECT)
+
     fun start() {
         scope.launch {
             while (true) {
@@ -119,6 +139,12 @@ class PlaybackMirror(
 
     override fun onControl(control: String) {
         val stamp = newStamp() ?: return
+        _intercomWanted.value = when {
+            control == START_INTERCOM -> true
+            control == STOP_INTERCOM || control == DISCONNECT -> false
+            player.position().playing -> true
+            else -> _intercomWanted.value
+        }
         val state = whereWeAre(control, stamp, nanoTime())
         scope.launch { send(state) }
     }
@@ -126,6 +152,7 @@ class PlaybackMirror(
     override fun onStartTogether(): Long {
         if (channelState.value !is ChannelState.Open) return 0
         val stamp = newStamp() ?: return 0
+        _intercomWanted.value = true
         val state = whereWeAre(START_TOGETHER, stamp, nanoTime() + START_LEAD_MS * NANOS_PER_MS)
             .copy(playing = true, waiting = false)
         scope.launch { send(state) }
@@ -150,7 +177,8 @@ class PlaybackMirror(
             atNanos = atNanos,
             stamp = stamp,
             control = control,
-            waiting = now.waiting
+            waiting = now.waiting,
+            intercom = _intercomWanted.value
         )
     }
 
@@ -188,6 +216,8 @@ class PlaybackMirror(
         if (current != null && state.stamp <= current) return
         latest = state.stamp
         pending = null
+        // Before the song: the intercom works with an empty playlist too.
+        _intercomWanted.value = state.intercom
         val songId = state.songId ?: return
         if (!player.hasSong(songId)) {
             log("Partner is on song-${songId.take(8)}, not in the queue yet: waiting for it")
@@ -262,6 +292,9 @@ class PlaybackMirror(
         const val DRIFT_MS = 500L
 
         const val START_TOGETHER = "StartTogether"
+        const val START_INTERCOM = "StartIntercom"
+        const val STOP_INTERCOM = "StopIntercom"
+        const val DISCONNECT = "Disconnect"
         const val SYNC = "Sync"
     }
 }

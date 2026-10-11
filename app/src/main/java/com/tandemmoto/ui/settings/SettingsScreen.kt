@@ -9,8 +9,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -64,8 +68,12 @@ fun SettingsScreen(
     onCancelMicTest: () -> Unit = {},
     /** Diagnostics → Talk test (#71); null hides the row (e.g. not linked). */
     talkTest: TalkTestState? = null,
-    onTalkTest: (Boolean) -> Unit = {}
+    onTalkTest: (Boolean) -> Unit = {},
+    /** Advanced → Use earbud mic for the intercom (#72). */
+    earbudMic: Boolean = false,
+    onEarbudMic: (Boolean) -> Unit = {}
 ) {
+    var advanced by rememberSaveable { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
     var confirmForget by rememberSaveable { mutableStateOf(false) }
     if (confirmForget && partnerName != null) {
@@ -147,38 +155,74 @@ fun SettingsScreen(
             )
             HorizontalDivider()
             ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_advanced)) },
+                supportingContent = { Text(stringResource(R.string.settings_advanced_summary)) },
+                trailingContent = {
+                    val arrow = if (advanced) {
+                        Icons.Filled.KeyboardArrowUp
+                    } else {
+                        Icons.Filled.KeyboardArrowDown
+                    }
+                    Icon(arrow, contentDescription = null)
+                },
+                modifier = Modifier.clickable { advanced = !advanced }
+            )
+            if (advanced) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_earbud_mic)) },
+                    supportingContent = {
+                        Text(
+                            stringResource(
+                                if (earbudMic) {
+                                    R.string.settings_earbud_mic_on
+                                } else {
+                                    R.string.settings_earbud_mic_off
+                                }
+                            )
+                        )
+                    },
+                    trailingContent = { Switch(checked = earbudMic, onCheckedChange = null) },
+                    modifier = Modifier.toggleable(
+                        value = earbudMic,
+                        role = Role.Switch,
+                        onValueChange = onEarbudMic
+                    )
+                )
+                if (micTest != null) MicTestRow(micTest, onMicTest, onCancelMicTest)
+                if (talkTest != null) {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.settings_talk_test)) },
+                        supportingContent = {
+                            Text(
+                                if (talkTest.on) {
+                                    stringResource(
+                                        R.string.settings_talk_test_on,
+                                        talkTest.secondsLeft
+                                    )
+                                } else {
+                                    stringResource(R.string.settings_talk_test_summary)
+                                }
+                            )
+                        },
+                        trailingContent = {
+                            Switch(checked = talkTest.on, onCheckedChange = null)
+                        },
+                        modifier = Modifier.toggleable(
+                            value = talkTest.on,
+                            role = Role.Switch,
+                            onValueChange = onTalkTest
+                        )
+                    )
+                }
+            }
+            HorizontalDivider()
+            ListItem(
                 headlineContent = { Text(stringResource(R.string.settings_export_logs)) },
                 supportingContent = {
                     Text(stringResource(R.string.settings_export_logs_summary))
                 },
                 modifier = Modifier.clickable(onClick = onExportLogs)
             )
-            if (micTest != null) {
-                HorizontalDivider()
-                MicTestRow(micTest, onMicTest, onCancelMicTest)
-            }
-            if (talkTest != null) {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_talk_test)) },
-                    supportingContent = {
-                        Text(
-                            if (talkTest.on) {
-                                stringResource(R.string.settings_talk_test_on, talkTest.secondsLeft)
-                            } else {
-                                stringResource(R.string.settings_talk_test_summary)
-                            }
-                        )
-                    },
-                    trailingContent = {
-                        Switch(checked = talkTest.on, onCheckedChange = null)
-                    },
-                    modifier = Modifier.toggleable(
-                        value = talkTest.on,
-                        role = Role.Switch,
-                        onValueChange = onTalkTest
-                    )
-                )
-            }
         }
     }
 }

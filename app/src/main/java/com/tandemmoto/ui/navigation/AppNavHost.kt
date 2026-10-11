@@ -60,6 +60,7 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             val transfers by app.transfers.state.collectAsStateWithLifecycle()
             val micTest by app.micTest.state.collectAsStateWithLifecycle()
             val talkTest by app.talkTest.state.collectAsStateWithLifecycle()
+            val earbudMic by app.earbudMic.on.collectAsStateWithLifecycle()
             val partnerHost by app.link.channel.partnerHost.collectAsStateWithLifecycle()
             SettingsScreen(
                 onBack = { navController.popBackStack() },
@@ -82,6 +83,8 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 // Only while linked (or while it's on, so it can be turned off).
                 talkTest = talkTest.takeIf { partnerHost != null || it.on },
                 onTalkTest = app.talkTest::set,
+                earbudMic = earbudMic,
+                onEarbudMic = app.earbudMic::set,
                 notifications = permissions.state.statuses[AppPermission.NOTIFICATIONS],
                 onNotificationsClick = {
                     if (permissions.state.isGranted(AppPermission.NOTIFICATIONS)) {

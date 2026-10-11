@@ -33,6 +33,9 @@
          without it. Needs its own Play declaration and demo video (docs/RELEASING.md). -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- Mic mode (#72): call mode and the call device (wired headset or the earbuds'
+         hands-free link). Granted at install, no prompt. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Optional (Android 13+): shows the service's notification; it runs without it. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 

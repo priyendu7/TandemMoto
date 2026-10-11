@@ -20,10 +20,12 @@ fun interface SpeakerSource {
 }
 
 /**
- * The partner's voice through Android's voice-call path: 16 kHz mono, low-latency mode, a small
- * buffer (a bigger one is more delay).
+ * The partner's voice: 16 kHz mono, low-latency mode, a small buffer (a bigger one is more
+ * delay). [usage] is the voice-call path, or media while the earbuds stay in music mode (#72).
  */
-class AudioTrackSource : SpeakerSource {
+class AudioTrackSource(
+    private val usage: () -> Int = { AudioAttributes.USAGE_VOICE_COMMUNICATION }
+) : SpeakerSource {
     override fun open(): SpeakerOutput? {
         val minBuffer = AudioTrack.getMinBufferSize(
             MicSource.SAMPLE_RATE,
@@ -35,7 +37,7 @@ class AudioTrackSource : SpeakerSource {
             AudioTrack.Builder()
                 .setAudioAttributes(
                     AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setUsage(usage())
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                         .build()
                 )

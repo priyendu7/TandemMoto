@@ -115,6 +115,18 @@
     <string name="playlist_play_from_here">Play from here</string>
     <string name="ride_intercom_on">Intercom on: you can talk to each other</string>
     <string name="ride_intercom_off">Intercom turns on when the music is paused</string>
+    <string name="ride_intercom_not_linked">The intercom works when you\'re connected</string>
+    <string name="ride_intercom_ready">Intercom off: start it, or it turns on when you pause the music</string>
+    <string name="ride_intercom_connecting">Connecting earbuds…</string>
+    <string name="ride_intercom_on_you_muted">Intercom on · you\'re muted</string>
+    <string name="ride_intercom_on_partner_muted">Intercom on · %1$s is muted</string>
+    <string name="ride_intercom_on_both_muted">Intercom on · you\'re both muted</string>
+    <string name="ride_intercom_on_talk_into_phone">Intercom on: listen on your earbuds, talk into the phone</string>
+    <string name="ride_intercom_on_phone">Intercom on the phone\'s mic (earbuds didn\'t connect)</string>
+    <string name="ride_intercom_start">Start intercom</string>
+    <string name="ride_intercom_stop">Stop intercom</string>
+    <string name="ride_mute">Mute me</string>
+    <string name="ride_unmute">Unmute me</string>
 
     <!-- Connection status -->
     <string name="status_not_paired">Not paired</string>
@@ -240,6 +252,11 @@
     <string name="settings_talk_test">Talk test</string>
     <string name="settings_talk_test_summary">Sends your mic to your partner\'s phone. To talk both ways, switch it on for both phones. Stops by itself after 2 minutes.</string>
     <string name="settings_talk_test_on">Sending your voice: stops in %1$d s</string>
+    <string name="settings_advanced">Advanced</string>
+    <string name="settings_advanced_summary">Intercom audio and test tools</string>
+    <string name="settings_earbud_mic">Use earbud mic for the intercom</string>
+    <string name="settings_earbud_mic_off">Off: your earbuds keep playing and you talk into the phone. Keep the phone in a chest pocket or on a mount for the clearest voice.</string>
+    <string name="settings_earbud_mic_on">On: your earbuds switch to call mode when the intercom opens (1–2 s). Some earbuds disconnect briefly, and it can slow the link on older phones.</string>
     <string name="settings_export_logs">Export diagnostic logs</string>
     <string name="settings_export_logs_summary">Share a log file to help fix a problem. Nothing is sent automatically.</string>
 
