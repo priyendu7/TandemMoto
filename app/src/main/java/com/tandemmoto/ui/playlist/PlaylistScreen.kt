@@ -5,12 +5,14 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree
 import androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,10 +32,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -51,10 +51,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -65,6 +67,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -77,10 +80,17 @@ import com.tandemmoto.R
 import com.tandemmoto.library.ImportSummary
 import com.tandemmoto.library.Song
 import com.tandemmoto.ui.components.BackTopBar
+import com.tandemmoto.ui.components.GroupedRow
+import com.tandemmoto.ui.components.PartnerTag
 import com.tandemmoto.ui.components.SongSeekBar
+import com.tandemmoto.ui.components.StatusChip
+import com.tandemmoto.ui.components.Tag
+import com.tandemmoto.ui.components.horizontalSwipe
 import com.tandemmoto.ui.theme.TandemMotoTheme
+import com.tandemmoto.ui.theme.groupItemShape
 import kotlin.math.abs
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -157,7 +167,9 @@ fun PlaylistScreen(
     onPlayPause: () -> Unit = {},
     onSeek: (Long) -> Unit = {}
 ) {
+    // Swiping left to right closes it, back the way it came in.
     Scaffold(
+        modifier = Modifier.horizontalSwipe(onSwipeRight = onBack),
         topBar = {
             if (state.rows.isEmpty()) {
                 BackTopBar(stringResource(R.string.playlist_title), onBack)
@@ -191,7 +203,7 @@ private fun NowPlayingBarView(bar: NowPlayingBar, onPlayPause: () -> Unit, onSee
         Column(
             modifier = Modifier
                 .navigationBarsPadding()
-                .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)
+                .padding(start = 16.dp, end = 8.dp, top = 4.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -211,7 +223,7 @@ private fun NowPlayingBarView(bar: NowPlayingBar, onPlayPause: () -> Unit, onSee
                         )
                     }
                 }
-                IconButton(onClick = onPlayPause, modifier = Modifier.size(56.dp)) {
+                IconButton(onClick = onPlayPause, modifier = Modifier.size(48.dp)) {
                     Icon(
                         painter = painterResource(
                             if (bar.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
@@ -228,6 +240,7 @@ private fun NowPlayingBarView(bar: NowPlayingBar, onPlayPause: () -> Unit, onSee
                 durationMs = bar.durationMs,
                 enabled = true,
                 onSeek = onSeek,
+                timesBeside = true,
                 modifier = Modifier.padding(end = 8.dp)
             )
         }
@@ -360,6 +373,16 @@ private fun SongList(
         }
     }
 
+    // Open on the song playing, about a third down the screen. Only on first composition, so it
+    // never fights a drag or the user's own scrolling.
+    LaunchedEffect(Unit) {
+        val current = state.rows.indexOfFirst { it is PlaylistRow.Entry && it.current }
+        if (current < 0) return@LaunchedEffect
+        listState.scrollToItem(current)
+        val height = snapshotFlow { listState.layoutInfo.viewportSize.height }.first { it > 0 }
+        listState.scrollBy(-height / 3f)
+    }
+
     /** Swaps the dragged row with its neighbour once it's past half of it. */
     fun swapIfPastNeighbour() {
         val current = order.indexOfFirst { it.key == dragging }
@@ -406,16 +429,22 @@ private fun SongList(
 
     Column(modifier = Modifier.fillMaxSize()) {
         PlaylistTotals(state)
-        HorizontalDivider()
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier.fillMaxSize()
+        ) {
             itemsIndexed(order, key = { _, row -> row.key }) { index, row ->
+                val shape = groupItemShape(index, order.size)
                 when (row) {
-                    is PlaylistRow.Reading -> ReadingRow(row)
+                    is PlaylistRow.Reading -> GroupedRow(shape) { ReadingRow(row) }
                     is PlaylistRow.Entry -> SongRow(
                         entry = row,
                         index = index,
                         songCount = songCount,
                         partnerName = state.partnerName,
+                        shape = shape,
                         onRemove = { onRemove(row.song.id) },
                         onMove = onMove,
                         onPlay = { onPlay(index) },
@@ -457,7 +486,6 @@ private fun SongList(
                         }
                     )
                 }
-                HorizontalDivider()
             }
         }
     }
@@ -482,7 +510,7 @@ private fun PlaylistTotals(state: PlaylistUiState) {
             ?: stringResource(R.string.playlist_sharing_shared)
         Sharing.WaitingToSync -> stringResource(R.string.playlist_sharing_waiting)
     }
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+    Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 12.dp)) {
         Text(
             text = "$count · $length",
             style = MaterialTheme.typography.titleSmall,
@@ -496,49 +524,104 @@ private fun PlaylistTotals(state: PlaylistUiState) {
     }
 }
 
+/** "Added by you" in C1, or the partner's phone name in C2; nothing when unpaired. */
+@Composable
+private fun WhoTag(entry: PlaylistRow.Entry, partnerName: String?) {
+    if (partnerName == null || entry.badge == null) return
+    if (entry.mine) {
+        val colors = TandemMotoTheme.appColors
+        Tag(stringResource(R.string.playlist_added_by_you), colors.me, colors.onMe)
+    } else {
+        PartnerTag(partnerName)
+    }
+}
+
 /**
- * "Added by you · On both phones ✓", "From Priyendu's S25 · Receiving 45%"… (just "On this phone"
- * when unpaired).
+ * Where the song is: yellow while it moves, dark blue once it's here, grey while it waits, red when
+ * the phone is full. Just a dark blue "On this phone" when unpaired.
  */
 @Composable
-private fun whereItIs(entry: PlaylistRow.Entry, partnerName: String?): String {
-    val onThisPhone = stringResource(R.string.playlist_on_this_phone)
+private fun WhereChip(entry: PlaylistRow.Entry, partnerName: String?) {
+    val colors = TandemMotoTheme.appColors
+    val scheme = MaterialTheme.colorScheme
     val badge = entry.badge
-    if (partnerName == null || badge == null) return onThisPhone
-    val who = if (entry.mine) {
-        stringResource(R.string.playlist_added_by_you)
-    } else {
-        stringResource(R.string.playlist_from_named, partnerName)
+    if (partnerName == null || badge == null) {
+        StatusChip(stringResource(R.string.playlist_on_this_phone), colors.stored, colors.onStored)
+        return
     }
-    val where = when (badge) {
-        SongBadge.OnBothPhones -> stringResource(R.string.playlist_on_both_phones)
-        SongBadge.NotOnPartner -> stringResource(R.string.playlist_not_on_partner, partnerName)
-        is SongBadge.Sending -> stringResource(R.string.playlist_sending, badge.percent)
-        SongBadge.OnThisPhone -> onThisPhone
-        is SongBadge.Receiving -> stringResource(R.string.playlist_receiving, badge.percent)
-        SongBadge.Queued -> stringResource(R.string.playlist_queued)
-        SongBadge.WaitingForConnection -> stringResource(R.string.playlist_waiting_for_connection)
-        SongBadge.OnPartnerOnly -> null
-        SongBadge.StorageFull -> stringResource(R.string.playlist_storage_full)
+    val (text, color, onColor) = when (badge) {
+        SongBadge.OnBothPhones ->
+            Triple(stringResource(R.string.playlist_on_both_phones), colors.stored, colors.onStored)
+        SongBadge.OnThisPhone ->
+            Triple(stringResource(R.string.playlist_on_this_phone), colors.stored, colors.onStored)
+        is SongBadge.Sending -> Triple(
+            stringResource(R.string.playlist_sending, badge.percent),
+            colors.transferring,
+            colors.onTransferring
+        )
+        is SongBadge.Receiving -> Triple(
+            stringResource(R.string.playlist_receiving, badge.percent),
+            colors.transferring,
+            colors.onTransferring
+        )
+        SongBadge.NotOnPartner -> Triple(
+            stringResource(R.string.playlist_not_on_partner, partnerName),
+            scheme.surfaceVariant,
+            scheme.onSurfaceVariant
+        )
+        SongBadge.Queued ->
+            Triple(
+                stringResource(R.string.playlist_queued),
+                scheme.surfaceVariant,
+                scheme.onSurfaceVariant
+            )
+        SongBadge.WaitingForConnection -> Triple(
+            stringResource(R.string.playlist_waiting_for_connection),
+            scheme.surfaceVariant,
+            scheme.onSurfaceVariant
+        )
+        SongBadge.StorageFull ->
+            Triple(stringResource(R.string.playlist_storage_full), scheme.error, scheme.onError)
+        SongBadge.OnPartnerOnly -> return
     }
-    return if (where == null) who else "$who · $where"
+    StatusChip(text, color, onColor)
 }
 
 @Composable
 private fun ReadingRow(row: PlaylistRow.Reading) {
-    ListItem(
-        headlineContent = { Text(row.name.ifBlank { stringResource(R.string.playlist_reading) }) },
-        supportingContent = { Text(stringResource(R.string.playlist_reading)) },
-        trailingContent = { CircularProgressIndicator(modifier = Modifier.size(24.dp)) }
-    )
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                row.name.ifBlank { stringResource(R.string.playlist_reading) },
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                stringResource(R.string.playlist_reading),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+    }
 }
 
+/**
+ * Three lines that never wrap: the title (scrolling sideways when too long), the artist with the
+ * duration at the far right, then whose song it is and where it is. A song that can't play has
+ * one red line in place of the tags. The song playing sits on `primaryContainer`.
+ */
 @Composable
 private fun SongRow(
     entry: PlaylistRow.Entry,
     index: Int,
     songCount: Int,
     partnerName: String?,
+    shape: Shape,
     onRemove: () -> Unit,
     onMove: (Int, Int) -> Unit,
     onPlay: () -> Unit,
@@ -553,101 +636,130 @@ private fun SongRow(
     val moveBottom = stringResource(R.string.playlist_move_bottom)
     val last = songCount - 1
     val remove = stringResource(R.string.playlist_remove)
-    val details = stringResource(
-        R.string.playlist_song_details,
-        song.artist ?: stringResource(R.string.playlist_unknown_artist),
-        formatDuration(song.durationMs)
-    )
     val playFromHere = stringResource(R.string.playlist_play_from_here)
-    ListItem(
-        modifier = modifier.clickable(onClickLabel = playFromHere, onClick = onPlay).semantics {
-            // Reordering without dragging, for TalkBack.
-            customActions = listOfNotNull(
-                CustomAccessibilityAction(moveTop) {
-                    onMove(index, 0)
-                    true
-                }
-                    .takeIf { index > 1 },
-                CustomAccessibilityAction(moveUp) {
-                    onMove(index, index - 1)
-                    true
-                }
-                    .takeIf { index > 0 },
-                CustomAccessibilityAction(moveDown) {
-                    onMove(index, index + 1)
-                    true
-                }
-                    .takeIf { index < last },
-                CustomAccessibilityAction(moveBottom) {
-                    onMove(index, last)
-                    true
-                }
-                    .takeIf { index < last - 1 },
-                CustomAccessibilityAction(remove) {
-                    onRemove()
-                    true
-                }
-            )
-        },
-        leadingContent = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(
-                    Icons.Filled.Menu,
-                    contentDescription = stringResource(R.string.playlist_drag),
-                    modifier = handle
-                )
-                // Its place in the playlist (phone test on #48).
-                Text(
-                    text = "${index + 1}",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.widthIn(min = 24.dp)
-                )
-            }
-        },
-        headlineContent = {
-            Text(
-                song.title,
-                color = if (entry.current) MaterialTheme.colorScheme.primary else Color.Unspecified,
-                fontWeight = if (entry.current) FontWeight.Bold else null
-            )
-        },
-        supportingContent = {
-            if (entry.missing || entry.cantPlay || entry.partnerCantPlay) {
-                Text(
-                    when {
-                        entry.missing -> stringResource(R.string.playlist_file_missing)
-                        entry.cantPlay -> stringResource(R.string.playlist_cant_play)
-                        else -> stringResource(
-                            R.string.playlist_partner_cant_play,
-                            partnerName ?: stringResource(R.string.ride_your_partner)
-                        )
-                    },
-                    color = MaterialTheme.colorScheme.error
-                )
-            } else {
-                val playing = stringResource(R.string.playlist_now_playing)
-                val line = "$details · ${whereItIs(entry, partnerName)}"
-                Text(if (entry.current) "$playing · $line" else line)
-            }
-        },
-        trailingContent = {
-            Box {
-                if (entry.missing || entry.cantPlay || entry.partnerCantPlay) {
-                    Icon(
-                        Icons.Filled.Warning,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(end = 48.dp)
+    val nowPlaying = stringResource(R.string.playlist_now_playing)
+    val problem = entry.missing || entry.cantPlay || entry.partnerCantPlay
+    val scheme = MaterialTheme.colorScheme
+    val secondary = if (entry.current) scheme.onPrimaryContainer else scheme.onSurfaceVariant
+    GroupedRow(
+        shape = shape,
+        color = if (entry.current) scheme.primaryContainer else scheme.surface,
+        modifier = modifier
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clickable(onClickLabel = playFromHere, onClick = onPlay)
+                .semantics {
+                    if (entry.current) stateDescription = nowPlaying
+                    // Reordering without dragging, for TalkBack.
+                    customActions = listOfNotNull(
+                        CustomAccessibilityAction(moveTop) {
+                            onMove(index, 0)
+                            true
+                        }
+                            .takeIf { index > 1 },
+                        CustomAccessibilityAction(moveUp) {
+                            onMove(index, index - 1)
+                            true
+                        }
+                            .takeIf { index > 0 },
+                        CustomAccessibilityAction(moveDown) {
+                            onMove(index, index + 1)
+                            true
+                        }
+                            .takeIf { index < last },
+                        CustomAccessibilityAction(moveBottom) {
+                            onMove(index, last)
+                            true
+                        }
+                            .takeIf { index < last - 1 },
+                        CustomAccessibilityAction(remove) {
+                            onRemove()
+                            true
+                        }
                     )
                 }
-                IconButton(onClick = {
-                    menu = true
-                }, modifier = Modifier.align(Alignment.CenterEnd)) {
+                .padding(start = 16.dp, top = 10.dp, bottom = 10.dp)
+        ) {
+            Icon(
+                Icons.Filled.Menu,
+                contentDescription = stringResource(R.string.playlist_drag),
+                tint = secondary,
+                modifier = handle
+            )
+            // Its place in the playlist (phone test on #48).
+            Text(
+                text = "${index + 1}",
+                style = MaterialTheme.typography.titleSmall,
+                color = secondary,
+                textAlign = TextAlign.End,
+                modifier = Modifier
+                    .padding(start = 12.dp, end = 16.dp)
+                    .widthIn(min = 24.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    song.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (entry.current) FontWeight.Bold else null,
+                    maxLines = 1,
+                    modifier = Modifier.basicMarquee()
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        song.artist ?: stringResource(R.string.playlist_unknown_artist),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = secondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        formatDuration(song.durationMs),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = secondary,
+                        maxLines = 1,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+                if (problem) {
+                    Text(
+                        when {
+                            entry.missing -> stringResource(R.string.playlist_file_missing)
+                            entry.cantPlay -> stringResource(R.string.playlist_cant_play)
+                            else -> stringResource(
+                                R.string.playlist_partner_cant_play,
+                                partnerName ?: stringResource(R.string.ride_your_partner)
+                            )
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = scheme.error,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                } else {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .clipToBounds()
+                    ) {
+                        WhoTag(entry, partnerName)
+                        WhereChip(entry, partnerName)
+                    }
+                }
+            }
+            if (problem) {
+                Icon(
+                    Icons.Filled.Warning,
+                    contentDescription = null,
+                    tint = scheme.error,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+            Box {
+                IconButton(onClick = { menu = true }) {
                     Icon(
                         Icons.Filled.MoreVert,
                         contentDescription = stringResource(R.string.playlist_more, song.title)
@@ -673,7 +785,7 @@ private fun SongRow(
                 }
             }
         }
-    )
+    }
 }
 
 /** 3:45, or 1:02:03 for anything an hour or longer. */

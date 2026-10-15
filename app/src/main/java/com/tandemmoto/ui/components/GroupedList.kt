@@ -9,6 +9,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import com.tandemmoto.ui.theme.groupItemShape
@@ -35,16 +36,20 @@ fun <T> GroupedList(
     }
 }
 
-/** One row of a [GroupedList]; also usable on its own for a hand-built group. */
+/**
+ * One row of a [GroupedList]; also usable on its own for a hand-built group. [color] sets the
+ * row's fill (e.g. `primaryContainer` to mark it), and its content colour follows.
+ */
 @Composable
 fun GroupedRow(
     shape: Shape,
     modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.surface,
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surface,
+        color = color,
         shape = shape,
         modifier = modifier
             .fillMaxWidth()

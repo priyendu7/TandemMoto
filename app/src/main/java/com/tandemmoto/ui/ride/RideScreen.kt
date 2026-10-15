@@ -77,6 +77,7 @@ import com.tandemmoto.ui.components.SongSeekBar
 import com.tandemmoto.ui.components.StatusStripMinHeight
 import com.tandemmoto.ui.components.connectWave
 import com.tandemmoto.ui.components.glow
+import com.tandemmoto.ui.components.horizontalSwipe
 import com.tandemmoto.ui.components.openWifiSettings
 import com.tandemmoto.ui.components.rememberConnectWave
 import com.tandemmoto.ui.components.rememberPermissionRequester
@@ -150,10 +151,14 @@ fun RideScreen(
     onStopIntercom: () -> Unit = {},
     onMute: (Boolean) -> Unit = {}
 ) {
+    // Swiping right to left opens the playlist, as if pulling it in from the right.
     Scaffold(
+        modifier = Modifier.horizontalSwipe(onSwipeLeft = onOpenPlaylist),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
+                // A little shorter than the default 64 dp, so the status band sits close under it.
+                expandedHeight = 56.dp,
                 // The page colour, so the bar and the page read as one surface.
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
@@ -178,7 +183,7 @@ fun RideScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .connectWave({ wave.value }, waveColor, StatusCardTop + StatusStripMinHeight / 2)
+                .connectWave({ wave.value }, waveColor, StatusStripMinHeight / 2)
         ) {
             ConnectionSection(
                 state.connection,
@@ -316,8 +321,10 @@ private fun ConnectionSection(
         bottom = 8.dp
     )
     if (permissions.isGranted(AppPermission.NEARBY)) {
+        // Trying it out: a full-width band under the top bar instead of a card.
         ConnectionStatusBar(
-            modifier = cardModifier,
+            modifier = Modifier.padding(bottom = 8.dp),
+            flat = true,
             status = connection,
             partnerName = partnerName,
             detail = nextTryAtMs?.let { nextTry(LocalContext.current, it) },

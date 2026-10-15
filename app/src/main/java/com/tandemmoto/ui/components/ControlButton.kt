@@ -2,10 +2,9 @@ package com.tandemmoto.ui.components
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -14,9 +13,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Large, glove-friendly playback button (well above the 48dp minimum touch target), glowing in
- * its container colour while enabled. [primary] draws the filled style used for play/pause.
- * A rounded square, with corners in proportion to its size.
+ * Large, glove-friendly playback button (well above the 48dp minimum touch target): just the
+ * icon, with no fill behind it. [primary] tints the icon in the accent colour, for play/pause.
  */
 @Composable
 fun ControlButton(
@@ -29,34 +27,19 @@ fun ControlButton(
     size: Dp = 64.dp
 ) {
     val colors = MaterialTheme.colorScheme
-    val container = if (primary) colors.primary else colors.secondaryContainer
-    val sized = modifier
-        .size(size)
-        .let { if (enabled) it.glow(container, shape = ControlShape) else it }
-    val iconContent: @Composable () -> Unit = {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        colors = IconButtonDefaults.iconButtonColors(
+            contentColor = if (primary) colors.primary else colors.onSurface
+        ),
+        modifier = modifier.size(size)
+    ) {
         Icon(
             painter = painterResource(icon),
             contentDescription = contentDescription,
-            modifier = Modifier.size(size / 2)
-        )
-    }
-    if (primary) {
-        FilledIconButton(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = sized,
-            shape = ControlShape,
-            content = iconContent
-        )
-    } else {
-        FilledTonalIconButton(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = sized,
-            shape = ControlShape,
-            content = iconContent
+            // A bigger icon than a filled button's, since there's no fill to show the target.
+            modifier = Modifier.size(size * 0.6f)
         )
     }
 }
-
-private val ControlShape = RoundedCornerShape(percent = 45)
