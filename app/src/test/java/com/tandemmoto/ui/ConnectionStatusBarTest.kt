@@ -86,10 +86,12 @@ class ConnectionStatusBarTest {
             ConnectionStatus.Reconnecting,
             ConnectionStatus.PartnerAppClosed
         )
+        val grey = setOf(ConnectionStatus.NotPaired, ConnectionStatus.NotConnected)
         ConnectionStatus.entries.forEach {
             val expected = when (it) {
                 in green -> BarTone.Connected
                 in yellow -> BarTone.Looking
+                in grey -> BarTone.Idle
                 else -> BarTone.NotConnected
             }
             assertEquals(it.name, expected, it.tone)

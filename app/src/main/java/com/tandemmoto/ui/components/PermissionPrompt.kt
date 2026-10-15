@@ -8,13 +8,15 @@ import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -27,12 +29,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.tandemmoto.R
 import com.tandemmoto.permissions.AppPermission
 import com.tandemmoto.permissions.PermissionStatus
 import com.tandemmoto.permissions.PermissionsState
 import com.tandemmoto.permissions.isPermissionGranted
+import com.tandemmoto.ui.theme.Radius
 import com.tandemmoto.ui.theme.TandemMotoTheme
 
 /** Current permission state plus the one action a section needs: ask, or open settings. */
@@ -106,16 +110,21 @@ fun PermissionPrompt(
 ) {
     val permanentlyDenied = state.status(permission) == PermissionStatus.PermanentlyDenied
     StatusStrip(
-        container = MaterialTheme.colorScheme.secondaryContainer,
-        content = MaterialTheme.colorScheme.onSecondaryContainer,
-        border = MaterialTheme.colorScheme.outline,
         icon = Icons.Filled.Info,
+        iconColor = MaterialTheme.colorScheme.primary,
+        iconTint = MaterialTheme.colorScheme.primaryContainer,
         text = stringResource(permission.prompt(state.sdk, state.approximateLocationOnly)),
         modifier = modifier,
         trailing = {
-            TextButton(
+            Button(
                 onClick = onRequest,
-                colors = ButtonDefaults.textButtonColors(contentColor = LocalContentColor.current)
+                shape = RoundedCornerShape(Radius.Medium),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.onSurface,
+                    contentColor = MaterialTheme.colorScheme.surface
+                ),
+                modifier = Modifier.height(ActionHeight)
             ) {
                 Text(
                     stringResource(
@@ -135,7 +144,7 @@ fun PermissionPrompt(
 @Preview(name = "Prompt and the bar it replaces", showBackground = true)
 @Composable
 private fun PermissionPromptPreview() {
-    TandemMotoTheme(dynamicColor = false) {
+    TandemMotoTheme(darkTheme = true) {
         Column {
             PermissionPrompt(
                 permission = AppPermission.NEARBY,

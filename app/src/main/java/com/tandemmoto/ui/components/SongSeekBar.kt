@@ -29,12 +29,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.tandemmoto.R
+import com.tandemmoto.ui.theme.AppText
 import java.util.Locale
 
 /**
  * Where the song is, on Home and in Playlist. Dragging only moves the thumb; letting go seeks,
  * which the partner's phone follows (#60), so a drag doesn't send a seek for every step.
- * The times sit under the bar, or on its left and right with [timesBeside].
+ * The times sit under the bar (where the song is, and how long is left), or on its left and right
+ * with [timesBeside] (where it is, and its length).
  */
 @OptIn(ExperimentalMaterial3Api::class) // the track's look
 @Composable
@@ -55,7 +57,15 @@ fun SongSeekBar(
         formatTime(shown),
         formatTime(duration)
     )
-    val colors = SliderDefaults.colors()
+    val scheme = MaterialTheme.colorScheme
+    val colors = SliderDefaults.colors(
+        thumbColor = scheme.onSurface,
+        activeTrackColor = scheme.primary,
+        inactiveTrackColor = scheme.outlineVariant,
+        disabledThumbColor = scheme.outline,
+        disabledActiveTrackColor = scheme.outline,
+        disabledInactiveTrackColor = scheme.outlineVariant
+    )
     val active = enabled && duration > 0
     val bar: @Composable (Modifier) -> Unit = { barModifier ->
         Slider(
@@ -67,11 +77,14 @@ fun SongSeekBar(
             },
             valueRange = 0f..duration.toFloat().coerceAtLeast(1f),
             enabled = active,
-            // A small round thumb on a plain track (not Material's default bar and gap).
+            // A round thumb ringed in the page colour, on a plain track (not Material's default
+            // bar and gap).
             thumb = {
                 Box(
                     Modifier
-                        .size(THUMB)
+                        .size(THUMB + RING * 2)
+                        .background(scheme.background, CircleShape)
+                        .padding(RING)
                         .background(
                             if (active) colors.thumbColor else colors.disabledThumbColor,
                             CircleShape
@@ -94,34 +107,35 @@ fun SongSeekBar(
             }
         )
     }
-    val time: @Composable (Long) -> Unit = {
+    val time: @Composable (String) -> Unit = {
         Text(
-            text = formatTime(it),
-            style = MaterialTheme.typography.labelMedium,
+            text = it,
+            style = AppText.time,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.clearAndSetSemantics {}
         )
     }
     if (timesBeside) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
-            time(shown)
+            time(formatTime(shown))
             bar(Modifier.weight(1f).padding(horizontal = 8.dp))
-            time(duration)
+            time(formatTime(duration))
         }
     } else {
         Column(modifier = modifier) {
             bar(Modifier)
             Row(modifier = Modifier.fillMaxWidth()) {
-                time(shown)
+                time(formatTime(shown))
                 Spacer(Modifier.weight(1f))
-                time(duration)
+                time("\u2212" + formatTime(duration - shown))
             }
         }
     }
 }
 
-private val THUMB = 16.dp
-private val TRACK = 4.dp
+private val THUMB = 20.dp
+private val RING = 4.dp
+private val TRACK = 6.dp
 
 /** "4:05", or "1:02:03" past an hour. */
 fun formatTime(ms: Long): String {

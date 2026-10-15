@@ -92,3 +92,5 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for branch/commit conventions, the buil
 ## License
 
 MIT — see [`LICENSE`](LICENSE). We chose a permissive license so the Wi-Fi Direct/Opus/NS-AGC integration work here is easy for others building similar rider-comms tooling to reuse; open an issue if there's a reason to reconsider this before the first tagged release.
+
+The app bundles two fonts under the SIL Open Font License 1.1: [Archivo](https://github.com/Omnibus-Type/Archivo) and [IBM Plex Mono](https://github.com/IBM/plex). Their licences are in [`docs/licenses/`](docs/licenses/).

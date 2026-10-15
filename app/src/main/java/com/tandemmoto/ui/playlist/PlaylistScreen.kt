@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree
 import androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments
+import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -14,24 +15,30 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,15 +62,18 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
@@ -79,15 +89,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tandemmoto.R
 import com.tandemmoto.library.ImportSummary
 import com.tandemmoto.library.Song
+import com.tandemmoto.ui.components.AppCard
 import com.tandemmoto.ui.components.BackTopBar
-import com.tandemmoto.ui.components.GroupedRow
-import com.tandemmoto.ui.components.PartnerTag
+import com.tandemmoto.ui.components.Dot
 import com.tandemmoto.ui.components.SongSeekBar
-import com.tandemmoto.ui.components.StatusChip
-import com.tandemmoto.ui.components.Tag
 import com.tandemmoto.ui.components.horizontalSwipe
+import com.tandemmoto.ui.theme.AppText
+import com.tandemmoto.ui.theme.Radius
 import com.tandemmoto.ui.theme.TandemMotoTheme
-import com.tandemmoto.ui.theme.groupItemShape
 import kotlin.math.abs
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
@@ -199,13 +208,29 @@ fun PlaylistScreen(
 /** The song playing, with play/pause and a seek bar, under the list. */
 @Composable
 private fun NowPlayingBarView(bar: NowPlayingBar, onPlayPause: () -> Unit, onSeek: (Long) -> Unit) {
-    Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .navigationBarsPadding()
-                .padding(start = 16.dp, end = 8.dp, top = 4.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+    val colors = MaterialTheme.colorScheme
+    val appColors = TandemMotoTheme.appColors
+    Surface(color = colors.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.navigationBarsPadding()) {
+            HorizontalDivider(color = colors.outlineVariant)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(colors.surfaceContainerHigh, RoundedCornerShape(10.dp))
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_music_note),
+                        contentDescription = null,
+                        tint = appColors.accent,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = bar.title,
@@ -217,13 +242,20 @@ private fun NowPlayingBarView(bar: NowPlayingBar, onPlayPause: () -> Unit, onSee
                         Text(
                             text = it,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = colors.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
-                IconButton(onClick = onPlayPause, modifier = Modifier.size(48.dp)) {
+                val shape = RoundedCornerShape(18.dp)
+                IconButton(
+                    onClick = onPlayPause,
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(shape)
+                        .background(appColors.accent, shape)
+                ) {
                     Icon(
                         painter = painterResource(
                             if (bar.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
@@ -231,7 +263,8 @@ private fun NowPlayingBarView(bar: NowPlayingBar, onPlayPause: () -> Unit, onSee
                         contentDescription = stringResource(
                             if (bar.isPlaying) R.string.ride_pause else R.string.ride_play
                         ),
-                        modifier = Modifier.size(32.dp)
+                        tint = appColors.onAccent,
+                        modifier = Modifier.size(26.dp)
                     )
                 }
             }
@@ -241,7 +274,7 @@ private fun NowPlayingBarView(bar: NowPlayingBar, onPlayPause: () -> Unit, onSee
                 enabled = true,
                 onSeek = onSeek,
                 timesBeside = true,
-                modifier = Modifier.padding(end = 8.dp)
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
         }
     }
@@ -260,8 +293,22 @@ private fun PlaylistTopBar(
         title = stringResource(R.string.playlist_title),
         onBack = onBack,
         actions = {
-            IconButton(onClick = { menu = true }) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.playlist_add))
+            val appColors = TandemMotoTheme.appColors
+            Button(
+                onClick = { menu = true },
+                shape = RoundedCornerShape(Radius.Medium),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = appColors.accent,
+                    contentColor = appColors.onAccent
+                ),
+                contentPadding = PaddingValues(start = 12.dp, end = 16.dp),
+                modifier = Modifier
+                    .padding(end = 12.dp)
+                    .height(44.dp)
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(R.string.playlist_add))
             }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 DropdownMenuItem(
@@ -431,20 +478,18 @@ private fun SongList(
         PlaylistTotals(state)
         LazyColumn(
             state = listState,
-            contentPadding = PaddingValues(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.fillMaxSize()
         ) {
             itemsIndexed(order, key = { _, row -> row.key }) { index, row ->
-                val shape = groupItemShape(index, order.size)
                 when (row) {
-                    is PlaylistRow.Reading -> GroupedRow(shape) { ReadingRow(row) }
+                    is PlaylistRow.Reading -> ReadingRow(row)
                     is PlaylistRow.Entry -> SongRow(
                         entry = row,
                         index = index,
                         songCount = songCount,
                         partnerName = state.partnerName,
-                        shape = shape,
                         onRemove = { onRemove(row.song.id) },
                         onMove = onMove,
                         onPlay = { onPlay(index) },
@@ -510,88 +555,148 @@ private fun PlaylistTotals(state: PlaylistUiState) {
             ?: stringResource(R.string.playlist_sharing_shared)
         Sharing.WaitingToSync -> stringResource(R.string.playlist_sharing_waiting)
     }
-    Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 12.dp)) {
+    AppCard(
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 12.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(text = "$count · $length", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    text = sharing,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (state.partnerName != null) {
+                val colors = TandemMotoTheme.appColors
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    LegendItem(colors.partner, stringResource(R.string.status_partner_tag))
+                    LegendItem(colors.me, stringResource(R.string.playlist_legend_you))
+                }
+            }
+        }
+    }
+}
+
+/** A dot and what its colour means, beside the totals. */
+@Composable
+private fun LegendItem(color: Color, label: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Dot(color, size = 8.dp)
         Text(
-            text = "$count · $length",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = sharing,
-            style = MaterialTheme.typography.bodySmall,
+            label,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
-/** "Added by you" in C1, or the partner's phone name in C2; nothing when unpaired. */
+/** A dot in C1 and "Added by you", or in C2 and the partner's phone name; nothing unpaired. */
 @Composable
 private fun WhoTag(entry: PlaylistRow.Entry, partnerName: String?) {
     if (partnerName == null || entry.badge == null) return
+    val colors = TandemMotoTheme.appColors
     if (entry.mine) {
-        val colors = TandemMotoTheme.appColors
-        Tag(stringResource(R.string.playlist_added_by_you), colors.me, colors.onMe)
+        RowLabel(stringResource(R.string.playlist_added_by_you), colors.me) { Dot(colors.me) }
     } else {
-        PartnerTag(partnerName)
+        RowLabel(partnerName, colors.partner) { Dot(colors.partner) }
     }
 }
 
 /**
- * Where the song is: yellow while it moves, dark blue once it's here, grey while it waits, red when
- * the phone is full. Just a dark blue "On this phone" when unpaired.
+ * Where the song is: amber while it moves, green once it's here, grey while it waits, red when
+ * the phone is full. Just a green "On this phone" when unpaired.
  */
 @Composable
 private fun WhereChip(entry: PlaylistRow.Entry, partnerName: String?) {
     val colors = TandemMotoTheme.appColors
     val scheme = MaterialTheme.colorScheme
     val badge = entry.badge
+    val here = Icons.Filled.Check
+    val moving = ImageVector.vectorResource(R.drawable.ic_download)
+    val waiting = ImageVector.vectorResource(R.drawable.ic_cloud)
     if (partnerName == null || badge == null) {
-        StatusChip(stringResource(R.string.playlist_on_this_phone), colors.stored, colors.onStored)
+        WhereLabel(stringResource(R.string.playlist_on_this_phone), colors.stored, here)
         return
     }
-    val (text, color, onColor) = when (badge) {
+    val (text, color, icon) = when (badge) {
         SongBadge.OnBothPhones ->
-            Triple(stringResource(R.string.playlist_on_both_phones), colors.stored, colors.onStored)
+            Triple(stringResource(R.string.playlist_on_both_phones), colors.stored, here)
         SongBadge.OnThisPhone ->
-            Triple(stringResource(R.string.playlist_on_this_phone), colors.stored, colors.onStored)
+            Triple(stringResource(R.string.playlist_on_this_phone), colors.stored, here)
         is SongBadge.Sending -> Triple(
             stringResource(R.string.playlist_sending, badge.percent),
             colors.transferring,
-            colors.onTransferring
+            moving
         )
         is SongBadge.Receiving -> Triple(
             stringResource(R.string.playlist_receiving, badge.percent),
             colors.transferring,
-            colors.onTransferring
+            moving
         )
         SongBadge.NotOnPartner -> Triple(
             stringResource(R.string.playlist_not_on_partner, partnerName),
-            scheme.surfaceVariant,
-            scheme.onSurfaceVariant
+            scheme.onSurfaceVariant,
+            waiting
         )
         SongBadge.Queued ->
-            Triple(
-                stringResource(R.string.playlist_queued),
-                scheme.surfaceVariant,
-                scheme.onSurfaceVariant
-            )
+            Triple(stringResource(R.string.playlist_queued), scheme.onSurfaceVariant, waiting)
         SongBadge.WaitingForConnection -> Triple(
             stringResource(R.string.playlist_waiting_for_connection),
-            scheme.surfaceVariant,
-            scheme.onSurfaceVariant
+            scheme.onSurfaceVariant,
+            waiting
         )
         SongBadge.StorageFull ->
-            Triple(stringResource(R.string.playlist_storage_full), scheme.error, scheme.onError)
+            Triple(
+                stringResource(R.string.playlist_storage_full),
+                scheme.error,
+                Icons.Filled.Warning
+            )
         SongBadge.OnPartnerOnly -> return
     }
-    StatusChip(text, color, onColor)
+    WhereLabel(text, color, icon)
+}
+
+@Composable
+private fun WhereLabel(text: String, color: Color, icon: ImageVector) {
+    RowLabel(text, color) {
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
+    }
+}
+
+/** A small [leading] mark and a one-line label in [color], for a song row's third line. */
+@Composable
+private fun RowLabel(text: String, color: Color, leading: @Composable () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        leading()
+        Text(
+            text = text,
+            color = color,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }
 
 @Composable
 private fun ReadingRow(row: PlaylistRow.Reading) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+        modifier = Modifier.padding(start = 44.dp, end = 16.dp, top = 12.dp, bottom = 12.dp)
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -606,14 +711,15 @@ private fun ReadingRow(row: PlaylistRow.Reading) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+        CircularProgressIndicator(strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
     }
 }
 
 /**
  * Three lines that never wrap: the title (scrolling sideways when too long), the artist with the
  * duration at the far right, then whose song it is and where it is. A song that can't play has
- * one red line in place of the tags. The song playing sits on `primaryContainer`.
+ * one red line in place of the tags. The song playing sits on a card, its title and place in the
+ * accent colour.
  */
 @Composable
 private fun SongRow(
@@ -621,7 +727,6 @@ private fun SongRow(
     index: Int,
     songCount: Int,
     partnerName: String?,
-    shape: Shape,
     onRemove: () -> Unit,
     onMove: (Int, Int) -> Unit,
     onPlay: () -> Unit,
@@ -640,11 +745,13 @@ private fun SongRow(
     val nowPlaying = stringResource(R.string.playlist_now_playing)
     val problem = entry.missing || entry.cantPlay || entry.partnerCantPlay
     val scheme = MaterialTheme.colorScheme
-    val secondary = if (entry.current) scheme.onPrimaryContainer else scheme.onSurfaceVariant
-    GroupedRow(
-        shape = shape,
-        color = if (entry.current) scheme.primaryContainer else scheme.surface,
+    val secondary = scheme.onSurfaceVariant
+    Surface(
+        color = if (entry.current) scheme.surfaceContainerHigh else Color.Transparent,
+        shape = RowShape,
         modifier = modifier
+            .fillMaxWidth()
+            .clip(RowShape)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -680,29 +787,46 @@ private fun SongRow(
                         }
                     )
                 }
-                .padding(start = 16.dp, top = 10.dp, bottom = 10.dp)
+                .padding(start = 8.dp, top = 10.dp, bottom = 10.dp)
         ) {
             Icon(
-                Icons.Filled.Menu,
+                painterResource(R.drawable.ic_drag),
                 contentDescription = stringResource(R.string.playlist_drag),
-                tint = secondary,
-                modifier = handle
+                tint = scheme.outline,
+                modifier = handle.size(20.dp)
             )
-            // Its place in the playlist (phone test on #48).
-            Text(
-                text = "${index + 1}",
-                style = MaterialTheme.typography.titleSmall,
-                color = secondary,
-                textAlign = TextAlign.End,
+            // Its place in the playlist (phone test on #48), with bars beside the song playing.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.End),
                 modifier = Modifier
-                    .padding(start = 12.dp, end = 16.dp)
-                    .widthIn(min = 24.dp)
-            )
-            Column(modifier = Modifier.weight(1f)) {
+                    .padding(start = 8.dp, end = 12.dp)
+                    .widthIn(min = 28.dp)
+            ) {
+                if (entry.current) {
+                    Icon(
+                        painterResource(R.drawable.ic_equalizer),
+                        contentDescription = null,
+                        tint = scheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+                Text(
+                    text = "${index + 1}",
+                    style = AppText.number,
+                    color = if (entry.current) scheme.primary else secondary,
+                    textAlign = TextAlign.End
+                )
+            }
+            Column(
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.weight(1f)
+            ) {
                 Text(
                     song.title,
                     style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (entry.current) FontWeight.Bold else null,
+                    fontWeight = if (entry.current) FontWeight.Bold else FontWeight.Medium,
+                    color = if (entry.current) scheme.primary else scheme.onSurface,
                     maxLines = 1,
                     modifier = Modifier.basicMarquee()
                 )
@@ -717,8 +841,8 @@ private fun SongRow(
                     )
                     Text(
                         formatDuration(song.durationMs),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = secondary,
+                        style = AppText.time,
+                        color = scheme.onSurfaceVariant,
                         maxLines = 1,
                         modifier = Modifier.padding(start = 8.dp)
                     )
@@ -740,9 +864,9 @@ private fun SongRow(
                     )
                 } else {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier
-                            .padding(top = 4.dp)
+                            .padding(top = 2.dp)
                             .clipToBounds()
                     ) {
                         WhoTag(entry, partnerName)
@@ -762,6 +886,7 @@ private fun SongRow(
                 IconButton(onClick = { menu = true }) {
                     Icon(
                         Icons.Filled.MoreVert,
+                        tint = secondary,
                         contentDescription = stringResource(R.string.playlist_more, song.title)
                     )
                 }
@@ -788,6 +913,9 @@ private fun SongRow(
     }
 }
 
+/** A song row's rounded corners, shown on the song playing. */
+private val RowShape = RoundedCornerShape(14.dp)
+
 /** 3:45, or 1:02:03 for anything an hour or longer. */
 internal fun formatDuration(ms: Long): String {
     val total = ms / 1_000
@@ -810,7 +938,7 @@ private val AUTO_SCROLL_MAX_STEP = 20.dp
 @Preview(showBackground = true)
 @Composable
 private fun PlaylistEmptyPreview() {
-    TandemMotoTheme(dynamicColor = false) {
+    TandemMotoTheme(darkTheme = true) {
         PlaylistScreen(PlaylistUiState(loaded = true), {}, {}, {}, {}, {}, { _, _ -> })
     }
 }
@@ -823,7 +951,7 @@ private fun PlaylistPreview() {
         Song("b", "u2", "Ride", null, 225_000, 6_000_000),
         Song("c", "u3", "Long Road", "Band", 301_000, 7_000_000)
     )
-    TandemMotoTheme(dynamicColor = false) {
+    TandemMotoTheme(darkTheme = true) {
         PlaylistScreen(
             PlaylistUiState(
                 rows = listOf(

@@ -185,13 +185,13 @@ class RideScreenTest {
                 )
             }
         }
-        val next = compose.onNodeWithContentDescription(str(R.string.ride_next))
+        val previous = compose.onNodeWithContentDescription(str(R.string.ride_previous))
             .fetchSemanticsNode().boundsInRoot
         val playlist = compose.onNodeWithContentDescription(str(R.string.ride_open_playlist))
-        // In the player row, after Next; not up in the top bar.
+        // In the player row, before Previous; not up in the top bar.
         val bounds = playlist.fetchSemanticsNode().boundsInRoot
-        assertEquals(next.center.y, bounds.center.y, 1f)
-        assertTrue(bounds.left > next.right)
+        assertEquals(previous.center.y, bounds.center.y, 1f)
+        assertTrue(bounds.right < previous.left)
         playlist.assertIsEnabled().performClick()
         assertTrue(openedPlaylist)
     }

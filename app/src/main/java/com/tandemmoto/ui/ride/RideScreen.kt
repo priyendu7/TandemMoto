@@ -1,12 +1,19 @@
 package com.tandemmoto.ui.ride
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.AudioManager
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -22,11 +29,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -50,15 +58,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -68,10 +77,10 @@ import com.tandemmoto.permissions.AskedOnce
 import com.tandemmoto.permissions.PermissionStatus
 import com.tandemmoto.permissions.PermissionsState
 import com.tandemmoto.service.nextTry
+import com.tandemmoto.ui.components.AppCard
 import com.tandemmoto.ui.components.BarTone
 import com.tandemmoto.ui.components.ConnectionStatus
 import com.tandemmoto.ui.components.ConnectionStatusBar
-import com.tandemmoto.ui.components.ControlButton
 import com.tandemmoto.ui.components.PermissionPrompt
 import com.tandemmoto.ui.components.SongSeekBar
 import com.tandemmoto.ui.components.StatusStripMinHeight
@@ -81,6 +90,7 @@ import com.tandemmoto.ui.components.horizontalSwipe
 import com.tandemmoto.ui.components.openWifiSettings
 import com.tandemmoto.ui.components.rememberConnectWave
 import com.tandemmoto.ui.components.rememberPermissionRequester
+import com.tandemmoto.ui.theme.Radius
 import com.tandemmoto.ui.theme.TandemMotoTheme
 import com.tandemmoto.voice.IntercomLine
 import kotlinx.coroutines.Dispatchers
@@ -127,7 +137,17 @@ fun RideRoute(
         onSeek = viewModel::onSeek,
         onStartIntercom = viewModel::onStartIntercom,
         onStopIntercom = viewModel::onStopIntercom,
-        onMute = viewModel::onMute
+        onMute = viewModel::onMute,
+        onVolume = context::showVolume
+    )
+}
+
+/** Shows the system volume panel for music, the same as pressing a volume key. */
+private fun Context.showVolume() {
+    getSystemService(AudioManager::class.java)?.adjustStreamVolume(
+        AudioManager.STREAM_MUSIC,
+        AudioManager.ADJUST_SAME,
+        AudioManager.FLAG_SHOW_UI
     )
 }
 
@@ -149,16 +169,23 @@ fun RideScreen(
     onSeek: (Long) -> Unit = {},
     onStartIntercom: () -> Unit = {},
     onStopIntercom: () -> Unit = {},
-    onMute: (Boolean) -> Unit = {}
+    onMute: (Boolean) -> Unit = {},
+    onVolume: () -> Unit = {}
 ) {
+    val colors = MaterialTheme.colorScheme
     // Swiping right to left opens the playlist, as if pulling it in from the right.
     Scaffold(
         modifier = Modifier.horizontalSwipe(onSwipeLeft = onOpenPlaylist),
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.app_name)) },
-                // A little shorter than the default 64 dp, so the status band sits close under it.
-                expandedHeight = 56.dp,
+                title = {
+                    Text(
+                        stringResource(R.string.app_name),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                },
+                // A little shorter than the default 64 dp, so the status card sits close under it.
+                expandedHeight = 60.dp,
                 // The page colour, so the bar and the page read as one surface.
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
@@ -166,10 +193,18 @@ fun RideScreen(
                 ),
                 actions = {
                     // The playlist opens from the player's fourth button.
-                    IconButton(onClick = onOpenSettings) {
+                    IconButton(
+                        onClick = onOpenSettings,
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .size(44.dp)
+                            .background(colors.surfaceContainer, TileShape)
+                            .border(1.dp, colors.outlineVariant, TileShape)
+                    ) {
                         Icon(
                             Icons.Filled.Settings,
-                            contentDescription = stringResource(R.string.ride_open_settings)
+                            contentDescription = stringResource(R.string.ride_open_settings),
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -183,7 +218,7 @@ fun RideScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .connectWave({ wave.value }, waveColor, StatusStripMinHeight / 2)
+                .connectWave({ wave.value }, waveColor, StatusCardTop + StatusStripMinHeight / 2)
         ) {
             ConnectionSection(
                 state.connection,
@@ -201,7 +236,7 @@ fun RideScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                    .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 20.dp)
             ) {
                 // The picture takes the room that's left, as a square: large on a tall phone,
                 // smaller on a short one, and never pushing the controls off the screen.
@@ -214,7 +249,7 @@ fun RideScreen(
                     Artwork(
                         state.artwork,
                         Modifier
-                            .widthIn(max = 400.dp)
+                            .widthIn(max = 320.dp)
                             .aspectRatio(1f, matchHeightConstraintsFirst = true)
                     )
                 }
@@ -228,7 +263,7 @@ fun RideScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-                PlaybackControls(state, onPlayPause, onNext, onPrevious, onOpenPlaylist)
+                PlaybackControls(state, onPlayPause, onNext, onPrevious, onOpenPlaylist, onVolume)
                 if (permissions.isGranted(AppPermission.MICROPHONE)) {
                     IntercomSection(state, onStartIntercom, onStopIntercom, onMute)
                 } else {
@@ -243,8 +278,11 @@ fun RideScreen(
     }
 }
 
-/** Space beside the connection card on Home. */
-private val StatusCardMargin = 16.dp
+/** Space beside the connection card and the player on Home. */
+private val StatusCardMargin = 20.dp
+
+/** The settings button's rounded square. */
+private val TileShape = RoundedCornerShape(Radius.Medium)
 
 /** Space above it: small, since the top bar already leaves room under the title. */
 private val StatusCardTop = 4.dp
@@ -321,10 +359,8 @@ private fun ConnectionSection(
         bottom = 8.dp
     )
     if (permissions.isGranted(AppPermission.NEARBY)) {
-        // Trying it out: a full-width band under the top bar instead of a card.
         ConnectionStatusBar(
-            modifier = Modifier.padding(bottom = 8.dp),
-            flat = true,
+            modifier = cardModifier,
             status = connection,
             partnerName = partnerName,
             detail = nextTryAtMs?.let { nextTry(LocalContext.current, it) },
@@ -377,7 +413,7 @@ private fun decodeArt(bytes: ByteArray): DecodedArt? {
     return DecodedArt(bitmap.asImageBitmap(), average)
 }
 
-private val ArtworkShape = RoundedCornerShape(16.dp)
+private val ArtworkShape = RoundedCornerShape(Radius.ExtraLarge)
 
 /**
  * The song's own picture (album art), or a music note when the file has none, glowing in the
@@ -394,7 +430,8 @@ private fun Artwork(bytes: ByteArray?, modifier: Modifier = Modifier) {
         modifier = modifier
             .glow(glowColor, radius = 32.dp, shape = ArtworkShape)
             .clip(ArtworkShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, ArtworkShape)
     ) {
         val picture = art?.image
         if (picture != null) {
@@ -409,7 +446,7 @@ private fun Artwork(bytes: ByteArray?, modifier: Modifier = Modifier) {
             Icon(
                 painter = painterResource(R.drawable.ic_music_note),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = TandemMotoTheme.appColors.accent,
                 modifier = Modifier.fillMaxSize(0.4f)
             )
         }
@@ -420,6 +457,7 @@ private fun Artwork(bytes: ByteArray?, modifier: Modifier = Modifier) {
 private fun SongInfo(state: RideUiState) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         // Song names are often file names: two lines at most, so a long one can't push the
@@ -443,7 +481,7 @@ private fun SongInfo(state: RideUiState) {
         if (below != null && state.nowPlaying != null) {
             Text(
                 text = below,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
@@ -459,45 +497,53 @@ private fun PlaybackControls(
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
-    onOpenPlaylist: () -> Unit
+    onOpenPlaylist: () -> Unit,
+    onVolume: () -> Unit
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Four 64 dp buttons, spread evenly: fits a 393 dp phone with room for the glows.
+        // Playlist and volume, plain, either side of three big buttons for gloves: previous and
+        // next on cards, play in the accent colour.
         Row(
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
         ) {
-            ControlButton(
+            // Always enabled: with no songs yet, this is where they're added.
+            PlayerButton(
+                icon = R.drawable.ic_queue_music,
+                contentDescription = stringResource(R.string.ride_open_playlist),
+                onClick = onOpenPlaylist,
+                style = PlayerButtonStyle.Plain
+            )
+            PlayerButton(
                 icon = R.drawable.ic_skip_previous,
                 contentDescription = stringResource(R.string.ride_previous),
                 onClick = onPrevious,
                 enabled = state.controlsEnabled
             )
-            ControlButton(
+            PlayerButton(
                 icon = if (state.isPlaying) R.drawable.ic_pause else R.drawable.ic_play,
                 contentDescription = stringResource(
                     if (state.isPlaying) R.string.ride_pause else R.string.ride_play
                 ),
                 onClick = onPlayPause,
                 enabled = state.controlsEnabled,
-                primary = true
+                style = PlayerButtonStyle.Main
             )
-            ControlButton(
+            PlayerButton(
                 icon = R.drawable.ic_skip_next,
                 contentDescription = stringResource(R.string.ride_next),
                 onClick = onNext,
                 enabled = state.controlsEnabled
             )
-            // Always enabled: with no songs yet, this is where they're added.
-            ControlButton(
-                icon = R.drawable.ic_queue_music,
-                contentDescription = stringResource(R.string.ride_open_playlist),
-                onClick = onOpenPlaylist,
-                enabled = true
+            PlayerButton(
+                icon = R.drawable.ic_volume,
+                contentDescription = stringResource(R.string.ride_volume),
+                onClick = onVolume,
+                style = PlayerButtonStyle.Plain
             )
         }
         if (!state.controlsEnabled) {
@@ -511,10 +557,67 @@ private fun PlaybackControls(
     }
 }
 
+private enum class PlayerButtonStyle(val size: Dp, val radius: Dp, val icon: Dp) {
+    /** Just the icon, in the secondary text colour. */
+    Plain(48.dp, 14.dp, 24.dp),
+
+    /** On a card: previous and next. */
+    Card(60.dp, 18.dp, 28.dp),
+
+    /** Filled with the accent: play and pause. */
+    Main(84.dp, Radius.ExtraLarge, 36.dp)
+}
+
+@Composable
+private fun PlayerButton(
+    @DrawableRes icon: Int,
+    contentDescription: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    style: PlayerButtonStyle = PlayerButtonStyle.Card
+) {
+    val colors = MaterialTheme.colorScheme
+    val accent = TandemMotoTheme.appColors
+    val shape = RoundedCornerShape(style.radius)
+    val (container, content) = when (style) {
+        PlayerButtonStyle.Plain -> Color.Transparent to colors.onSurfaceVariant
+        PlayerButtonStyle.Card -> colors.surfaceContainer to colors.onSurface
+        PlayerButtonStyle.Main -> accent.accent to accent.onAccent
+    }
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(style.size)
+            .clip(shape)
+            .background(
+                if (enabled || style != PlayerButtonStyle.Main) {
+                    container
+                } else {
+                    colors.surfaceContainerHighest
+                }
+            )
+            .then(
+                if (style == PlayerButtonStyle.Card) {
+                    Modifier.border(1.dp, colors.outlineVariant, shape)
+                } else {
+                    Modifier
+                }
+            )
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+    ) {
+        Icon(
+            painter = painterResource(icon),
+            contentDescription = contentDescription,
+            tint = if (enabled) content else colors.onSurface.copy(alpha = 0.38f),
+            modifier = Modifier.size(style.icon)
+        )
+    }
+}
+
 /**
- * The intercom (#72): one line saying what it's doing, Start or Stop intercom (both phones), and
- * this phone's mute. Mute and Stop share the filled style, Unmute and Start the tonal one; all
- * are 56 dp tall, for gloves.
+ * The intercom (#72) on its own card: what it's doing in two lines (read as one), a level meter
+ * while it's live, then this phone's mute and Start or Stop intercom (both phones), 60 dp tall
+ * for gloves.
  */
 @Composable
 private fun IntercomSection(
@@ -524,6 +627,7 @@ private fun IntercomSection(
     onMute: (Boolean) -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
+    val appColors = TandemMotoTheme.appColors
     val partner = state.partnerName ?: stringResource(R.string.ride_your_partner)
     val on = when (state.intercom) {
         IntercomLine.NotLinked, IntercomLine.Ready, IntercomLine.WaitingForPause -> false
@@ -547,92 +651,123 @@ private fun IntercomSection(
     val title = stringResource(
         if (on) R.string.ride_intercom_title_on else R.string.ride_intercom_title_off
     )
-    val line = buildAnnotatedString {
-        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(title) }
-        withStyle(SpanStyle(color = colors.onSurfaceVariant)) { append(" · $detail") }
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            // A change is read out, like the connection bar.
-            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+    AppCard(shape = RoundedCornerShape(22.dp)) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.padding(16.dp)
         ) {
-            Icon(
-                painter = painterResource(
-                    if (state.muted) R.drawable.ic_mic_off else R.drawable.ic_mic
-                ),
-                contentDescription = null,
-                tint = if (state.intercomOn) colors.primary else colors.onSurfaceVariant,
-                modifier = Modifier.size(24.dp)
-            )
-            Text(
-                text = line,
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        if (state.intercom == IntercomLine.NotLinked) return@Column
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            val buttonModifier = Modifier.weight(1f)
-            when (state.intercom) {
-                IntercomLine.Ready -> IntercomButton(
-                    filled = false,
-                    onClick = onStart,
-                    modifier = buttonModifier
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        // Read as one line, and a change is read out, like the connection card.
+                        .clearAndSetSemantics {
+                            text = AnnotatedString("$title · $detail")
+                            liveRegion = LiveRegionMode.Polite
+                        }
                 ) {
-                    Text(stringResource(R.string.ride_intercom_start))
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        detail,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
-                IntercomLine.Connecting, IntercomLine.On, IntercomLine.OnPhone -> IntercomButton(
-                    filled = true,
-                    onClick = onStop,
-                    modifier = buttonModifier
-                ) {
-                    Text(stringResource(R.string.ride_intercom_stop))
-                }
-                else -> Unit
+                if (state.intercomOn && !state.muted) LevelBars(appColors.connected)
             }
-            IntercomButton(
-                filled = !state.muted,
-                onClick = { onMute(!state.muted) },
-                modifier = buttonModifier
-            ) {
-                Icon(
-                    painter = painterResource(
-                        if (state.muted) R.drawable.ic_mic else R.drawable.ic_mic_off
-                    ),
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.size(8.dp))
-                Text(stringResource(if (state.muted) R.string.ride_unmute else R.string.ride_mute))
+            if (state.intercom == IntercomLine.NotLinked) return@Column
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                val buttonModifier = Modifier.weight(1f)
+                val muted = state.muted
+                IntercomButton(
+                    container = if (muted) colors.onSurface else colors.surfaceContainerHighest,
+                    content = if (muted) colors.surface else colors.onSurface,
+                    border = colors.outline,
+                    onClick = { onMute(!state.muted) },
+                    modifier = buttonModifier
+                ) {
+                    Icon(
+                        painter = painterResource(
+                            if (state.muted) R.drawable.ic_mic else R.drawable.ic_mic_off
+                        ),
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    Text(stringResource(if (muted) R.string.ride_unmute else R.string.ride_mute))
+                }
+                when (state.intercom) {
+                    IntercomLine.Ready -> IntercomButton(
+                        container = appColors.connectedTint,
+                        content = appColors.connected,
+                        border = appColors.connected.copy(alpha = 0.35f),
+                        onClick = onStart,
+                        modifier = buttonModifier
+                    ) {
+                        Text(stringResource(R.string.ride_intercom_start))
+                    }
+                    IntercomLine.Connecting, IntercomLine.On, IntercomLine.OnPhone ->
+                        IntercomButton(
+                            container = appColors.notConnectedTint,
+                            content = appColors.notConnected,
+                            border = appColors.notConnected.copy(alpha = 0.35f),
+                            onClick = onStop,
+                            modifier = buttonModifier
+                        ) {
+                            Text(stringResource(R.string.ride_intercom_stop))
+                        }
+                    else -> Unit
+                }
             }
         }
     }
 }
 
-/**
- * An intercom button, 56 dp tall with a medium radius, glowing in its container colour:
- * [filled] in `primary` (Mute, Stop intercom), otherwise tonal in `secondaryContainer`
- * (Unmute, Start intercom).
- */
+/** Five bars like a level meter, showing the intercom is live; decorative. */
+@Composable
+private fun LevelBars(color: Color) {
+    Row(
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        modifier = Modifier.height(24.dp)
+    ) {
+        listOf(8, 16, 24, 12, 18).forEach {
+            Box(
+                Modifier
+                    .size(width = 4.dp, height = it.dp)
+                    .background(color, RoundedCornerShape(2.dp))
+            )
+        }
+    }
+}
+
+/** An intercom button: 60 dp tall, filled with [container], with a hairline [border]. */
 @Composable
 private fun IntercomButton(
-    filled: Boolean,
+    container: Color,
+    content: Color,
+    border: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    content: @Composable RowScope.() -> Unit
+    body: @Composable RowScope.() -> Unit
 ) {
-    val colors = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(percent = 45)
-    val styled = modifier
-        .height(56.dp)
-        .glow(if (filled) colors.primary else colors.secondaryContainer, shape = shape)
-    if (filled) {
-        Button(onClick = onClick, shape = shape, modifier = styled, content = content)
-    } else {
-        FilledTonalButton(onClick = onClick, shape = shape, modifier = styled, content = content)
+    val shape = RoundedCornerShape(16.dp)
+    Button(
+        onClick = onClick,
+        shape = shape,
+        colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = content),
+        border = BorderStroke(1.dp, border),
+        contentPadding = PaddingValues(horizontal = 12.dp),
+        modifier = modifier.height(60.dp)
+    ) {
+        ProvideTextStyle(MaterialTheme.typography.titleMedium) { body() }
     }
 }
 
@@ -665,7 +800,7 @@ private fun RidePreview(state: RideUiState, permissions: PermissionsState = near
 @Preview(name = "Nearby permission missing · light", showBackground = true)
 @Composable
 private fun RideNeedsNearbyPreview() {
-    TandemMotoTheme(darkTheme = false, dynamicColor = false) {
+    TandemMotoTheme(darkTheme = false) {
         RidePreview(
             RideUiState(),
             PermissionsState(34, mapOf(AppPermission.NEARBY to PermissionStatus.Denied))
@@ -676,7 +811,7 @@ private fun RideNeedsNearbyPreview() {
 @Preview(name = "Not paired · light", showBackground = true)
 @Composable
 private fun RideNotPairedPreview() {
-    TandemMotoTheme(darkTheme = false, dynamicColor = false) {
+    TandemMotoTheme(darkTheme = false) {
         RidePreview(RideUiState())
     }
 }
@@ -684,7 +819,7 @@ private fun RideNotPairedPreview() {
 @Preview(name = "Connected, paused · dark", showBackground = true)
 @Composable
 private fun RideConnectedPreview() {
-    TandemMotoTheme(darkTheme = true, dynamicColor = false) {
+    TandemMotoTheme(darkTheme = true) {
         RidePreview(
             RideUiState(
                 connection = ConnectionStatus.Connected,

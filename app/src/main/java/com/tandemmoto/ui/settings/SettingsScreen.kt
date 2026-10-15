@@ -1,23 +1,32 @@
 package com.tandemmoto.ui.settings
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -28,17 +37,31 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.tandemmoto.BuildConfig
 import com.tandemmoto.R
 import com.tandemmoto.permissions.PermissionStatus
 import com.tandemmoto.transfer.WindowSettings
+import com.tandemmoto.ui.components.AppCard
 import com.tandemmoto.ui.components.BackTopBar
+import com.tandemmoto.ui.components.CardDivider
+import com.tandemmoto.ui.components.IconTile
+import com.tandemmoto.ui.components.SectionHeader
+import com.tandemmoto.ui.theme.AppText
+import com.tandemmoto.ui.theme.Radius
 import com.tandemmoto.ui.theme.TandemMotoTheme
 import com.tandemmoto.voice.MicTestResult
 import com.tandemmoto.voice.MicTestState
@@ -113,145 +136,265 @@ fun SettingsScreen(
                 .padding(padding)
                 // Longer than a phone screen since Songs from partner (#50 phone test).
                 .verticalScroll(rememberScrollState())
+                .padding(start = 20.dp, end = 20.dp, bottom = 32.dp)
         ) {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.app_name)) },
-                supportingContent = {
-                    Text(
-                        stringResource(R.string.settings_version, versionName) + "\n" +
-                            stringResource(R.string.settings_license)
-                    )
-                }
-            )
-            HorizontalDivider()
             if (partnerName != null) {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_forget_partner)) },
-                    supportingContent = {
-                        Text(stringResource(R.string.settings_paired_with, partnerName))
-                    },
-                    modifier = Modifier.clickable { confirmForget = true }
-                )
-                HorizontalDivider()
+                SectionHeader(stringResource(R.string.settings_section_partner))
+                PartnerCard(partnerName, onForget = { confirmForget = true })
             }
             if (partnerSongs != null) {
+                SectionHeader(stringResource(R.string.settings_partner_songs))
                 PartnerSongsSection(partnerSongs, onWindowChange, onRemovePartnerSongs)
             }
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_sound_cues)) },
-                supportingContent = { Text(stringResource(R.string.settings_sound_cues_summary)) },
-                trailingContent = { Switch(checked = soundCues, onCheckedChange = null) },
-                modifier = Modifier.toggleable(
-                    value = soundCues,
-                    role = Role.Switch,
-                    onValueChange = onSoundCues
-                )
-            )
-            HorizontalDivider()
-            if (notifications != null) {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_notifications)) },
+            SectionHeader(stringResource(R.string.settings_section_alerts))
+            AppCard {
+                CardListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_sound_cues)) },
                     supportingContent = {
-                        Text(
-                            stringResource(
-                                if (notifications == PermissionStatus.Granted) {
-                                    R.string.settings_notifications_on
-                                } else {
-                                    R.string.settings_notifications_off
-                                }
-                            )
-                        )
+                        Text(stringResource(R.string.settings_sound_cues_summary))
                     },
-                    modifier = Modifier.clickable(onClick = onNotificationsClick)
-                )
-                HorizontalDivider()
-            }
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_privacy_policy)) },
-                supportingContent = { Text(stringResource(R.string.settings_privacy_summary)) },
-                modifier = Modifier.clickable { uriHandler.openUri(PRIVACY_URL) }
-            )
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_source_code)) },
-                supportingContent = { Text(stringResource(R.string.settings_source_summary)) },
-                modifier = Modifier.clickable { uriHandler.openUri(SOURCE_URL) }
-            )
-            HorizontalDivider()
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_advanced)) },
-                supportingContent = { Text(stringResource(R.string.settings_advanced_summary)) },
-                trailingContent = {
-                    val arrow = if (advanced) {
-                        Icons.Filled.KeyboardArrowUp
-                    } else {
-                        Icons.Filled.KeyboardArrowDown
-                    }
-                    Icon(arrow, contentDescription = null)
-                },
-                modifier = Modifier.clickable { advanced = !advanced }
-            )
-            if (advanced) {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_earbud_mic)) },
-                    supportingContent = {
-                        Text(
-                            stringResource(
-                                if (earbudMic) {
-                                    R.string.settings_earbud_mic_on
-                                } else {
-                                    R.string.settings_earbud_mic_off
-                                }
-                            )
-                        )
-                    },
-                    trailingContent = { Switch(checked = earbudMic, onCheckedChange = null) },
+                    trailingContent = { Switch(checked = soundCues, onCheckedChange = null) },
                     modifier = Modifier.toggleable(
-                        value = earbudMic,
+                        value = soundCues,
                         role = Role.Switch,
-                        onValueChange = onEarbudMic
+                        onValueChange = onSoundCues
                     )
                 )
-                VoiceProcessingRow(voiceProcessing, onVoiceProcessing, voiceEffects)
-                if (micTest != null) MicTestRow(micTest, onMicTest, onCancelMicTest)
-                if (talkTest != null) {
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.settings_talk_test)) },
+                if (notifications != null) {
+                    CardDivider()
+                    CardListItem(
+                        headlineContent = { Text(stringResource(R.string.settings_notifications)) },
                         supportingContent = {
-                            Column {
-                                Text(
-                                    if (talkTest.on) {
-                                        stringResource(
-                                            R.string.settings_talk_test_on,
-                                            talkTest.secondsLeft
-                                        )
+                            Text(
+                                stringResource(
+                                    if (notifications == PermissionStatus.Granted) {
+                                        R.string.settings_notifications_on
                                     } else {
-                                        stringResource(R.string.settings_talk_test_summary)
+                                        R.string.settings_notifications_off
                                     }
                                 )
-                                if (talkTest.on && talkLevelDb != null) LevelMeter(talkLevelDb)
-                            }
+                            )
                         },
-                        trailingContent = {
-                            Switch(checked = talkTest.on, onCheckedChange = null)
-                        },
-                        modifier = Modifier.toggleable(
-                            value = talkTest.on,
-                            role = Role.Switch,
-                            onValueChange = onTalkTest
-                        )
+                        trailingContent = { Chevron() },
+                        modifier = Modifier.clickable(onClick = onNotificationsClick)
                     )
                 }
             }
-            HorizontalDivider()
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_export_logs)) },
-                supportingContent = {
-                    Text(stringResource(R.string.settings_export_logs_summary))
-                },
-                modifier = Modifier.clickable(onClick = onExportLogs)
-            )
+            SectionHeader(stringResource(R.string.settings_section_troubleshooting))
+            AppCard {
+                CardListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_advanced)) },
+                    supportingContent = {
+                        Text(stringResource(R.string.settings_advanced_summary))
+                    },
+                    trailingContent = {
+                        val arrow = if (advanced) {
+                            Icons.Filled.KeyboardArrowUp
+                        } else {
+                            Icons.Filled.KeyboardArrowDown
+                        }
+                        Icon(arrow, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable { advanced = !advanced }
+                )
+                if (advanced) {
+                    CardListItem(
+                        headlineContent = { Text(stringResource(R.string.settings_earbud_mic)) },
+                        supportingContent = {
+                            Text(
+                                stringResource(
+                                    if (earbudMic) {
+                                        R.string.settings_earbud_mic_on
+                                    } else {
+                                        R.string.settings_earbud_mic_off
+                                    }
+                                )
+                            )
+                        },
+                        trailingContent = { Switch(checked = earbudMic, onCheckedChange = null) },
+                        modifier = Modifier.toggleable(
+                            value = earbudMic,
+                            role = Role.Switch,
+                            onValueChange = onEarbudMic
+                        )
+                    )
+                    VoiceProcessingRow(voiceProcessing, onVoiceProcessing, voiceEffects)
+                    if (micTest != null) MicTestRow(micTest, onMicTest, onCancelMicTest)
+                    if (talkTest != null) {
+                        CardListItem(
+                            headlineContent = { Text(stringResource(R.string.settings_talk_test)) },
+                            supportingContent = {
+                                Column {
+                                    Text(
+                                        if (talkTest.on) {
+                                            stringResource(
+                                                R.string.settings_talk_test_on,
+                                                talkTest.secondsLeft
+                                            )
+                                        } else {
+                                            stringResource(R.string.settings_talk_test_summary)
+                                        }
+                                    )
+                                    if (talkTest.on && talkLevelDb != null) LevelMeter(talkLevelDb)
+                                }
+                            },
+                            trailingContent = {
+                                Switch(checked = talkTest.on, onCheckedChange = null)
+                            },
+                            modifier = Modifier.toggleable(
+                                value = talkTest.on,
+                                role = Role.Switch,
+                                onValueChange = onTalkTest
+                            )
+                        )
+                    }
+                }
+                CardDivider()
+                CardListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_export_logs)) },
+                    supportingContent = {
+                        Text(stringResource(R.string.settings_export_logs_summary))
+                    },
+                    trailingContent = {
+                        Icon(
+                            painterResource(R.drawable.ic_share),
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    modifier = Modifier.clickable(onClick = onExportLogs)
+                )
+            }
+            SectionHeader(stringResource(R.string.settings_section_about))
+            AppCard {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.app_name),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        stringResource(R.string.settings_version, versionName),
+                        style = AppText.number.copy(fontSize = 13.sp),
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Text(
+                        stringResource(R.string.settings_license),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                CardDivider()
+                CardListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_privacy_policy)) },
+                    supportingContent = { Text(stringResource(R.string.settings_privacy_summary)) },
+                    trailingContent = { Chevron() },
+                    modifier = Modifier.clickable { uriHandler.openUri(PRIVACY_URL) }
+                )
+                CardListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_source_code)) },
+                    supportingContent = { Text(stringResource(R.string.settings_source_summary)) },
+                    trailingContent = {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    modifier = Modifier.clickable { uriHandler.openUri(SOURCE_URL) }
+                )
+            }
         }
     }
+}
+
+/** The paired phone on its tile, with Forget. */
+@Composable
+private fun PartnerCard(name: String, onForget: () -> Unit) {
+    val appColors = TandemMotoTheme.appColors
+    AppCard {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(14.dp)
+        ) {
+            IconTile(
+                ImageVector.vectorResource(R.drawable.ic_phone_android),
+                appColors.connected,
+                appColors.connectedTint
+            )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    stringResource(R.string.settings_paired_partner),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            DangerButton(stringResource(R.string.settings_forget_partner), onForget)
+        }
+    }
+}
+
+/** A small button in the problem colour, for actions that undo something (Forget). */
+@Composable
+internal fun DangerButton(text: String, onClick: () -> Unit) {
+    val appColors = TandemMotoTheme.appColors
+    OutlinedButton(
+        onClick = onClick,
+        shape = RoundedCornerShape(Radius.Medium),
+        border = BorderStroke(1.dp, appColors.notConnected.copy(alpha = 0.35f)),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = appColors.notConnectedTint,
+            contentColor = appColors.notConnected
+        ),
+        contentPadding = PaddingValues(horizontal = 14.dp),
+        modifier = Modifier.height(40.dp)
+    ) {
+        Text(text, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+/** A row's "opens something" mark. */
+@Composable
+private fun Chevron() {
+    Icon(
+        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+/** A [ListItem] that shows the card behind it, for rows inside an [AppCard]. */
+@Composable
+internal fun CardListItem(
+    headlineContent: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    supportingContent: (@Composable () -> Unit)? = null,
+    trailingContent: (@Composable () -> Unit)? = null,
+    headlineColor: Color = MaterialTheme.colorScheme.onSurface
+) {
+    ListItem(
+        headlineContent = headlineContent,
+        supportingContent = supportingContent,
+        trailingContent = trailingContent,
+        colors = ListItemDefaults.colors(
+            containerColor = Color.Transparent,
+            headlineColor = headlineColor
+        ),
+        modifier = modifier
+    )
 }
 
 /** Compares the processed voice with the raw mic (#73); applies when the mic next opens. */
@@ -261,7 +404,7 @@ private fun VoiceProcessingRow(
     onChange: (Boolean) -> Unit,
     effects: Set<VoiceEffect>
 ) {
-    ListItem(
+    CardListItem(
         headlineContent = { Text(stringResource(R.string.settings_voice_processing)) },
         supportingContent = {
             val summary = stringResource(
@@ -314,7 +457,7 @@ private fun MicTestRow(
     onStart: (delaySeconds: Int) -> Unit,
     onCancel: () -> Unit
 ) {
-    ListItem(
+    CardListItem(
         headlineContent = { Text(stringResource(R.string.settings_mic_test)) },
         supportingContent = {
             Column {
@@ -369,7 +512,7 @@ private const val LONG_DELAY_S = 5 * 60
 @Preview(showBackground = true)
 @Composable
 private fun SettingsPreview() {
-    TandemMotoTheme(dynamicColor = false) {
+    TandemMotoTheme(darkTheme = true) {
         SettingsScreen(onBack = {}, onExportLogs = {}, versionName = "0.1.0")
     }
 }

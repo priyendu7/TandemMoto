@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.tandemmoto.ui.theme.groupItemShape
 
 /**
- * A grouped (segmented) list: rows on the surface colour with a 2dp gap between them and no
+ * A grouped (segmented) list: rows on the card colour with a 2dp gap between them and no
  * dividers. The first and last rows have large outer corners, the rest small ones
  * ([groupItemShape]). A row with [onClick] ripples inside its own shape.
  */
@@ -44,7 +44,7 @@ fun <T> GroupedList(
 fun GroupedRow(
     shape: Shape,
     modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.surface,
+    color: Color = MaterialTheme.colorScheme.surfaceContainer,
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
