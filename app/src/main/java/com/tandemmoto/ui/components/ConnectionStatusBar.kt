@@ -97,7 +97,7 @@ fun ConnectionStatusBar(
             val style = MaterialTheme.typography.titleMedium
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                 if (!head.isNullOrEmpty()) Text(head, style = style, maxLines = 1, softWrap = false)
-                if (head != null) PartnerTag(name, Modifier.weight(1f, fill = false))
+                if (head != null) PartnerTag(name, Modifier.weight(1f, fill = false), style)
                 Text(
                     tail,
                     style = style,
@@ -107,7 +107,10 @@ fun ConnectionStatusBar(
                 )
             }
         },
-        trailing = action?.let { { StatusChip(it, content, container) } }
+        // Same size as the status text, so the boxes don't look like fine print.
+        trailing = action?.let {
+            { StatusChip(it, content, container, style = MaterialTheme.typography.titleMedium) }
+        }
     )
 }
 
