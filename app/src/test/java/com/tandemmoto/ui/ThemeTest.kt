@@ -4,7 +4,9 @@ import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import com.tandemmoto.ui.theme.DarkAppColors
 import com.tandemmoto.ui.theme.TandemMotoTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Rule
 import org.junit.Test
@@ -36,5 +38,37 @@ class ThemeTest {
     @Config(sdk = [34])
     fun dynamicSchemeOnAndroid14() {
         assertNotEquals(Color.Unspecified, primaryColor(dark = true))
+    }
+
+    @Test
+    @Config(sdk = [34])
+    fun pageAndSurfaceOverrideDynamicColour() {
+        var background = Color.Unspecified
+        var surface = Color.Unspecified
+        compose.setContent {
+            TandemMotoTheme(darkTheme = false) {
+                background = MaterialTheme.colorScheme.background
+                surface = MaterialTheme.colorScheme.surface
+            }
+        }
+        compose.waitForIdle()
+        assertEquals(Color(0xFFEEF0F3), background)
+        assertEquals(Color.White, surface)
+    }
+
+    @Test
+    @Config(sdk = [30])
+    fun darkThemeProvidesDarkAppColors() {
+        var me = Color.Unspecified
+        var surface = Color.Unspecified
+        compose.setContent {
+            TandemMotoTheme(darkTheme = true) {
+                me = TandemMotoTheme.appColors.me
+                surface = MaterialTheme.colorScheme.surface
+            }
+        }
+        compose.waitForIdle()
+        assertEquals(DarkAppColors.me, me)
+        assertEquals(Color.Black, surface)
     }
 }
