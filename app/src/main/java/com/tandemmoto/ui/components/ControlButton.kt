@@ -59,4 +59,4 @@ fun ControlButton(
     }
 }
 
-private val ControlShape = RoundedCornerShape(percent = 30)
+private val ControlShape = RoundedCornerShape(percent = 40)

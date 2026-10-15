@@ -80,7 +80,6 @@ import com.tandemmoto.ui.components.glow
 import com.tandemmoto.ui.components.openWifiSettings
 import com.tandemmoto.ui.components.rememberConnectWave
 import com.tandemmoto.ui.components.rememberPermissionRequester
-import com.tandemmoto.ui.theme.Radius
 import com.tandemmoto.ui.theme.TandemMotoTheme
 import com.tandemmoto.voice.IntercomLine
 import kotlinx.coroutines.Dispatchers
@@ -611,7 +610,7 @@ private fun IntercomButton(
     content: @Composable RowScope.() -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(Radius.Large)
+    val shape = RoundedCornerShape(percent = 40)
     val styled = modifier
         .height(56.dp)
         .glow(if (filled) colors.primary else colors.secondaryContainer, shape = shape)
