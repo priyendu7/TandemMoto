@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -32,6 +34,7 @@ import java.util.Locale
 /**
  * Where the song is, on Home and in Playlist. Dragging only moves the thumb; letting go seeks,
  * which the partner's phone follows (#60), so a drag doesn't send a seek for every step.
+ * The times sit under the bar, or on its left and right with [timesBeside].
  */
 @OptIn(ExperimentalMaterial3Api::class) // the track's look
 @Composable
@@ -40,7 +43,8 @@ fun SongSeekBar(
     durationMs: Long,
     enabled: Boolean,
     onSeek: (Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    timesBeside: Boolean = false
 ) {
     var dragging by remember { mutableStateOf<Float?>(null) }
     val duration = durationMs.coerceAtLeast(0)
@@ -53,7 +57,7 @@ fun SongSeekBar(
     )
     val colors = SliderDefaults.colors()
     val active = enabled && duration > 0
-    Column(modifier = modifier) {
+    val bar: @Composable (Modifier) -> Unit = { barModifier ->
         Slider(
             value = shown.toFloat(),
             onValueChange = { dragging = it },
@@ -84,23 +88,34 @@ fun SongSeekBar(
                     modifier = Modifier.height(TRACK)
                 )
             },
-            modifier = Modifier.semantics {
+            modifier = barModifier.semantics {
                 contentDescription = description
                 stateDescription = position
             }
         )
-        Row(modifier = Modifier.fillMaxWidth().clearAndSetSemantics {}) {
-            Text(
-                text = formatTime(shown),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.weight(1f))
-            Text(
-                text = formatTime(duration),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+    }
+    val time: @Composable (Long) -> Unit = {
+        Text(
+            text = formatTime(it),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.clearAndSetSemantics {}
+        )
+    }
+    if (timesBeside) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
+            time(shown)
+            bar(Modifier.weight(1f).padding(horizontal = 8.dp))
+            time(duration)
+        }
+    } else {
+        Column(modifier = modifier) {
+            bar(Modifier)
+            Row(modifier = Modifier.fillMaxWidth()) {
+                time(shown)
+                Spacer(Modifier.weight(1f))
+                time(duration)
+            }
         }
     }
 }

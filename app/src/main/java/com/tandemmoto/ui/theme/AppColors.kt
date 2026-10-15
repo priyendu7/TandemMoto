@@ -33,10 +33,12 @@ data class AppColors(
     val transferring: Color get() = searching
     val onTransferring: Color get() = onSearching
 
-    /** A song stored on this phone. */
-    val stored: Color get() = connected
-    val onStored: Color get() = onConnected
+    /** A song stored on this phone ("On this phone", "On both phones"): dark blue in both themes. */
+    val stored: Color get() = StoredBlue
+    val onStored: Color get() = Color.White
 }
+
+private val StoredBlue = Color(0xFF1A3A7A)
 
 val LightAppColors = AppColors(
     me = Color(0xFF2F6FEB),

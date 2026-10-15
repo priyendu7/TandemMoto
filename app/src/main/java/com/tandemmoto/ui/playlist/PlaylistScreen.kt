@@ -85,6 +85,7 @@ import com.tandemmoto.ui.components.PartnerTag
 import com.tandemmoto.ui.components.SongSeekBar
 import com.tandemmoto.ui.components.StatusChip
 import com.tandemmoto.ui.components.Tag
+import com.tandemmoto.ui.components.horizontalSwipe
 import com.tandemmoto.ui.theme.TandemMotoTheme
 import com.tandemmoto.ui.theme.groupItemShape
 import kotlin.math.abs
@@ -166,7 +167,9 @@ fun PlaylistScreen(
     onPlayPause: () -> Unit = {},
     onSeek: (Long) -> Unit = {}
 ) {
+    // Swiping left to right closes it, back the way it came in.
     Scaffold(
+        modifier = Modifier.horizontalSwipe(onSwipeRight = onBack),
         topBar = {
             if (state.rows.isEmpty()) {
                 BackTopBar(stringResource(R.string.playlist_title), onBack)
@@ -200,7 +203,7 @@ private fun NowPlayingBarView(bar: NowPlayingBar, onPlayPause: () -> Unit, onSee
         Column(
             modifier = Modifier
                 .navigationBarsPadding()
-                .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)
+                .padding(start = 16.dp, end = 8.dp, top = 4.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -220,7 +223,7 @@ private fun NowPlayingBarView(bar: NowPlayingBar, onPlayPause: () -> Unit, onSee
                         )
                     }
                 }
-                IconButton(onClick = onPlayPause, modifier = Modifier.size(56.dp)) {
+                IconButton(onClick = onPlayPause, modifier = Modifier.size(48.dp)) {
                     Icon(
                         painter = painterResource(
                             if (bar.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
@@ -237,6 +240,7 @@ private fun NowPlayingBarView(bar: NowPlayingBar, onPlayPause: () -> Unit, onSee
                 durationMs = bar.durationMs,
                 enabled = true,
                 onSeek = onSeek,
+                timesBeside = true,
                 modifier = Modifier.padding(end = 8.dp)
             )
         }
@@ -427,7 +431,7 @@ private fun SongList(
         PlaylistTotals(state)
         LazyColumn(
             state = listState,
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+            contentPadding = PaddingValues(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
             modifier = Modifier.fillMaxSize()
         ) {
@@ -533,8 +537,8 @@ private fun WhoTag(entry: PlaylistRow.Entry, partnerName: String?) {
 }
 
 /**
- * Where the song is: yellow while it moves, green once it's here, grey while it waits, red when
- * the phone is full. Just a green "On this phone" when unpaired.
+ * Where the song is: yellow while it moves, dark blue once it's here, grey while it waits, red when
+ * the phone is full. Just a dark blue "On this phone" when unpaired.
  */
 @Composable
 private fun WhereChip(entry: PlaylistRow.Entry, partnerName: String?) {
