@@ -26,7 +26,7 @@ fun ControlButton(
     enabled: Boolean,
     modifier: Modifier = Modifier,
     primary: Boolean = false,
-    size: Dp = if (primary) 84.dp else 64.dp
+    size: Dp = 64.dp
 ) {
     val colors = MaterialTheme.colorScheme
     val container = if (primary) colors.primary else colors.secondaryContainer
@@ -59,4 +59,4 @@ fun ControlButton(
     }
 }
 
-private val ControlShape = RoundedCornerShape(percent = 40)
+private val ControlShape = RoundedCornerShape(percent = 45)

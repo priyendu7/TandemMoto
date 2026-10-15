@@ -455,7 +455,7 @@ private fun PlaybackControls(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 64 + 84 + 64 + 64 dp, spread evenly: fits a 393 dp phone with room for the glows.
+        // Four 64 dp buttons, spread evenly: fits a 393 dp phone with room for the glows.
         Row(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
@@ -615,7 +615,7 @@ private fun IntercomButton(
     content: @Composable RowScope.() -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(percent = 40)
+    val shape = RoundedCornerShape(percent = 45)
     val styled = modifier
         .height(56.dp)
         .glow(if (filled) colors.primary else colors.secondaryContainer, shape = shape)
