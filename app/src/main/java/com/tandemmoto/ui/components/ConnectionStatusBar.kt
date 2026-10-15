@@ -108,7 +108,15 @@ fun ConnectionStatusBar(
             val style = MaterialTheme.typography.titleMedium
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (!head.isNullOrEmpty()) Text(head, style = style, maxLines = 1, softWrap = false)
-                if (head != null) PartnerTag(name, Modifier.weight(1f, fill = false), style)
+                if (head != null) {
+                    // One step smaller than the line, so the box with its padding is no taller
+                    // than the text beside it.
+                    PartnerTag(
+                        name,
+                        Modifier.weight(1f, fill = false),
+                        MaterialTheme.typography.titleSmall
+                    )
+                }
                 Text(short.last(), style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Text(
