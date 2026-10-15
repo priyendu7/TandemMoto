@@ -77,6 +77,7 @@ class AppNavigationTest {
     @Test
     fun playlistOpensAndReturns() {
         start()
+        // The player's fourth button.
         compose.onNodeWithContentDescription(str(R.string.ride_open_playlist)).performClick()
         // Its contents load from disk; what they show is covered by PlaylistScreenTest.
         compose.onNodeWithText(str(R.string.playlist_title)).assertExists()
