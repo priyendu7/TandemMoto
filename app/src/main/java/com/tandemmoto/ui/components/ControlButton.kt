@@ -2,9 +2,11 @@ package com.tandemmoto.ui.components
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -12,8 +14,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Large, glove-friendly playback button (well above the 48dp minimum touch target).
- * [primary] draws the filled style used for play/pause.
+ * Large, glove-friendly playback button (well above the 48dp minimum touch target), glowing in
+ * its container colour while enabled. [primary] draws the filled style used for play/pause.
  */
 @Composable
 fun ControlButton(
@@ -23,8 +25,13 @@ fun ControlButton(
     enabled: Boolean,
     modifier: Modifier = Modifier,
     primary: Boolean = false,
-    size: Dp = if (primary) 96.dp else 72.dp
+    size: Dp = if (primary) 84.dp else 64.dp
 ) {
+    val colors = MaterialTheme.colorScheme
+    val container = if (primary) colors.primary else colors.secondaryContainer
+    val sized = modifier
+        .size(size)
+        .let { if (enabled) it.glow(container, shape = CircleShape) else it }
     val iconContent: @Composable () -> Unit = {
         Icon(
             painter = painterResource(icon),
@@ -36,14 +43,14 @@ fun ControlButton(
         FilledIconButton(
             onClick = onClick,
             enabled = enabled,
-            modifier = modifier.size(size),
+            modifier = sized,
             content = iconContent
         )
     } else {
         FilledTonalIconButton(
             onClick = onClick,
             enabled = enabled,
-            modifier = modifier.size(size),
+            modifier = sized,
             content = iconContent
         )
     }

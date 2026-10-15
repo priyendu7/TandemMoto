@@ -1,5 +1,6 @@
 package com.tandemmoto.ui.ride
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,12 +21,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -48,8 +51,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -68,9 +75,11 @@ import com.tandemmoto.ui.components.PermissionPrompt
 import com.tandemmoto.ui.components.SongSeekBar
 import com.tandemmoto.ui.components.StatusStripMinHeight
 import com.tandemmoto.ui.components.connectWave
+import com.tandemmoto.ui.components.glow
 import com.tandemmoto.ui.components.openWifiSettings
 import com.tandemmoto.ui.components.rememberConnectWave
 import com.tandemmoto.ui.components.rememberPermissionRequester
+import com.tandemmoto.ui.theme.Radius
 import com.tandemmoto.ui.theme.TandemMotoTheme
 import com.tandemmoto.voice.IntercomLine
 import kotlinx.coroutines.Dispatchers
@@ -146,12 +155,7 @@ fun RideScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
-                    IconButton(onClick = onOpenPlaylist) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_queue_music),
-                            contentDescription = stringResource(R.string.ride_open_playlist)
-                        )
-                    }
+                    // The playlist opens from the player's fourth button.
                     IconButton(onClick = onOpenSettings) {
                         Icon(
                             Icons.Filled.Settings,
@@ -214,7 +218,7 @@ fun RideScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-                PlaybackControls(state, onPlayPause, onNext, onPrevious)
+                PlaybackControls(state, onPlayPause, onNext, onPrevious, onOpenPlaylist)
                 if (permissions.isGranted(AppPermission.MICROPHONE)) {
                     IntercomSection(state, onStartIntercom, onStopIntercom, onMute)
                 } else {
@@ -341,23 +345,38 @@ private fun ConnectionSection(
     }
 }
 
-/** The song's own picture (album art), or a music note when the file has none. */
+/** A decoded picture and its average colour, for the glow behind it. */
+private class DecodedArt(val image: ImageBitmap, val average: Color)
+
+private fun decodeArt(bytes: ByteArray): DecodedArt? {
+    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+    // Scaling to one pixel blends the picture into one colour, with no palette library.
+    val pixel = Bitmap.createScaledBitmap(bitmap, 1, 1, true)
+    val average = Color(pixel.getPixel(0, 0))
+    if (pixel !== bitmap) pixel.recycle()
+    return DecodedArt(bitmap.asImageBitmap(), average)
+}
+
+private val ArtworkShape = RoundedCornerShape(16.dp)
+
+/**
+ * The song's own picture (album art), or a music note when the file has none, glowing in the
+ * picture's average colour (in `primary`, faintly, without one).
+ */
 @Composable
 private fun Artwork(bytes: ByteArray?, modifier: Modifier = Modifier) {
-    val image by produceState<ImageBitmap?>(null, bytes) {
-        value = bytes?.let {
-            withContext(Dispatchers.Default) {
-                BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap()
-            }
-        }
+    val art by produceState<DecodedArt?>(null, bytes) {
+        value = bytes?.let { withContext(Dispatchers.Default) { decodeArt(it) } }
     }
+    val glowColor = art?.average ?: MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .glow(glowColor, radius = 32.dp, shape = ArtworkShape)
+            .clip(ArtworkShape)
             .background(MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        val picture = image
+        val picture = art?.image
         if (picture != null) {
             // Decorative: the title and artist below say what's playing.
             Image(
@@ -419,15 +438,18 @@ private fun PlaybackControls(
     state: RideUiState,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
-    onPrevious: () -> Unit
+    onPrevious: () -> Unit,
+    onOpenPlaylist: () -> Unit
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // 64 + 84 + 64 + 64 dp, spread evenly: fits a 393 dp phone with room for the glows.
         Row(
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
-            verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
         ) {
             ControlButton(
                 icon = R.drawable.ic_skip_previous,
@@ -450,6 +472,13 @@ private fun PlaybackControls(
                 onClick = onNext,
                 enabled = state.controlsEnabled
             )
+            // Always enabled: with no songs yet, this is where they're added.
+            ControlButton(
+                icon = R.drawable.ic_queue_music,
+                contentDescription = stringResource(R.string.ride_open_playlist),
+                onClick = onOpenPlaylist,
+                enabled = true
+            )
         }
         if (!state.controlsEnabled) {
             Text(
@@ -463,8 +492,9 @@ private fun PlaybackControls(
 }
 
 /**
- * The intercom (#72): what it's doing, Start or Stop intercom (both phones), and this phone's
- * mute. Buttons are 56 dp tall, for gloves.
+ * The intercom (#72): one line saying what it's doing, Start or Stop intercom (both phones), and
+ * this phone's mute. Mute and Stop share the filled style, Unmute and Start the tonal one; all
+ * are 56 dp tall, for gloves.
  */
 @Composable
 private fun IntercomSection(
@@ -475,7 +505,11 @@ private fun IntercomSection(
 ) {
     val colors = MaterialTheme.colorScheme
     val partner = state.partnerName ?: stringResource(R.string.ride_your_partner)
-    val line = when (state.intercom) {
+    val on = when (state.intercom) {
+        IntercomLine.NotLinked, IntercomLine.Ready, IntercomLine.WaitingForPause -> false
+        IntercomLine.Connecting, IntercomLine.On, IntercomLine.OnPhone -> true
+    }
+    val detail = when (state.intercom) {
         IntercomLine.NotLinked -> stringResource(R.string.ride_intercom_not_linked)
         IntercomLine.Ready -> stringResource(R.string.ride_intercom_ready)
         IntercomLine.WaitingForPause -> stringResource(R.string.ride_intercom_off)
@@ -489,6 +523,13 @@ private fun IntercomSection(
             state.talkIntoPhone -> stringResource(R.string.ride_intercom_on_talk_into_phone)
             else -> stringResource(R.string.ride_intercom_on)
         }
+    }
+    val title = stringResource(
+        if (on) R.string.ride_intercom_title_on else R.string.ride_intercom_title_off
+    )
+    val line = buildAnnotatedString {
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(title) }
+        withStyle(SpanStyle(color = colors.onSurfaceVariant)) { append(" · $detail") }
     }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -505,27 +546,38 @@ private fun IntercomSection(
                 tint = if (state.intercomOn) colors.primary else colors.onSurfaceVariant,
                 modifier = Modifier.size(24.dp)
             )
-            Text(text = line, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = line,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
         if (state.intercom == IntercomLine.NotLinked) return@Column
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            val buttonModifier = Modifier
-                .weight(1f)
-                .height(56.dp)
+            val buttonModifier = Modifier.weight(1f)
             when (state.intercom) {
-                IntercomLine.Ready -> FilledTonalButton(
+                IntercomLine.Ready -> IntercomButton(
+                    filled = false,
                     onClick = onStart,
                     modifier = buttonModifier
                 ) {
                     Text(stringResource(R.string.ride_intercom_start))
                 }
-                IntercomLine.Connecting, IntercomLine.On, IntercomLine.OnPhone ->
-                    OutlinedButton(onClick = onStop, modifier = buttonModifier) {
-                        Text(stringResource(R.string.ride_intercom_stop))
-                    }
+                IntercomLine.Connecting, IntercomLine.On, IntercomLine.OnPhone -> IntercomButton(
+                    filled = true,
+                    onClick = onStop,
+                    modifier = buttonModifier
+                ) {
+                    Text(stringResource(R.string.ride_intercom_stop))
+                }
                 else -> Unit
             }
-            FilledTonalButton(onClick = { onMute(!state.muted) }, modifier = buttonModifier) {
+            IntercomButton(
+                filled = !state.muted,
+                onClick = { onMute(!state.muted) },
+                modifier = buttonModifier
+            ) {
                 Icon(
                     painter = painterResource(
                         if (state.muted) R.drawable.ic_mic else R.drawable.ic_mic_off
@@ -537,6 +589,30 @@ private fun IntercomSection(
                 Text(stringResource(if (state.muted) R.string.ride_unmute else R.string.ride_mute))
             }
         }
+    }
+}
+
+/**
+ * An intercom button, 56 dp tall with a medium radius, glowing in its container colour:
+ * [filled] in `primary` (Mute, Stop intercom), otherwise tonal in `secondaryContainer`
+ * (Unmute, Start intercom).
+ */
+@Composable
+private fun IntercomButton(
+    filled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(Radius.Medium)
+    val styled = modifier
+        .height(56.dp)
+        .glow(if (filled) colors.primary else colors.secondaryContainer, shape = shape)
+    if (filled) {
+        Button(onClick = onClick, shape = shape, modifier = styled, content = content)
+    } else {
+        FilledTonalButton(onClick = onClick, shape = shape, modifier = styled, content = content)
     }
 }
 
