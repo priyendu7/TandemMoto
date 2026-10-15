@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -43,6 +44,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tandemmoto.R
+import com.tandemmoto.ui.theme.AppColors
+import com.tandemmoto.ui.theme.DarkAppColors
 import com.tandemmoto.ui.theme.Radius
 import com.tandemmoto.ui.theme.TandemMotoTheme
 
@@ -69,6 +72,9 @@ fun ConnectionStatusBar(
     val container by animateColorAsState(tone.container, tween(TONE_FADE_MS), label = "bar")
     val content by animateColorAsState(tone.content, tween(TONE_FADE_MS), label = "barContent")
     val border by animateColorAsState(tone.border, tween(TONE_FADE_MS), label = "barBorder")
+    // The action chip uses the dark theme's softer fill in both themes.
+    val chipTone = status.tone.colors(DarkAppColors)
+    val chip by animateColorAsState(chipTone.border, tween(TONE_FADE_MS), label = "barChip")
     val label = status.namedLabel
         ?.takeIf { !partnerName.isNullOrBlank() }
         ?.let { stringResource(it, partnerName!!) }
@@ -83,7 +89,8 @@ fun ConnectionStatusBar(
     StatusStrip(
         container = container,
         content = content,
-        border = border,
+        // A soft outline, just a shade off the card; the action chip keeps the solid colour.
+        border = lerp(container, border, CARD_BORDER_STRENGTH),
         icon = status.kind.icon(status),
         modifier = modifier,
         clickModifier = Modifier
@@ -141,8 +148,8 @@ fun ConnectionStatusBar(
             {
                 StatusChip(
                     it,
-                    border,
-                    tone.onBorder,
+                    chip,
+                    chipTone.onBorder,
                     style = MaterialTheme.typography.labelLarge
                 )
             }
@@ -230,6 +237,9 @@ internal fun StatusStrip(
     }
 }
 
+/** How far the card's outline goes from its pale fill towards the tone's solid colour. */
+private const val CARD_BORDER_STRENGTH = 0.35f
+
 /** A tone's card colours: pale [container], [content] text on it, and a solid [border]. */
 private class ToneColors(
     val container: Color,
@@ -239,16 +249,13 @@ private class ToneColors(
 )
 
 @Composable
-private fun BarTone.colors(): ToneColors {
-    val c = TandemMotoTheme.appColors
-    return when (this) {
-        BarTone.Connected ->
-            ToneColors(c.connectedTint, c.onConnectedTint, c.connected, c.onConnected)
-        BarTone.Looking ->
-            ToneColors(c.searchingTint, c.onSearchingTint, c.searching, c.onSearching)
-        BarTone.NotConnected ->
-            ToneColors(c.notConnectedTint, c.onNotConnectedTint, c.notConnected, c.onNotConnected)
-    }
+private fun BarTone.colors(c: AppColors = TandemMotoTheme.appColors): ToneColors = when (this) {
+    BarTone.Connected ->
+        ToneColors(c.connectedTint, c.onConnectedTint, c.connected, c.onConnected)
+    BarTone.Looking ->
+        ToneColors(c.searchingTint, c.onSearchingTint, c.searching, c.onSearching)
+    BarTone.NotConnected ->
+        ToneColors(c.notConnectedTint, c.onNotConnectedTint, c.notConnected, c.onNotConnected)
 }
 
 private fun StatusKind.icon(status: ConnectionStatus): ImageVector = when {

@@ -31,6 +31,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -79,7 +80,6 @@ import com.tandemmoto.ui.components.glow
 import com.tandemmoto.ui.components.openWifiSettings
 import com.tandemmoto.ui.components.rememberConnectWave
 import com.tandemmoto.ui.components.rememberPermissionRequester
-import com.tandemmoto.ui.theme.Radius
 import com.tandemmoto.ui.theme.TandemMotoTheme
 import com.tandemmoto.voice.IntercomLine
 import kotlinx.coroutines.Dispatchers
@@ -154,6 +154,11 @@ fun RideScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
+                // The page colour, so the bar and the page read as one surface.
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.background
+                ),
                 actions = {
                     // The playlist opens from the player's fourth button.
                     IconButton(onClick = onOpenSettings) {
@@ -173,7 +178,7 @@ fun RideScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .connectWave({ wave.value }, waveColor, StatusCardMargin + StatusStripMinHeight / 2)
+                .connectWave({ wave.value }, waveColor, StatusCardTop + StatusStripMinHeight / 2)
         ) {
             ConnectionSection(
                 state.connection,
@@ -204,7 +209,7 @@ fun RideScreen(
                     Artwork(
                         state.artwork,
                         Modifier
-                            .widthIn(max = 320.dp)
+                            .widthIn(max = 400.dp)
                             .aspectRatio(1f, matchHeightConstraintsFirst = true)
                     )
                 }
@@ -233,8 +238,11 @@ fun RideScreen(
     }
 }
 
-/** Space above and below the connection card on Home. */
-private val StatusCardMargin = 8.dp
+/** Space beside the connection card on Home. */
+private val StatusCardMargin = 16.dp
+
+/** Space above it: small, since the top bar already leaves room under the title. */
+private val StatusCardTop = 4.dp
 
 /** Offered once on the first connection, in this order. */
 private val connectOffers = listOf(AppPermission.NOTIFICATIONS, AppPermission.MICROPHONE)
@@ -301,7 +309,12 @@ private fun ConnectionSection(
             }
         )
     }
-    val cardModifier = Modifier.padding(horizontal = 16.dp, vertical = StatusCardMargin)
+    val cardModifier = Modifier.padding(
+        start = StatusCardMargin,
+        end = StatusCardMargin,
+        top = StatusCardTop,
+        bottom = 8.dp
+    )
     if (permissions.isGranted(AppPermission.NEARBY)) {
         ConnectionStatusBar(
             modifier = cardModifier,
@@ -445,7 +458,7 @@ private fun PlaybackControls(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 64 + 84 + 64 + 64 dp, spread evenly: fits a 393 dp phone with room for the glows.
+        // Four 64 dp buttons, spread evenly: fits a 393 dp phone with room for the glows.
         Row(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
@@ -605,7 +618,7 @@ private fun IntercomButton(
     content: @Composable RowScope.() -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(Radius.Medium)
+    val shape = RoundedCornerShape(percent = 45)
     val styled = modifier
         .height(56.dp)
         .glow(if (filled) colors.primary else colors.secondaryContainer, shape = shape)
