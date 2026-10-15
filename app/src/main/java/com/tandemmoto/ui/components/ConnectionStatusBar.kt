@@ -1,9 +1,12 @@
 package com.tandemmoto.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -18,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,38 +33,47 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.tandemmoto.R
 import com.tandemmoto.ui.theme.TandemMotoTheme
 
 /**
- * Always-visible strip showing the link state. The screen shows "label · hint"; TalkBack reads
- * only the label, announces it when it changes (polite live region), and offers the tap as a
- * button with [onClickLabel] ("double-tap to connect"), so the action isn't read twice.
+ * Always-visible strip showing the link state on one line: icon, the short status with the
+ * partner's name in their C2 box, and a trailing action chip ("Connect") when tapping does
+ * something. Its colour follows [ConnectionStatus.tone] and fades between states. TalkBack reads
+ * only the full label, announces it when it changes (polite live region), and offers the tap as a
+ * button with [onClickLabel] ("double-tap to connect"), so the chip's action isn't read twice.
  */
 @Composable
 fun ConnectionStatusBar(
     status: ConnectionStatus,
     modifier: Modifier = Modifier,
-    /** The paired phone's name; shown instead of "your partner" when known. */
+    /** The paired phone's name, shown in the partner's box ("Partner" until it's known). */
     partnerName: String? = null,
-    /** Shown after the label, e.g. "next try 13:22" (#85); not announced each time it changes. */
+    /** Shown after the status, e.g. "next try 13:22" (#85); not announced each time it changes. */
     detail: String? = null,
     onClickLabel: String? = null,
     onClick: (() -> Unit)? = null
 ) {
-    val (container, content) = status.kind.colors()
+    val (toneContainer, toneContent) = status.tone.colors()
+    val container by animateColorAsState(toneContainer, tween(TONE_FADE_MS), label = "bar")
+    val content by animateColorAsState(toneContent, tween(TONE_FADE_MS), label = "barContent")
     val label = status.namedLabel
         ?.takeIf { !partnerName.isNullOrBlank() }
         ?.let { stringResource(it, partnerName!!) }
         ?: stringResource(status.label)
-    // The hint only makes sense when tapping does something.
-    val hint = status.hint?.takeIf { onClick != null }?.let { stringResource(it) }
+    // Split the short text around the name, so the name can sit in its own box.
+    val short = stringResource(status.short, NAME_MARKER).split(NAME_MARKER)
+    val name =
+        partnerName?.takeIf { it.isNotBlank() } ?: stringResource(R.string.status_partner_tag)
+    // The chip only makes sense when tapping does something.
+    val action = status.action?.takeIf { onClick != null }?.let { stringResource(it) }
     StatusStrip(
         container = container,
         content = content,
         icon = status.kind.icon(status),
-        text = listOfNotNull(label, detail, hint).joinToString(" · "),
         modifier = modifier
             .then(
                 if (onClick != null) {
@@ -76,21 +89,42 @@ fun ConnectionStatusBar(
             .clearAndSetSemantics {
                 text = AnnotatedString(label)
                 liveRegion = LiveRegionMode.Polite
+            },
+        body = {
+            // The text before the name (if it has one), the name's box, then the rest.
+            val head = short.takeIf { it.size > 1 }?.first()
+            val tail = short.last() + detail?.let { " · $it" }.orEmpty()
+            val style = MaterialTheme.typography.titleMedium
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                if (!head.isNullOrEmpty()) Text(head, style = style, maxLines = 1, softWrap = false)
+                if (head != null) PartnerTag(name, Modifier.weight(1f, fill = false))
+                Text(
+                    tail,
+                    style = style,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
             }
+        },
+        trailing = action?.let { { StatusChip(it, content, container) } }
     )
 }
 
+/** How long the bar takes to fade to a new tone. */
+private const val TONE_FADE_MS = 250
+
+/** Stands in for the name while splitting a short status around it. */
+private const val NAME_MARKER = "\u0000"
+
 /**
- * Height shared by the connection bar and the permission prompt that can replace it. It fits two
- * lines of text, so a prompt that wraps on a narrow phone is still the same height as the bar.
- * Keep strip texts short enough for two lines at the default font size.
+ * Height shared by the connection bar and the permission prompt that can replace it. The bar is
+ * one line; the prompt may wrap to two on a narrow phone, and this fits both, so swapping one for
+ * the other doesn't shift the rest of Home.
  */
 internal val StatusStripMinHeight = 56.dp
 
-/**
- * The one-line strip layout used by [ConnectionStatusBar] and [PermissionPrompt], so they're the
- * same height and swapping one for the other doesn't shift the rest of Home.
- */
+/** The strip layout used by [ConnectionStatusBar] and [PermissionPrompt], with [text] as body. */
 @Composable
 internal fun StatusStrip(
     container: Color,
@@ -99,6 +133,30 @@ internal fun StatusStrip(
     text: String,
     modifier: Modifier = Modifier,
     trailing: (@Composable () -> Unit)? = null
+) = StatusStrip(
+    container = container,
+    content = content,
+    icon = icon,
+    modifier = modifier,
+    trailing = trailing,
+    body = {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f)
+        )
+    }
+)
+
+/** Icon, [body] (which takes the room left) and an optional [trailing] item, at least 56 dp tall. */
+@Composable
+internal fun StatusStrip(
+    container: Color,
+    content: Color,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    trailing: (@Composable () -> Unit)? = null,
+    body: @Composable RowScope.() -> Unit
 ) {
     Surface(color = container, contentColor = content, modifier = modifier.fillMaxWidth()) {
         Row(
@@ -109,25 +167,19 @@ internal fun StatusStrip(
                 .padding(horizontal = 16.dp)
         ) {
             Icon(imageVector = icon, contentDescription = null)
-            Text(
-                text = text,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f)
-            )
+            body()
             trailing?.invoke()
         }
     }
 }
 
 @Composable
-private fun StatusKind.colors(): Pair<Color, Color> {
-    val scheme = MaterialTheme.colorScheme
+private fun BarTone.colors(): Pair<Color, Color> {
+    val colors = TandemMotoTheme.appColors
     return when (this) {
-        StatusKind.Neutral -> scheme.surfaceVariant to scheme.onSurfaceVariant
-        StatusKind.InProgress -> scheme.secondaryContainer to scheme.onSecondaryContainer
-        StatusKind.Ok -> scheme.primaryContainer to scheme.onPrimaryContainer
-        StatusKind.Info -> scheme.tertiaryContainer to scheme.onTertiaryContainer
-        StatusKind.Problem -> scheme.errorContainer to scheme.onErrorContainer
+        BarTone.Connected -> colors.connected to colors.onConnected
+        BarTone.Looking -> colors.searching to colors.onSearching
+        BarTone.NotConnected -> colors.notConnected to colors.onNotConnected
     }
 }
 
@@ -144,7 +196,9 @@ private fun StatusKind.icon(status: ConnectionStatus): ImageVector = when {
 private fun ConnectionStatusBarPreview() {
     TandemMotoTheme(dynamicColor = false) {
         Column {
-            ConnectionStatus.entries.forEach { ConnectionStatusBar(it) }
+            ConnectionStatus.entries.forEach {
+                ConnectionStatusBar(it, partnerName = "Redmi Y2", onClick = {})
+            }
         }
     }
 }
