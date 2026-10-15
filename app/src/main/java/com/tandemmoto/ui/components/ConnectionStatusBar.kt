@@ -28,7 +28,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -66,7 +70,9 @@ fun ConnectionStatusBar(
     /** Replaces the second line, e.g. "next try 13:22" (#85); not announced when it changes. */
     detail: String? = null,
     onClickLabel: String? = null,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
+    /** Edge to edge, square, with lines only top and bottom. */
+    flat: Boolean = false
 ) {
     val tone = status.tone.colors()
     val container by animateColorAsState(tone.container, tween(TONE_FADE_MS), label = "bar")
@@ -91,6 +97,7 @@ fun ConnectionStatusBar(
         content = content,
         // A soft outline, just a shade off the card; the action chip keeps the solid colour.
         border = lerp(container, border, CARD_BORDER_STRENGTH),
+        flat = flat,
         icon = status.kind.icon(status),
         modifier = modifier,
         clickModifier = Modifier
@@ -201,7 +208,8 @@ internal fun StatusStrip(
 /**
  * A rounded card with a solid [border]: icon, [body] (which takes the room left) and an optional
  * [trailing] item, at least [StatusStripMinHeight] tall. [clickModifier] goes inside the card, so
- * its ripple is clipped to the corners.
+ * its ripple is clipped to the corners. [flat] makes it a square-cornered band with the border
+ * only along its top and bottom, for running edge to edge.
  */
 @Composable
 internal fun StatusStrip(
@@ -211,15 +219,18 @@ internal fun StatusStrip(
     icon: ImageVector,
     modifier: Modifier = Modifier,
     clickModifier: Modifier = Modifier,
+    flat: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
     body: @Composable ColumnScope.() -> Unit
 ) {
     Surface(
         color = container,
         contentColor = content,
-        shape = RoundedCornerShape(Radius.Medium),
-        border = BorderStroke(1.5.dp, border),
-        modifier = modifier.fillMaxWidth()
+        shape = if (flat) RectangleShape else RoundedCornerShape(Radius.Medium),
+        border = if (flat) null else BorderStroke(BORDER_WIDTH, border),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (flat) Modifier.topAndBottomLines(border) else Modifier)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -236,6 +247,16 @@ internal fun StatusStrip(
         }
     }
 }
+
+/** Lines along the top and bottom edges, drawn over the content. */
+private fun Modifier.topAndBottomLines(color: Color): Modifier = drawWithContent {
+    drawContent()
+    val width = BORDER_WIDTH.toPx()
+    drawRect(color, Offset.Zero, Size(size.width, width))
+    drawRect(color, Offset(0f, size.height - width), Size(size.width, width))
+}
+
+private val BORDER_WIDTH = 1.5.dp
 
 /** How far the card's outline goes from its pale fill towards the tone's solid colour. */
 private const val CARD_BORDER_STRENGTH = 0.35f
