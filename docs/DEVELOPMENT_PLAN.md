@@ -131,6 +131,12 @@ Decided in planning (issues #60–#62):
 
 - Setup/pairing UX polish, first-run flow
 - Error copy pass, connection status iconography
+- **UI refresh** (#92–#96), following the [UI design guidelines](https://claude.ai/artifact/YZHKYdRwXfA7puqFUgWfGx):
+  - Theme roles, with a colour for each phone (this phone blue, the partner pink) and grouped-list components (#92)
+  - A connection bar coloured by status (green / yellow / orange), all on one line, with a wave animation on connect (#93)
+  - A glow on the artwork and buttons, Playlist as the 4th player button, and a one-line intercom whose buttons have matching colours (#94)
+  - A Playlist that slides in from the right, scrolls to the playing song and shows 3-line rows with phone tags (#95)
+  - Settings in sections (#96)
 - Battery draw measurement against the NFR target
 - Internal beta → fix pass → release build
 
