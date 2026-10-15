@@ -110,10 +110,12 @@ fun ConnectionStatusBar(
                 if (!head.isNullOrEmpty()) Text(head, style = style, maxLines = 1, softWrap = false)
                 if (head != null) {
                     // One step smaller than the line, so the box with its padding is no taller
-                    // than the text beside it.
+                    // than the text beside it; a gap on each side keeps it off the " · ".
                     PartnerTag(
                         name,
-                        Modifier.weight(1f, fill = false),
+                        Modifier
+                            .weight(1f, fill = false)
+                            .padding(horizontal = 4.dp),
                         MaterialTheme.typography.titleSmall
                     )
                 }
