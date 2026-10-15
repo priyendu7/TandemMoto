@@ -273,4 +273,7 @@
     <string name="export_logs_chooser">Share diagnostic logs</string>
     <string name="export_logs_subject">TandemMoto diagnostic logs</string>
     <string name="export_logs_failed">Couldn\'t export the logs</string>
+
+    <!-- Device tags -->
+    <string name="tag_me">Me</string>
 </resources>

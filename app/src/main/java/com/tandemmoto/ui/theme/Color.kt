@@ -4,6 +4,13 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
+// Page and surface colours, used with both dynamic and fallback schemes: rows and cards sit on
+// a slightly darker page in light mode and on true black in dark mode.
+internal val LightPage = Color(0xFFEEF0F3)
+internal val LightSurface = Color(0xFFFFFFFF)
+internal val DarkPage = Color(0xFF121212)
+internal val DarkSurface = Color(0xFF000000)
+
 // Fallback palette for Android 8–11, where Material You dynamic colour isn't available.
 // Based on the launcher icon: navy background, white + amber rings.
 private val Navy = Color(0xFF1E2A38)
@@ -20,7 +27,9 @@ internal val FallbackLightColors = lightColorScheme(
     secondaryContainer = Color(0xFFD8E3F8),
     tertiary = AmberDark,
     tertiaryContainer = Color(0xFFFFDDB3),
-    onTertiaryContainer = Color(0xFF291800)
+    onTertiaryContainer = Color(0xFF291800),
+    background = LightPage,
+    surface = LightSurface
 )
 
 internal val FallbackDarkColors = darkColorScheme(
@@ -33,6 +42,6 @@ internal val FallbackDarkColors = darkColorScheme(
     tertiary = Amber,
     tertiaryContainer = AmberDark,
     onTertiaryContainer = Color(0xFFFFDDB3),
-    background = Color(0xFF111820),
-    surface = Color(0xFF111820)
+    background = DarkPage,
+    surface = DarkSurface
 )
