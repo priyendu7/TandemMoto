@@ -169,7 +169,7 @@ fun RideScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .connectWave({ wave.value }, waveColor, StatusStripMinHeight / 2)
+                .connectWave({ wave.value }, waveColor, StatusCardMargin + StatusStripMinHeight / 2)
         ) {
             ConnectionSection(
                 state.connection,
@@ -228,6 +228,9 @@ fun RideScreen(
         }
     }
 }
+
+/** Space above and below the connection card on Home. */
+private val StatusCardMargin = 8.dp
 
 /** Offered once on the first connection, in this order. */
 private val connectOffers = listOf(AppPermission.NOTIFICATIONS, AppPermission.MICROPHONE)
@@ -294,8 +297,10 @@ private fun ConnectionSection(
             }
         )
     }
+    val cardModifier = Modifier.padding(horizontal = 16.dp, vertical = StatusCardMargin)
     if (permissions.isGranted(AppPermission.NEARBY)) {
         ConnectionStatusBar(
+            modifier = cardModifier,
             status = connection,
             partnerName = partnerName,
             detail = nextTryAtMs?.let { nextTry(LocalContext.current, it) },
@@ -330,7 +335,8 @@ private fun ConnectionSection(
         PermissionPrompt(
             permission = AppPermission.NEARBY,
             state = permissions,
-            onRequest = { onRequestPermission(AppPermission.NEARBY) }
+            onRequest = { onRequestPermission(AppPermission.NEARBY) },
+            modifier = cardModifier
         )
     }
 }

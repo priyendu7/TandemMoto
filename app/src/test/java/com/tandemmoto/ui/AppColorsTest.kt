@@ -24,7 +24,10 @@ class AppColorsTest {
         "searching" to (c.searching to c.onSearching),
         "notConnected" to (c.notConnected to c.onNotConnected),
         "transferring" to (c.transferring to c.onTransferring),
-        "stored" to (c.stored to c.onStored)
+        "stored" to (c.stored to c.onStored),
+        "connectedTint" to (c.connectedTint to c.onConnectedTint),
+        "searchingTint" to (c.searchingTint to c.onSearchingTint),
+        "notConnectedTint" to (c.notConnectedTint to c.onNotConnectedTint)
     )
 
     private fun assertReadable(mode: String, colors: AppColors) {

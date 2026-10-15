@@ -38,7 +38,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [34], qualifiers = "w360dp-h780dp")
 class RideScreenTest {
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()
