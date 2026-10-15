@@ -12,7 +12,7 @@ intercom. Pairing, playlist and settings open from it.
 | `navigation/` | `AppNavHost` and `Routes`: starts on Ride (Home); Pair opens from the connection bar, Playlist and Settings from the app bar |
 | `setup/` | Pair screen: nearby-device search (`PairViewModel` + `link/PeerDiscovery`); tapping a device to pair arrives with #24 |
 | `ride/` | `RideScreen` (Home), `RideViewModel`, `RideUiState` |
-| `components/` | `ConnectionStatusBar` + `ConnectionStatus`, `PermissionPrompt` + `rememberPermissionRequester`, `ControlButton`, `BackTopBar`, `GroupedList`, `MeTag` / `PartnerTag`, `StatusChip`, `Modifier.glow` |
+| `components/` | `ConnectionStatusBar` + `ConnectionStatus` (`BarTone`), `connectWave`, `PermissionPrompt` + `rememberPermissionRequester`, `ControlButton`, `BackTopBar`, `GroupedList`, `MeTag` / `PartnerTag`, `StatusChip`, `Modifier.glow` |
 | `playlist/`, `settings/` | Playlist (placeholder until Phase 2) and Settings (version, privacy policy, source, log export) |
 
 ## Decisions

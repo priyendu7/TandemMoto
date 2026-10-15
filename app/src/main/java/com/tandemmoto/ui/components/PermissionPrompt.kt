@@ -94,8 +94,8 @@ fun rememberPermissionRequester(): PermissionRequester {
 
 /**
  * Shown in place of a Home section whose permission is missing: one line saying what to allow and
- * why, and a button, "Allow" or (once permanently denied) "Open settings". It uses the same strip
- * as the connection bar, so both are the same height. The rest of the screen keeps working.
+ * why, and a button, "Allow" or (once permanently denied) "Open settings". It uses the same card
+ * as the connection status, so both are the same height. The rest of the screen keeps working.
  */
 @Composable
 fun PermissionPrompt(
@@ -108,6 +108,7 @@ fun PermissionPrompt(
     StatusStrip(
         container = MaterialTheme.colorScheme.secondaryContainer,
         content = MaterialTheme.colorScheme.onSecondaryContainer,
+        border = MaterialTheme.colorScheme.outline,
         icon = Icons.Filled.Info,
         text = stringResource(permission.prompt(state.sdk, state.approximateLocationOnly)),
         modifier = modifier,

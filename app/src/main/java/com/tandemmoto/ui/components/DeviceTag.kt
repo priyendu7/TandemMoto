@@ -10,15 +10,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.tandemmoto.R
 import com.tandemmoto.ui.theme.Radius
 import com.tandemmoto.ui.theme.TandemMotoTheme
 
-/** Small filled tag: radius 4, one line, ellipsised. Base for device tags and status chips. */
+/**
+ * Small filled tag: radius 4, one line, ellipsised. Base for device tags and status chips.
+ * [style] defaults to label size; pass the surrounding text's style to sit inline with it.
+ */
 @Composable
-fun Tag(text: String, color: Color, onColor: Color, modifier: Modifier = Modifier) {
+fun Tag(
+    text: String,
+    color: Color,
+    onColor: Color,
+    modifier: Modifier = Modifier,
+    style: TextStyle = MaterialTheme.typography.labelMedium
+) {
     Box(
         modifier = modifier
             .background(color, RoundedCornerShape(Radius.Small))
@@ -27,7 +37,7 @@ fun Tag(text: String, color: Color, onColor: Color, modifier: Modifier = Modifie
         Text(
             text = text,
             color = onColor,
-            style = MaterialTheme.typography.labelMedium,
+            style = style,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -43,7 +53,11 @@ fun MeTag(modifier: Modifier = Modifier) {
 
 /** Marks something as the partner's, in C2, with their phone's [name]. */
 @Composable
-fun PartnerTag(name: String, modifier: Modifier = Modifier) {
+fun PartnerTag(
+    name: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = MaterialTheme.typography.labelMedium
+) {
     val colors = TandemMotoTheme.appColors
-    Tag(name, colors.partner, colors.onPartner, modifier)
+    Tag(name, colors.partner, colors.onPartner, modifier, style)
 }

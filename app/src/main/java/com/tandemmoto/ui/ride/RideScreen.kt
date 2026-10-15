@@ -60,12 +60,16 @@ import com.tandemmoto.permissions.AskedOnce
 import com.tandemmoto.permissions.PermissionStatus
 import com.tandemmoto.permissions.PermissionsState
 import com.tandemmoto.service.nextTry
+import com.tandemmoto.ui.components.BarTone
 import com.tandemmoto.ui.components.ConnectionStatus
 import com.tandemmoto.ui.components.ConnectionStatusBar
 import com.tandemmoto.ui.components.ControlButton
 import com.tandemmoto.ui.components.PermissionPrompt
 import com.tandemmoto.ui.components.SongSeekBar
+import com.tandemmoto.ui.components.StatusStripMinHeight
+import com.tandemmoto.ui.components.connectWave
 import com.tandemmoto.ui.components.openWifiSettings
+import com.tandemmoto.ui.components.rememberConnectWave
 import com.tandemmoto.ui.components.rememberPermissionRequester
 import com.tandemmoto.ui.theme.TandemMotoTheme
 import com.tandemmoto.voice.IntercomLine
@@ -158,10 +162,14 @@ fun RideScreen(
             )
         }
     ) { padding ->
+        // One green ring spreads from the connection bar when the partner connects.
+        val wave = rememberConnectWave(state.connection.tone == BarTone.Connected)
+        val waveColor = TandemMotoTheme.appColors.connected
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .connectWave({ wave.value }, waveColor, StatusCardMargin + StatusStripMinHeight / 2)
         ) {
             ConnectionSection(
                 state.connection,
@@ -220,6 +228,9 @@ fun RideScreen(
         }
     }
 }
+
+/** Space above and below the connection card on Home. */
+private val StatusCardMargin = 8.dp
 
 /** Offered once on the first connection, in this order. */
 private val connectOffers = listOf(AppPermission.NOTIFICATIONS, AppPermission.MICROPHONE)
@@ -286,8 +297,10 @@ private fun ConnectionSection(
             }
         )
     }
+    val cardModifier = Modifier.padding(horizontal = 16.dp, vertical = StatusCardMargin)
     if (permissions.isGranted(AppPermission.NEARBY)) {
         ConnectionStatusBar(
+            modifier = cardModifier,
             status = connection,
             partnerName = partnerName,
             detail = nextTryAtMs?.let { nextTry(LocalContext.current, it) },
@@ -322,7 +335,8 @@ private fun ConnectionSection(
         PermissionPrompt(
             permission = AppPermission.NEARBY,
             state = permissions,
-            onRequest = { onRequestPermission(AppPermission.NEARBY) }
+            onRequest = { onRequestPermission(AppPermission.NEARBY) },
+            modifier = cardModifier
         )
     }
 }

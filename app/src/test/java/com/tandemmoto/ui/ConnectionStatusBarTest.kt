@@ -21,6 +21,7 @@ import com.tandemmoto.R
 import com.tandemmoto.permissions.AppPermission
 import com.tandemmoto.permissions.PermissionStatus
 import com.tandemmoto.permissions.PermissionsState
+import com.tandemmoto.ui.components.BarTone
 import com.tandemmoto.ui.components.ConnectionStatus
 import com.tandemmoto.ui.components.ConnectionStatusBar
 import com.tandemmoto.ui.components.PermissionPrompt
@@ -72,9 +73,27 @@ class ConnectionStatusBarTest {
                         "Connect to your partner"
                 }
             )
-        // The visible "· Tap to connect" isn't read out on top of TalkBack's own action.
-        val hint = compose.activity.getString(R.string.status_hint_connect)
-        compose.onNodeWithText(hint, substring = true).assertDoesNotExist()
+        // The visible "Connect" chip isn't read out on top of TalkBack's own action.
+        val chip = compose.activity.getString(R.string.status_action_connect)
+        compose.onNodeWithText(chip).assertDoesNotExist()
+    }
+
+    @Test
+    fun everyStatusHasATone() {
+        val green = setOf(ConnectionStatus.Connected, ConnectionStatus.PartnerOnCall)
+        val yellow = setOf(
+            ConnectionStatus.Searching,
+            ConnectionStatus.Reconnecting,
+            ConnectionStatus.PartnerAppClosed
+        )
+        ConnectionStatus.entries.forEach {
+            val expected = when (it) {
+                in green -> BarTone.Connected
+                in yellow -> BarTone.Looking
+                else -> BarTone.NotConnected
+            }
+            assertEquals(it.name, expected, it.tone)
+        }
     }
 
     @Test
