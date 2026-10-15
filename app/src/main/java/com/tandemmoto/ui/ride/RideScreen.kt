@@ -178,7 +178,7 @@ fun RideScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .connectWave({ wave.value }, waveColor, StatusCardMargin + StatusStripMinHeight / 2)
+                .connectWave({ wave.value }, waveColor, StatusCardTop + StatusStripMinHeight / 2)
         ) {
             ConnectionSection(
                 state.connection,
@@ -209,7 +209,7 @@ fun RideScreen(
                     Artwork(
                         state.artwork,
                         Modifier
-                            .widthIn(max = 320.dp)
+                            .widthIn(max = 400.dp)
                             .aspectRatio(1f, matchHeightConstraintsFirst = true)
                     )
                 }
@@ -238,8 +238,11 @@ fun RideScreen(
     }
 }
 
-/** Space above and beside the connection card on Home, so its gaps match. */
+/** Space beside the connection card on Home. */
 private val StatusCardMargin = 16.dp
+
+/** Space above it: small, since the top bar already leaves room under the title. */
+private val StatusCardTop = 4.dp
 
 /** Offered once on the first connection, in this order. */
 private val connectOffers = listOf(AppPermission.NOTIFICATIONS, AppPermission.MICROPHONE)
@@ -309,7 +312,7 @@ private fun ConnectionSection(
     val cardModifier = Modifier.padding(
         start = StatusCardMargin,
         end = StatusCardMargin,
-        top = StatusCardMargin,
+        top = StatusCardTop,
         bottom = 8.dp
     )
     if (permissions.isGranted(AppPermission.NEARBY)) {
