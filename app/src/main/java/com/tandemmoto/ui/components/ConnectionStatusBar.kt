@@ -37,9 +37,11 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.tandemmoto.R
 import com.tandemmoto.ui.theme.Radius
 import com.tandemmoto.ui.theme.TandemMotoTheme
@@ -109,14 +111,21 @@ fun ConnectionStatusBar(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (!head.isNullOrEmpty()) Text(head, style = style, maxLines = 1, softWrap = false)
                 if (head != null) {
-                    // One step smaller than the line, so the box with its padding is no taller
-                    // than the text beside it; a gap on each side keeps it off the " · ".
+                    // One step smaller than the line, with the line height trimmed to the
+                    // letters, so the box sits inside the line rather than filling it; a gap on
+                    // each side keeps it off the " · ".
                     PartnerTag(
                         name,
                         Modifier
                             .weight(1f, fill = false)
                             .padding(horizontal = 4.dp),
-                        MaterialTheme.typography.titleSmall
+                        MaterialTheme.typography.titleSmall.copy(
+                            lineHeight = 16.sp,
+                            lineHeightStyle = LineHeightStyle(
+                                LineHeightStyle.Alignment.Center,
+                                LineHeightStyle.Trim.Both
+                            )
+                        )
                     )
                 }
                 Text(short.last(), style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
