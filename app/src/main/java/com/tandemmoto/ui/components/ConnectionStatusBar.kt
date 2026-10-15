@@ -91,20 +91,16 @@ fun ConnectionStatusBar(
                 liveRegion = LiveRegionMode.Polite
             },
         body = {
-            // The text before the name (if it has one), the name's box, then the rest.
+            // The text before the name (if it has one), the name's box, then the rest. The texts
+            // are measured first and the name's box gets what's left, so a long name is the
+            // first thing ellipsised and the status and "next try" stay readable.
             val head = short.takeIf { it.size > 1 }?.first()
             val tail = short.last() + detail?.let { " · $it" }.orEmpty()
             val style = MaterialTheme.typography.titleMedium
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                 if (!head.isNullOrEmpty()) Text(head, style = style, maxLines = 1, softWrap = false)
                 if (head != null) PartnerTag(name, Modifier.weight(1f, fill = false), style)
-                Text(
-                    tail,
-                    style = style,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
+                Text(tail, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         },
         // Same size as the status text, so the boxes don't look like fine print.
