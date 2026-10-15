@@ -238,8 +238,8 @@ fun RideScreen(
     }
 }
 
-/** Space above and below the connection card on Home. */
-private val StatusCardMargin = 8.dp
+/** Space above and beside the connection card on Home, so its gaps match. */
+private val StatusCardMargin = 16.dp
 
 /** Offered once on the first connection, in this order. */
 private val connectOffers = listOf(AppPermission.NOTIFICATIONS, AppPermission.MICROPHONE)
@@ -306,7 +306,12 @@ private fun ConnectionSection(
             }
         )
     }
-    val cardModifier = Modifier.padding(horizontal = 16.dp, vertical = StatusCardMargin)
+    val cardModifier = Modifier.padding(
+        start = StatusCardMargin,
+        end = StatusCardMargin,
+        top = StatusCardMargin,
+        bottom = 8.dp
+    )
     if (permissions.isGranted(AppPermission.NEARBY)) {
         ConnectionStatusBar(
             modifier = cardModifier,
