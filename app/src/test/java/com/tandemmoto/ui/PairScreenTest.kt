@@ -65,9 +65,9 @@ class PairScreenTest {
             )
         )
         compose.onNodeWithText(str(R.string.pair_searching)).assertExists()
-        compose.onNodeWithText(str(R.string.pair_phones)).assertExists()
+        compose.onNodeWithText(str(R.string.pair_phones).uppercase()).assertExists()
         compose.onNodeWithText("Redmi Y2").assertExists()
-        compose.onNodeWithText(str(R.string.pair_other_devices)).assertExists()
+        compose.onNodeWithText(str(R.string.pair_other_devices).uppercase()).assertExists()
         compose.onNodeWithText("Living room TV").assertExists()
     }
 

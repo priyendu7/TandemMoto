@@ -12,12 +12,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -28,8 +27,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -45,10 +46,14 @@ import com.tandemmoto.link.PairingState
 import com.tandemmoto.permissions.AppPermission
 import com.tandemmoto.permissions.PermissionStatus
 import com.tandemmoto.permissions.PermissionsState
+import com.tandemmoto.ui.components.AppCard
 import com.tandemmoto.ui.components.BackTopBar
+import com.tandemmoto.ui.components.CardDivider
+import com.tandemmoto.ui.components.IconTile
 import com.tandemmoto.ui.components.PermissionPrompt
 import com.tandemmoto.ui.components.openWifiSettings
 import com.tandemmoto.ui.components.rememberPermissionRequester
+import com.tandemmoto.ui.theme.AppText
 import com.tandemmoto.ui.theme.TandemMotoTheme
 
 // Opened from Home's connection bar. Pairing succeeds → [onPaired] (back to Home).
@@ -141,6 +146,7 @@ fun PairScreen(
                     if (state.suggestLocation) {
                         Message(stringResource(R.string.pair_location_hint))
                         OutlinedButton(
+                            shape = RoundedCornerShape(16.dp),
                             onClick = onOpenLocationSettings,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -164,6 +170,7 @@ fun PairScreen(
                         onOpenWifiSettings
                     )
                     OutlinedButton(
+                        shape = RoundedCornerShape(16.dp),
                         onClick = onSearchAgain,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -212,45 +219,61 @@ private fun DeviceSection(
     devices: List<NearbyDevice>,
     onDeviceClick: ((NearbyDevice) -> Unit)?
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column {
         Text(
-            title,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            title.uppercase(),
+            style = AppText.section,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
         )
-        devices.forEach { device ->
-            val clickLabel = stringResource(R.string.pair_device_action)
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-                    .then(
-                        if (onDeviceClick != null) {
-                            Modifier.clickable(onClickLabel = clickLabel) { onDeviceClick(device) }
-                        } else {
-                            Modifier
-                        }
+        AppCard {
+            devices.forEachIndexed { index, device ->
+                if (index > 0) CardDivider()
+                val clickLabel = stringResource(R.string.pair_device_action)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 64.dp)
+                        .then(
+                            if (onDeviceClick != null) {
+                                Modifier.clickable(onClickLabel = clickLabel) {
+                                    onDeviceClick(device)
+                                }
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                        .semantics(mergeDescendants = true) {}
+                ) {
+                    val appColors = TandemMotoTheme.appColors
+                    IconTile(
+                        ImageVector.vectorResource(R.drawable.ic_phone_android),
+                        appColors.idle,
+                        appColors.idleTint
                     )
-                    .semantics(mergeDescendants = true) {}
-            ) {
-                Text(
-                    device.name.ifBlank { stringResource(R.string.pair_unnamed_device) },
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    stringResource(device.status.label()),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                    Column {
+                        Text(
+                            device.name.ifBlank { stringResource(R.string.pair_unnamed_device) },
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            stringResource(device.status.label()),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
-            HorizontalDivider()
         }
     }
 }
 
 @Composable
 private fun InvitingCard(device: NearbyDevice, onCancel: () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
+    AppCard {
         Column(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier
@@ -275,6 +298,7 @@ private fun InvitingCard(device: NearbyDevice, onCancel: () -> Unit) {
                 style = MaterialTheme.typography.bodyLarge
             )
             OutlinedButton(
+                shape = RoundedCornerShape(16.dp),
                 onClick = onCancel,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -288,7 +312,7 @@ private fun InvitingCard(device: NearbyDevice, onCancel: () -> Unit) {
 
 @Composable
 private fun FailedCard(reason: PairingState.Failed.Reason, onDismiss: () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
+    AppCard {
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier
@@ -340,6 +364,7 @@ private fun Message(text: String) {
 private fun ActionButton(text: String, onClick: () -> Unit) {
     Button(
         onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
@@ -361,7 +386,7 @@ private val previewPermissions =
 @Preview(name = "Searching", showBackground = true)
 @Composable
 private fun PairSearchingPreview() {
-    TandemMotoTheme(dynamicColor = false) {
+    TandemMotoTheme(darkTheme = true) {
         PairScreen(
             state = DiscoveryState.Scanning(
                 listOf(
@@ -392,7 +417,7 @@ private fun PairSearchingPreview() {
 @Preview(name = "Nothing found · dark", showBackground = true)
 @Composable
 private fun PairNothingFoundPreview() {
-    TandemMotoTheme(darkTheme = true, dynamicColor = false) {
+    TandemMotoTheme(darkTheme = true) {
         PairScreen(
             state = DiscoveryState.Finished(emptyList()),
             pairing = PairingState.Idle,

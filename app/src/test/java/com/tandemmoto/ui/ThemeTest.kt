@@ -5,9 +5,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.tandemmoto.ui.theme.DarkAppColors
+import com.tandemmoto.ui.theme.LightAppColors
 import com.tandemmoto.ui.theme.TandemMotoTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -19,56 +19,52 @@ class ThemeTest {
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()
 
-    private fun primaryColor(dark: Boolean): Color {
-        var primary = Color.Unspecified
+    private class Seen(val primary: Color, val background: Color, val card: Color)
+
+    private fun seen(dark: Boolean): Seen {
+        var seen: Seen? = null
         compose.setContent {
-            TandemMotoTheme(darkTheme = dark) { primary = MaterialTheme.colorScheme.primary }
-        }
-        compose.waitForIdle()
-        return primary
-    }
-
-    @Test
-    @Config(sdk = [30])
-    fun fallbackSchemeOnAndroid11() {
-        assertNotEquals(Color.Unspecified, primaryColor(dark = false))
-    }
-
-    @Test
-    @Config(sdk = [34])
-    fun dynamicSchemeOnAndroid14() {
-        assertNotEquals(Color.Unspecified, primaryColor(dark = true))
-    }
-
-    @Test
-    @Config(sdk = [34])
-    fun pageAndSurfaceOverrideDynamicColour() {
-        var background = Color.Unspecified
-        var surface = Color.Unspecified
-        compose.setContent {
-            TandemMotoTheme(darkTheme = false) {
-                background = MaterialTheme.colorScheme.background
-                surface = MaterialTheme.colorScheme.surface
+            TandemMotoTheme(darkTheme = dark) {
+                val scheme = MaterialTheme.colorScheme
+                seen = Seen(scheme.primary, scheme.background, scheme.surfaceContainer)
             }
         }
         compose.waitForIdle()
-        assertEquals(Color(0xFFEEF0F3), background)
-        assertEquals(Color.White, surface)
+        return seen!!
+    }
+
+    @Test
+    @Config(sdk = [34])
+    fun darkIsTheRidePaletteEvenWhereMaterialYouExists() {
+        val dark = seen(dark = true)
+        assertEquals(Color(0xFFF2A33A), dark.primary)
+        assertEquals(Color(0xFF0E0F11), dark.background)
+        assertEquals(Color(0xFF16171A), dark.card)
     }
 
     @Test
     @Config(sdk = [30])
-    fun darkThemeProvidesDarkAppColors() {
+    fun lightKeepsTheAmberWithWhiteCardsOnAWarmPage() {
+        val light = seen(dark = false)
+        assertEquals(Color(0xFF9A5800), light.primary)
+        assertEquals(Color(0xFFF5F3EE), light.background)
+        assertEquals(Color.White, light.card)
+    }
+
+    private fun appColorsMe(dark: Boolean): Color {
         var me = Color.Unspecified
-        var surface = Color.Unspecified
         compose.setContent {
-            TandemMotoTheme(darkTheme = true) {
-                me = TandemMotoTheme.appColors.me
-                surface = MaterialTheme.colorScheme.surface
-            }
+            TandemMotoTheme(darkTheme = dark) { me = TandemMotoTheme.appColors.me }
         }
         compose.waitForIdle()
-        assertEquals(DarkAppColors.me, me)
-        assertEquals(Color.Black, surface)
+        return me
     }
+
+    @Test
+    @Config(sdk = [30])
+    fun darkThemeProvidesDarkAppColors() = assertEquals(DarkAppColors.me, appColorsMe(true))
+
+    @Test
+    @Config(sdk = [30])
+    fun lightThemeProvidesLightAppColors() = assertEquals(LightAppColors.me, appColorsMe(false))
 }

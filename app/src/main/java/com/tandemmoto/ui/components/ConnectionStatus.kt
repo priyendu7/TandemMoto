@@ -6,8 +6,11 @@ import com.tandemmoto.R
 /** How serious a status is; drives its icon. */
 enum class StatusKind { Neutral, InProgress, Ok, Info, Problem }
 
-/** The connection bar's colour: green when connected, yellow while looking, orange otherwise. */
-enum class BarTone { Connected, Looking, NotConnected }
+/**
+ * The connection card's colour: green when connected, amber while looking, red for a problem,
+ * grey when simply not linked yet.
+ */
+enum class BarTone { Connected, Looking, NotConnected, Idle }
 
 /**
  * Every link/peripheral state the PRD asks the UI to surface (PRD §3 "clear error states").
@@ -140,8 +143,8 @@ enum class ConnectionStatus(
         get() = when (this) {
             Connected, PartnerOnCall -> BarTone.Connected
             Searching, Reconnecting, PartnerAppClosed -> BarTone.Looking
-            NotPaired, NotConnected, Unreachable, PairedElsewhere, NoLongerPaired,
-            PartnerDisconnected, WifiOff, UpdateNeeded, HeadsetDisconnected,
-            MicPermissionMissing -> BarTone.NotConnected
+            NotPaired, NotConnected -> BarTone.Idle
+            Unreachable, PairedElsewhere, NoLongerPaired, PartnerDisconnected, WifiOff,
+            UpdateNeeded, HeadsetDisconnected, MicPermissionMissing -> BarTone.NotConnected
         }
 }
