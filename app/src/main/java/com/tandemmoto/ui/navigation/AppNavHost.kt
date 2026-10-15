@@ -2,6 +2,11 @@ package com.tandemmoto.ui.navigation
 
 import android.content.Intent
 import android.provider.Settings
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -37,7 +42,24 @@ object Routes {
 @Composable
 fun AppNavHost(navController: NavHostController = rememberNavController()) {
     NavHost(navController = navController, startDestination = Routes.RIDE) {
-        composable(Routes.RIDE) {
+        composable(
+            Routes.RIDE,
+            // A small parallax under the playlist sliding over it; other screens keep the default.
+            exitTransition = {
+                if (targetState.destination.route == Routes.PLAYLIST) {
+                    slideOutHorizontally(tween(SLIDE_MS)) { -it / 4 }
+                } else {
+                    null
+                }
+            },
+            popEnterTransition = {
+                if (initialState.destination.route == Routes.PLAYLIST) {
+                    slideInHorizontally(tween(SLIDE_MS)) { -it / 4 }
+                } else {
+                    null
+                }
+            }
+        ) {
             RideRoute(
                 onOpenPair = { navController.navigate(Routes.PAIR) },
                 onOpenPlaylist = { navController.navigate(Routes.PLAYLIST) },
@@ -50,7 +72,15 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 onPaired = { navController.popBackStack() }
             )
         }
-        composable(Routes.PLAYLIST) {
+        composable(
+            Routes.PLAYLIST,
+            enterTransition = {
+                slideInHorizontally(tween(SLIDE_MS)) { it } + fadeIn(tween(SLIDE_MS))
+            },
+            popExitTransition = {
+                slideOutHorizontally(tween(SLIDE_MS)) { it } + fadeOut(tween(SLIDE_MS))
+            }
+        ) {
             PlaylistRoute(onBack = { navController.popBackStack() })
         }
         composable(Routes.SETTINGS) {
@@ -112,3 +142,6 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
         }
     }
 }
+
+/** The playlist slides in from the right and back out over Home. */
+private const val SLIDE_MS = 300

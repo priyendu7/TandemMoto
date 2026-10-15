@@ -11,9 +11,11 @@ import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import com.tandemmoto.R
 import com.tandemmoto.library.Song
@@ -104,8 +106,9 @@ class PlaylistScreenTest {
     fun rowsShowTitleArtistDurationAndStatus() {
         show(songs(PlaylistRow.Entry(alpha, false), PlaylistRow.Entry(bravo, true)))
         compose.onNodeWithText("Alpha").assertIsDisplayed()
-        compose.onNodeWithText("Artist · 3:45 · ${str(R.string.playlist_on_this_phone)}")
-            .assertIsDisplayed()
+        compose.onNodeWithText("Artist").assertIsDisplayed()
+        compose.onNodeWithText("3:45").assertIsDisplayed()
+        compose.onNodeWithText(str(R.string.playlist_on_this_phone)).assertIsDisplayed()
         compose.onNodeWithText(str(R.string.playlist_file_missing)).assertIsDisplayed()
     }
 
@@ -154,14 +157,14 @@ class PlaylistScreenTest {
                 partnerName = "Redmi"
             )
         )
-        val from = str(R.string.playlist_from_named, "Redmi")
-        val yours = str(R.string.playlist_added_by_you)
-        val both = str(R.string.playlist_on_both_phones)
-        val unknown = str(R.string.playlist_unknown_artist)
-        val here = str(R.string.playlist_on_this_phone)
-        compose.onNodeWithText("Artist · 3:45 · $yours · $both").assertIsDisplayed()
-        compose.onNodeWithText("$unknown · 1:01 · $from · $here").assertIsDisplayed()
-        compose.onNodeWithText("Band · 1:02:03 · $from").assertIsDisplayed()
+        compose.onNodeWithText(str(R.string.playlist_added_by_you)).assertIsDisplayed()
+        compose.onNodeWithText(str(R.string.playlist_on_both_phones)).assertIsDisplayed()
+        compose.onNodeWithText(str(R.string.playlist_unknown_artist)).assertIsDisplayed()
+        compose.onNodeWithText(str(R.string.playlist_on_this_phone)).assertIsDisplayed()
+        compose.onNodeWithText("1:02:03").assertIsDisplayed()
+        // The partner's phone name tags Bravo and Charlie; Charlie (only there) has no chip.
+        assertEquals(2, compose.onAllNodesWithText("Redmi").fetchSemanticsNodes().size)
+        assertEquals("On both phones", str(R.string.playlist_on_both_phones))
         compose.onNodeWithText(
             str(R.string.playlist_sharing_shared_named, "Redmi")
         ).assertIsDisplayed()
@@ -200,7 +203,7 @@ class PlaylistScreenTest {
         badges.forEach { (badge, text) ->
             val mine = badge is SongBadge.NotOnPartner || badge is SongBadge.Sending
             row.value = PlaylistRow.Entry(alpha, false, mine, false, badge)
-            compose.onNodeWithText(text, substring = true).assertExists()
+            compose.onNodeWithText(text).assertExists()
         }
         assertEquals("Sending 45%", str(R.string.playlist_sending, 45))
     }
@@ -280,7 +283,9 @@ class PlaylistScreenTest {
                 PlaylistRow.Entry(alpha.copy(id = "d", title = "Delta"), false)
             )
         )
-        compose.onNodeWithContentDescription(str(R.string.playlist_more, "Charlie")).performClick()
+        compose.onNodeWithContentDescription(str(R.string.playlist_more, "Charlie"))
+            .performScrollTo()
+            .performClick()
         compose.onNodeWithText(str(R.string.playlist_move_top)).performClick()
         compose.onNodeWithContentDescription(str(R.string.playlist_more, "Bravo")).performClick()
         compose.onNodeWithText(str(R.string.playlist_move_bottom)).performClick()
@@ -339,9 +344,24 @@ class PlaylistScreenTest {
                 )
             }
         }
-        compose.onNodeWithText(str(R.string.playlist_now_playing), substring = true).assertExists()
+        compose.onNode(
+            SemanticsMatcher.expectValue(StateDescription, str(R.string.playlist_now_playing))
+        ).assert(hasText("Alpha"))
+        compose.onNodeWithText(str(R.string.playlist_now_playing), substring = true)
+            .assertDoesNotExist()
         compose.onNodeWithText("Bravo").performClick()
         assertEquals(1, played)
+    }
+
+    @Test
+    fun itOpensOnTheSongPlaying() {
+        val many = (1..40).map {
+            PlaylistRow.Entry(Song("s$it", "u$it", "Song $it", "Artist", 200_000, 1), false)
+        }
+        show(songs(*many.mapIndexed { i, row -> row.copy(current = i == 30) }.toTypedArray()))
+        compose.waitForIdle()
+        compose.onNodeWithText("Song 31").assertIsDisplayed()
+        compose.onNodeWithText("Song 1").assertDoesNotExist()
     }
 
     @Test
