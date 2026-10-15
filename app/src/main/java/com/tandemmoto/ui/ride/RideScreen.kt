@@ -31,6 +31,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -154,6 +155,11 @@ fun RideScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
+                // The page colour, so the bar and the page read as one surface.
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.background
+                ),
                 actions = {
                     // The playlist opens from the player's fourth button.
                     IconButton(onClick = onOpenSettings) {
@@ -605,7 +611,7 @@ private fun IntercomButton(
     content: @Composable RowScope.() -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(Radius.Medium)
+    val shape = RoundedCornerShape(Radius.Large)
     val styled = modifier
         .height(56.dp)
         .glow(if (filled) colors.primary else colors.secondaryContainer, shape = shape)
