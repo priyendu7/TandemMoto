@@ -89,11 +89,19 @@ Decided in planning (issues #60–#62):
 
 - **Mirroring** (#60): one **shared playback state** (song, playing/paused, position, time, Lamport stamp), not forwarded button presses; the newest control wins, as in the ride playlist. Every control goes through it: Home (with a seek bar), Playlist, the notification, the lock screen and earbuds. The heartbeat's `Pong` carries the receiver's time for the clock offset. Link down: each phone plays on its own; on reconnect the newest control wins
 - **Start together** (#61): a new song starts only when **both** phones have it ("Getting song on …"), at a start time planned ~0.3 s ahead; the phones correct drift over ~0.5 s. A song one phone can't play is skipped on both and marked "Can't play on …"
-- **Exit criteria** (#62): either phone's control changes playback on both within 0.3 s (p95), and the phones are within 0.2 s after a start
-
-**Handlebar remote spike** (after Phase 3): the bike's own switches (Harley X440 T) reach the rider's phone as Bluetooth input through the bike's TFT. The spike covers what key codes arrive, mapping them to play/pause/next/previous, a "Test your buttons" screen, and where audio goes while the bike is connected. Build an abstraction over media button events rather than hard-coding key codes
+- **Exit criteria** (#62): either phone's control changes playback on both within 0.3 s (p95), and the phones are within 0.2 s after a start. **Met** (PR #66): controls followed in under 80 ms even during downloads, once commands and song transfers were put in different Wi-Fi queues; the phones stay within 0.5 s (usually 0.1–0.4 s; tighter sync is #67). 24-bit FLAC on the Redmi is skipped (#68)
 
 ### Phase 4 — Mic mode + voice channel
+
+Decided in planning (issues #70–#74, #33). Test setup: rider P1 (S25, Android 16) with wired earphones; pillion P4 (Redmi Y2, Android 9) with boAt Nirvana earbuds (E1).
+
+- **Mic in the background** (#70) first: the foreground service needs the **microphone** type, which Android only allows if it's declared while the app is on screen; check screen-locked capture on both phones, including after a background reconnect
+- **Voice format:** **uncompressed 16 kHz mono PCM** over UDP (~256 kbit/s, ~1 % of the link), not Opus: no encoding delay and no native code (Android 9 has no Opus encoder). Opus stays an option if range testing (Phase 6) shows dropouts. 20 ms packets marked for Wi-Fi's voice queue, ~60 ms jitter buffer (#71)
+- **Mic mode = linked and paused** in the shared playback state (#72): no second synced state, so the phones can't disagree. Routing: wired headset mic on P1 (`setCommunicationDevice`); Bluetooth hands-free on P4 (`startBluetoothSco`, the only way before Android 12)
+- **Noise suppression / AGC** (#73): the phone's own voice processing (`VOICE_COMMUNICATION` source, platform effects) first; WebRTC's processing only if the bike test needs it
+- **Self-mute** (#33) and the **exit check** (#74)
+
+Original plan:
 
 - Mic-mode state machine: pause → both phones enter mic mode; resume → both exit, synced via the command channel (not independently triggered, to avoid a race where one side is "on" and the other "off")
 - Design the state machine with a **call-hold** state from the start (Playing / Paused + mic mode / Call hold). Call hold overrides both other states, and clears into Paused + mic mode. The call-detection wiring is done in Phase 5
@@ -109,6 +117,7 @@ Decided in planning (issues #60–#62):
 
 ### Phase 5 — Robustness & edge cases
 
+- **Handlebar remote spike** (moved from after Phase 3): the bike's own switches (Harley X440 T) reach the rider's phone as Bluetooth input through the bike's TFT. The spike covers what key codes arrive, mapping them to play/pause/next/previous, a "Test your buttons" screen, and where audio goes while the bike is connected. Build an abstraction over media button events rather than hard-coding key codes
 - Peer disconnect mid-call: mics/audio must not get stuck open — force mic mode off and surface a clear error
 - Headset disconnect (rider unplugs earphones, pillion's earbuds drop BT) → pause playback and/or mic mode gracefully, with a UI state for it
 - Mic permission missing/revoked → blocking, clear error, no silent failure
