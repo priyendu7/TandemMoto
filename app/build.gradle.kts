@@ -88,7 +88,7 @@ play {
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2024.09.00")
+    val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -97,9 +97,9 @@ dependencies {
     // FileProvider for sharing the diagnostic log export.
     implementation("androidx.core:core-ktx:1.19.1")
     // System splash screen on every Android version (Android 12+ shows one anyway).
-    implementation("androidx.core:core-splashscreen:1.0.1")
+    implementation("androidx.core:core-splashscreen:1.2.0")
     // Stores the paired partner (link/Partner.kt).
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("androidx.datastore:datastore-preferences:1.3.0")
     // Command channel messages (state/Message.kt): JSON, see state/README.md for why not protobuf.
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     // Local player (#51): ExoPlayer and a MediaSession for the lock screen, notification and
