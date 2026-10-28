@@ -101,7 +101,7 @@ dependencies {
     // Stores the paired partner (link/Partner.kt).
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     // Command channel messages (state/Message.kt): JSON, see state/README.md for why not protobuf.
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
     // Local player (#51): ExoPlayer and a MediaSession for the lock screen, notification and
     // headset buttons. The foreground service and its notification stay our own (service/).
     implementation("androidx.media3:media3-exoplayer:1.11.1")
@@ -116,7 +116,7 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     // Virtual time for coroutine logic such as the 30 s discovery window (link/PeerDiscovery).
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     // Compose UI tests run on the JVM via Robolectric, so CI's testDebugUnitTest covers them.
     testImplementation(composeBom)
     testImplementation("androidx.compose.ui:ui-test-junit4")
