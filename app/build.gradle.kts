@@ -120,5 +120,5 @@ dependencies {
     // Compose UI tests run on the JVM via Robolectric, so CI's testDebugUnitTest covers them.
     testImplementation(composeBom)
     testImplementation("androidx.compose.ui:ui-test-junit4")
-    testImplementation("org.robolectric:robolectric:4.17")
+    testImplementation("org.robolectric:robolectric:4.18")
 }
